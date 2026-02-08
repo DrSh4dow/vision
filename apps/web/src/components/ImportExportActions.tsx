@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SVG_IMPORT_COLORS } from "@/constants/colors";
-import { DEFAULT_STITCH_LENGTH } from "@/constants/embroidery";
+import { DEFAULT_STITCH_LENGTH, DEFAULT_STITCH_PARAMS } from "@/constants/embroidery";
 import { downloadFile } from "@/lib/download";
 import type { ParsedVectorPath } from "@/types/design";
 
@@ -53,6 +53,7 @@ export function ImportExportActions({ engine, refreshScene }: ImportExportAction
               fill: p.closed ? { ...color, a: 50 } : null,
               stroke: color,
               stroke_width: 0.2,
+              stitch: { ...DEFAULT_STITCH_PARAMS },
             },
           };
           engine.sceneAddNode(`Imported Path ${i + 1}`, kind, layerId);

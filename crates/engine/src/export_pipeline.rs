@@ -3,18 +3,17 @@
 //! This module bridges the gap between the vector design (scene graph with
 //! shapes, transforms, colors) and the embroidery export formats (DST, PES).
 //!
-//! Currently generates running stitches along shape outlines (strokes).
-//! Fill stitch algorithms (tatami, spiral, contour) will be added in Phase 2.
+//! Generates running stitches along outlines and tatami fills for closed shapes.
+//! Spiral/contour fill variants will be added in Phase 2.
 
-use crate::Color;
-use crate::Point;
-use crate::constants::DEFAULT_FLATTEN_TOLERANCE;
+use crate::constants::{DEFAULT_FLATTEN_TOLERANCE, DEFAULT_STITCH_LENGTH};
 use crate::format::{ExportDesign, ExportStitch, ExportStitchType};
 use crate::scene::{NodeKind, Scene};
+use crate::stitch::fill::generate_tatami_fill;
 use crate::stitch::running::generate_running_stitches;
-
-/// Default stitch length (in mm) when none is specified.
-const DEFAULT_STITCH_LENGTH: f64 = 2.5;
+use crate::Color;
+use crate::Point;
+use crate::StitchType;
 
 /// Minimum number of points required to generate stitches from a path.
 const MIN_POINTS_FOR_STITCHES: usize = 2;
@@ -41,26 +40,21 @@ pub fn scene_to_export_design(scene: &Scene, stitch_length: f64) -> Result<Expor
 
     let render_items = scene.render_list();
 
-    // Collect shape data: (flattened outline points in world coords, color)
-    let mut shape_outlines: Vec<(Vec<Point>, Color)> = Vec::new();
+    // Build the ExportDesign by stitching each shape
+    let mut stitches: Vec<ExportStitch> = Vec::new();
+    let mut colors: Vec<Color> = Vec::new();
+    let mut current_color: Option<Color> = None;
 
     for item in &render_items {
         let NodeKind::Shape {
             shape,
             stroke,
             fill,
+            stitch,
             ..
         } = &item.kind
         else {
             continue;
-        };
-
-        // Determine the color for this shape's stitches.
-        // Prefer stroke color; fall back to fill color; skip if neither.
-        let color = match (stroke, fill) {
-            (Some(c), _) => *c,
-            (None, Some(c)) => *c,
-            (None, None) => continue,
         };
 
         // Convert shape to path and flatten to polyline
@@ -77,21 +71,58 @@ pub fn scene_to_export_design(scene: &Scene, stitch_length: f64) -> Result<Expor
             .map(|p| apply_transform(p, world))
             .collect();
 
-        shape_outlines.push((world_points, color));
-    }
+        let (shape_stitches, color) = match stitch.stitch_type {
+            StitchType::Tatami => {
+                let subpaths = path.flatten_subpaths(DEFAULT_FLATTEN_TOLERANCE);
+                let world_subpaths: Vec<Vec<Point>> = subpaths
+                    .iter()
+                    .map(|points| points.iter().map(|p| apply_transform(p, world)).collect())
+                    .collect();
+                let fill_stitches = generate_tatami_fill(
+                    &world_subpaths,
+                    stitch.density,
+                    stitch.angle,
+                    stitch_length,
+                );
 
-    if shape_outlines.is_empty() {
-        return Err("No visible shapes with stroke or fill to export".to_string());
-    }
+                if !fill_stitches.is_empty() {
+                    let color = match (fill, stroke) {
+                        (Some(c), _) => *c,
+                        (None, Some(c)) => *c,
+                        (None, None) => continue,
+                    };
+                    (fill_stitches, color)
+                } else {
+                    let outline_color = match (stroke, fill) {
+                        (Some(c), _) => *c,
+                        (None, Some(c)) => *c,
+                        (None, None) => continue,
+                    };
+                    (
+                        generate_running_stitches(&world_points, stitch_length),
+                        outline_color,
+                    )
+                }
+            }
+            _ => {
+                let color = match (stroke, fill) {
+                    (Some(c), _) => *c,
+                    (None, Some(c)) => *c,
+                    (None, None) => continue,
+                };
+                (
+                    generate_running_stitches(&world_points, stitch_length),
+                    color,
+                )
+            }
+        };
 
-    // Build the ExportDesign by stitching each shape outline
-    let mut stitches: Vec<ExportStitch> = Vec::new();
-    let mut colors: Vec<Color> = Vec::new();
-    let mut current_color: Option<Color> = None;
+        if shape_stitches.is_empty() {
+            continue;
+        }
 
-    for (points, color) in &shape_outlines {
         // Insert color change if the color differs from the previous shape
-        if current_color.is_some() && current_color != Some(*color) {
+        if current_color.is_some() && current_color != Some(color) {
             // Trim before color change
             if let Some(last) = stitches.last() {
                 stitches.push(ExportStitch {
@@ -101,29 +132,26 @@ pub fn scene_to_export_design(scene: &Scene, stitch_length: f64) -> Result<Expor
                 });
             }
             stitches.push(ExportStitch {
-                x: points[0].x,
-                y: points[0].y,
+                x: shape_stitches[0].position.x,
+                y: shape_stitches[0].position.y,
                 stitch_type: ExportStitchType::ColorChange,
             });
         }
 
         // Track color
-        if current_color != Some(*color) {
-            colors.push(*color);
-            current_color = Some(*color);
+        if current_color != Some(color) {
+            colors.push(color);
+            current_color = Some(color);
         }
 
         // Jump to the start of this shape (if not the first shape)
         if stitches.len() > 1 {
             stitches.push(ExportStitch {
-                x: points[0].x,
-                y: points[0].y,
+                x: shape_stitches[0].position.x,
+                y: shape_stitches[0].position.y,
                 stitch_type: ExportStitchType::Jump,
             });
         }
-
-        // Generate running stitches along the outline
-        let shape_stitches = generate_running_stitches(points, stitch_length);
 
         for stitch in &shape_stitches {
             let stitch_type = if stitch.is_jump {
@@ -140,6 +168,10 @@ pub fn scene_to_export_design(scene: &Scene, stitch_length: f64) -> Result<Expor
                 stitch_type,
             });
         }
+    }
+
+    if stitches.is_empty() {
+        return Err("No visible shapes with stroke or fill to export".to_string());
     }
 
     // Append end marker
@@ -201,6 +233,7 @@ mod tests {
                     fill: None,
                     stroke: Some(Color::new(255, 0, 0, 255)),
                     stroke_width: 0.5,
+                    stitch: crate::StitchParams::default(),
                 },
                 None,
             )
@@ -238,6 +271,7 @@ mod tests {
                     fill: None,
                     stroke: Some(Color::new(255, 0, 0, 255)),
                     stroke_width: 0.5,
+                    stitch: crate::StitchParams::default(),
                 },
                 None,
             )
@@ -252,6 +286,7 @@ mod tests {
                     fill: None,
                     stroke: Some(Color::new(0, 0, 255, 255)),
                     stroke_width: 0.5,
+                    stitch: crate::StitchParams::default(),
                 },
                 None,
             )
@@ -304,6 +339,7 @@ mod tests {
                     fill: None,
                     stroke: Some(Color::new(0, 0, 0, 255)),
                     stroke_width: 0.5,
+                    stitch: crate::StitchParams::default(),
                 },
                 Some(layer),
             )
@@ -324,6 +360,7 @@ mod tests {
                     fill: Some(Color::new(0, 128, 0, 255)),
                     stroke: None,
                     stroke_width: 0.0,
+                    stitch: crate::StitchParams::default(),
                 },
                 None,
             )
@@ -332,6 +369,32 @@ mod tests {
         // Fill-only shapes should still export (using fill color for running stitches)
         let design = scene_to_export_design(&scene, 2.0).unwrap();
         assert_eq!(design.colors[0].g, 128);
+    }
+
+    #[test]
+    fn test_export_pipeline_tatami_fill() {
+        let mut scene = Scene::new();
+        let mut stitch = crate::StitchParams::default();
+        stitch.stitch_type = crate::StitchType::Tatami;
+        stitch.density = 2.0;
+
+        scene
+            .add_node(
+                "Tatami",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(12.0, 8.0, 0.0)),
+                    fill: Some(Color::new(10, 200, 50, 255)),
+                    stroke: None,
+                    stroke_width: 0.0,
+                    stitch,
+                },
+                None,
+            )
+            .unwrap();
+
+        let design = scene_to_export_design(&scene, 2.0).unwrap();
+        assert!(!design.stitches.is_empty());
+        assert_eq!(design.colors[0].g, 200);
     }
 
     #[test]
@@ -345,6 +408,7 @@ mod tests {
                     fill: None,
                     stroke: Some(Color::new(0, 0, 0, 255)),
                     stroke_width: 0.5,
+                    stitch: crate::StitchParams::default(),
                 },
                 None,
             )
@@ -382,6 +446,7 @@ mod tests {
                     fill: None,
                     stroke: Some(Color::new(0, 0, 0, 255)),
                     stroke_width: 0.5,
+                    stitch: crate::StitchParams::default(),
                 },
                 None,
             )

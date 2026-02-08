@@ -35,8 +35,17 @@ pub const DEFAULT_MAX_HISTORY: usize = 200;
 // Stitch Generation
 // =============================================================================
 
+/// Default tatami/fill stitch density (row spacing) in mm.
+pub const DEFAULT_STITCH_DENSITY: f64 = 0.45;
+
+/// Default stitch length (in mm) for running and fill stitches.
+pub const DEFAULT_STITCH_LENGTH: f64 = 2.5;
+
 /// Minimum satin stitch density (mm). Values below this are clamped.
 pub const MIN_SATIN_DENSITY: f64 = 0.1;
+
+/// Minimum tatami stitch density (mm). Values below this are clamped.
+pub const MIN_TATAMI_DENSITY: f64 = 0.1;
 
 // =============================================================================
 // DST Format

@@ -3,10 +3,10 @@
 //! Every scene mutation goes through the command system so it can be reversed.
 //! Commands store minimal before/after state for efficient undo/redo.
 
-use crate::Color;
 use crate::path::PathCommand;
 use crate::scene::{Node, NodeId, NodeKind, Scene, Transform};
 use crate::shapes::ShapeData;
+use crate::Color;
 
 /// A reversible scene mutation.
 #[derive(Debug, Clone)]
@@ -425,6 +425,7 @@ mod tests {
                 fill: None,
                 stroke: None,
                 stroke_width: 0.0,
+                stitch: crate::StitchParams::default(),
             },
             parent: None,
             transform: Transform::identity(),
@@ -451,6 +452,7 @@ mod tests {
                     fill: None,
                     stroke: None,
                     stroke_width: 0.0,
+                    stitch: crate::StitchParams::default(),
                 },
                 Some(layer),
             )
@@ -483,6 +485,7 @@ mod tests {
                     fill: None,
                     stroke: None,
                     stroke_width: 0.0,
+                    stitch: crate::StitchParams::default(),
                 },
                 Some(group),
             )
@@ -495,6 +498,7 @@ mod tests {
                     fill: None,
                     stroke: None,
                     stroke_width: 0.0,
+                    stitch: crate::StitchParams::default(),
                 },
                 Some(group),
             )
@@ -523,6 +527,7 @@ mod tests {
                     fill: None,
                     stroke: None,
                     stroke_width: 0.0,
+                    stitch: crate::StitchParams::default(),
                 },
                 None,
             )
@@ -572,6 +577,7 @@ mod tests {
                     fill: None,
                     stroke: None,
                     stroke_width: 0.0,
+                    stitch: crate::StitchParams::default(),
                 },
                 None,
             )
@@ -616,6 +622,7 @@ mod tests {
                     fill: None,
                     stroke: Some(Color::new(0, 0, 0, 255)),
                     stroke_width: 1.0,
+                    stitch: crate::StitchParams::default(),
                 },
                 None,
             )
@@ -757,6 +764,7 @@ mod tests {
                     fill: None,
                     stroke: None,
                     stroke_width: 0.0,
+                    stitch: crate::StitchParams::default(),
                 },
                 None,
             )

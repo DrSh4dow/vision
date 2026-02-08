@@ -36,15 +36,15 @@ export interface ThreadColor {
 export type ThreadBrand = "madeira" | "isacord" | "sulky";
 
 /** Stitch type enumeration (mirrors Rust StitchType). */
-export type StitchType = "running" | "satin";
+export type StitchType = "running" | "satin" | "tatami";
 
 /** Stitch parameters for an embroidery object. */
 export interface StitchParams {
   type: StitchType;
   density: number;
   angle: number;
-  underlayEnabled: boolean;
-  pullCompensation: number;
+  underlay_enabled: boolean;
+  pull_compensation: number;
 }
 
 /** A single stitch with metadata. */
@@ -124,6 +124,7 @@ export type NodeKindData =
         fill: Color | null;
         stroke: Color | null;
         stroke_width: number;
+        stitch: StitchParams;
       };
     };
 

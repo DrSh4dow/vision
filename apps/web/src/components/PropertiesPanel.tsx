@@ -1,7 +1,8 @@
-import type { SceneNodeInfo, VisionEngine } from "@vision/wasm-bridge";
+import type { SceneNodeInfo, StitchParams, VisionEngine } from "@vision/wasm-bridge";
 import { useCallback, useEffect, useState } from "react";
 
 import { Input } from "@/components/ui/input";
+import { DEFAULT_STITCH_PARAMS } from "@/constants/embroidery";
 import { firstOf } from "@/lib/utils";
 
 interface PropertiesPanelProps {
@@ -76,6 +77,14 @@ export function PropertiesPanel({ engine, selectedIds, onRefreshScene }: Propert
 
       {/* Shape-specific properties */}
       <ShapeFields nodeInfo={nodeInfo} />
+
+      <StitchFields
+        engine={engine}
+        nodeInfo={nodeInfo}
+        selectedIds={selectedIds}
+        onRefreshScene={onRefreshScene}
+        setNodeInfo={setNodeInfo}
+      />
     </div>
   );
 }
@@ -234,6 +243,91 @@ function ShapeFields({ nodeInfo }: { nodeInfo: SceneNodeInfo }) {
 }
 
 // ============================================================================
+// Stitch Fields
+// ============================================================================
+
+function StitchFields({
+  engine,
+  nodeInfo,
+  selectedIds,
+  onRefreshScene,
+  setNodeInfo,
+}: {
+  engine: VisionEngine;
+  nodeInfo: SceneNodeInfo;
+  selectedIds: Set<number>;
+  onRefreshScene: () => void;
+  setNodeInfo: (info: SceneNodeInfo) => void;
+}) {
+  const kind = nodeInfo.kind;
+  const shapeKind = typeof kind === "string" || !("Shape" in kind) ? null : kind.Shape;
+  const stitch = shapeKind?.stitch ?? DEFAULT_STITCH_PARAMS;
+
+  const updateStitch = useCallback(
+    (next: StitchParams) => {
+      if (!shapeKind) return;
+      const id = firstOf(selectedIds);
+      if (id === undefined) return;
+      const nextKind = {
+        Shape: {
+          ...shapeKind,
+          stitch: next,
+        },
+      };
+      engine.sceneUpdateKind(id, nextKind);
+      onRefreshScene();
+      setNodeInfo({
+        ...nodeInfo,
+        kind: nextKind,
+      });
+    },
+    [engine, nodeInfo, onRefreshScene, selectedIds, setNodeInfo, shapeKind],
+  );
+
+  if (!shapeKind) return null;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <PropLabel>Stitch</PropLabel>
+
+      <div className="flex flex-col gap-1.5">
+        <PropLabel htmlFor="prop-stitch-type">Type</PropLabel>
+        <select
+          id="prop-stitch-type"
+          className="h-7 rounded-md border border-border/40 bg-surface px-2 text-xs text-foreground"
+          value={stitch.type}
+          onChange={(e) =>
+            updateStitch({ ...stitch, type: e.target.value as StitchParams["type"] })
+          }
+          data-testid="prop-stitch-type"
+        >
+          <option value="running">Running</option>
+          <option value="tatami">Tatami</option>
+        </select>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <LabeledNumberField
+          id="prop-stitch-density"
+          label="Density"
+          value={stitch.density}
+          step={0.05}
+          min={0.1}
+          onChange={(value) => updateStitch({ ...stitch, density: value })}
+        />
+        <LabeledNumberField
+          id="prop-stitch-angle"
+          label="Angle"
+          value={stitch.angle}
+          step={1}
+          onChange={(value) => updateStitch({ ...stitch, angle: value })}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
 // Prop Input (compact number field)
 // ============================================================================
 
@@ -279,6 +373,62 @@ function PropInput({
             if (!Number.isNaN(v)) {
               onChange(v);
             }
+          }
+        }}
+      />
+    </div>
+  );
+}
+
+// ============================================================================
+// Labeled Number Field
+// ============================================================================
+
+function LabeledNumberField({
+  id,
+  label,
+  value,
+  step,
+  min,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: number;
+  step: number;
+  min?: number;
+  onChange: (value: number) => void;
+}) {
+  const [text, setText] = useState(value.toFixed(2));
+
+  useEffect(() => {
+    setText(value.toFixed(2));
+  }, [value]);
+
+  return (
+    <div className="flex flex-col gap-1">
+      <PropLabel htmlFor={id}>{label}</PropLabel>
+      <Input
+        id={id}
+        type="number"
+        inputMode="decimal"
+        step={step}
+        min={min}
+        className="h-7 rounded-md bg-surface px-2 text-xs"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={() => {
+          const parsed = Number.parseFloat(text);
+          if (!Number.isNaN(parsed)) {
+            const next = min !== undefined ? Math.max(min, parsed) : parsed;
+            onChange(next);
+          } else {
+            setText(value.toFixed(2));
+          }
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            (e.target as HTMLInputElement).blur();
           }
         }}
       />

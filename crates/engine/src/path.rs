@@ -253,6 +253,59 @@ impl VectorPath {
         points
     }
 
+    /// Flatten the path into separate subpaths.
+    ///
+    /// Each MoveTo starts a new subpath, and Close ends the current subpath
+    /// with a final point equal to the start.
+    pub fn flatten_subpaths(&self, tolerance: f64) -> Vec<Vec<Point>> {
+        let mut subpaths: Vec<Vec<Point>> = Vec::new();
+        let mut current_points: Vec<Point> = Vec::new();
+        let mut current = Point::new(0.0, 0.0);
+        let mut subpath_start = current;
+
+        for cmd in &self.commands {
+            match *cmd {
+                PathCommand::MoveTo(p) => {
+                    if !current_points.is_empty() {
+                        subpaths.push(current_points);
+                        current_points = Vec::new();
+                    }
+                    current = p;
+                    subpath_start = p;
+                    current_points.push(p);
+                }
+                PathCommand::LineTo(p) => {
+                    current = p;
+                    current_points.push(p);
+                }
+                PathCommand::CubicTo { c1, c2, end } => {
+                    flatten_cubic(current, c1, c2, end, tolerance, &mut current_points);
+                    current = end;
+                }
+                PathCommand::QuadTo { ctrl, end } => {
+                    flatten_quad(current, ctrl, end, tolerance, &mut current_points);
+                    current = end;
+                }
+                PathCommand::Close => {
+                    if distance(current, subpath_start) > f64::EPSILON {
+                        current_points.push(subpath_start);
+                    }
+                    current = subpath_start;
+                    if !current_points.is_empty() {
+                        subpaths.push(current_points);
+                        current_points = Vec::new();
+                    }
+                }
+            }
+        }
+
+        if !current_points.is_empty() {
+            subpaths.push(current_points);
+        }
+
+        subpaths
+    }
+
     /// Compute the axis-aligned bounding box of this path.
     ///
     /// For curves, this uses the flattened approximation with a default tolerance.
@@ -435,6 +488,22 @@ mod tests {
         assert_eq!(points[1].y, 0.0);
         assert_eq!(points[2].x, 10.0);
         assert_eq!(points[2].y, 10.0);
+    }
+
+    #[test]
+    fn test_flatten_subpaths_splits_moves() {
+        let mut path = VectorPath::new();
+        path.move_to(Point::new(0.0, 0.0));
+        path.line_to(Point::new(10.0, 0.0));
+        path.close();
+        path.move_to(Point::new(20.0, 0.0));
+        path.line_to(Point::new(30.0, 0.0));
+        path.close();
+
+        let subpaths = path.flatten_subpaths(0.5);
+        assert_eq!(subpaths.len(), 2);
+        assert_eq!(subpaths[0][0].x, 0.0);
+        assert_eq!(subpaths[1][0].x, 20.0);
     }
 
     #[test]

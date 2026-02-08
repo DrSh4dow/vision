@@ -42,6 +42,16 @@ export const ThreadColorSchema = z.object({
 // Stitch Schemas
 // ============================================================================
 
+const StitchTypeSchema = z.enum(["running", "satin", "tatami"]);
+
+const StitchParamsSchema = z.object({
+  type: StitchTypeSchema,
+  density: z.number(),
+  angle: z.number(),
+  underlay_enabled: z.boolean(),
+  pull_compensation: z.number(),
+});
+
 const StitchSchema = z.object({
   position: PointSchema,
   is_jump: z.boolean(),
@@ -145,6 +155,7 @@ const NodeKindDataSchema = z.union([
       fill: ColorSchema.nullable(),
       stroke: ColorSchema.nullable(),
       stroke_width: z.number(),
+      stitch: StitchParamsSchema,
     }),
   }),
 ]);

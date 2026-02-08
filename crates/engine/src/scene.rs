@@ -100,6 +100,9 @@ pub enum NodeKind {
         stroke: Option<Color>,
         /// Stroke width in design units.
         stroke_width: f64,
+        /// Stitching parameters for embroidery export.
+        #[serde(default)]
+        stitch: crate::StitchParams,
     },
 }
 
@@ -846,6 +849,7 @@ mod tests {
                     fill: Some(Color::new(255, 0, 0, 255)),
                     stroke: None,
                     stroke_width: 0.0,
+                    stitch: crate::StitchParams::default(),
                 },
                 Some(layer_id),
             )
@@ -1047,6 +1051,7 @@ mod tests {
                     fill: None,
                     stroke: None,
                     stroke_width: 0.0,
+                    stitch: crate::StitchParams::default(),
                 },
                 None,
             )
@@ -1107,6 +1112,7 @@ mod tests {
                     fill: Some(Color::new(255, 0, 0, 255)),
                     stroke: Some(Color::new(0, 0, 0, 255)),
                     stroke_width: 1.0,
+                    stitch: crate::StitchParams::default(),
                 },
                 Some(layer),
             )
@@ -1120,6 +1126,7 @@ mod tests {
                     fill: Some(Color::new(0, 0, 255, 255)),
                     stroke: None,
                     stroke_width: 0.0,
+                    stitch: crate::StitchParams::default(),
                 },
                 Some(layer),
             )
@@ -1140,6 +1147,7 @@ mod tests {
                     fill: Some(Color::new(255, 0, 0, 255)),
                     stroke: None,
                     stroke_width: 0.0,
+                    stitch: crate::StitchParams::default(),
                 },
                 None,
             )
@@ -1177,6 +1185,7 @@ mod tests {
                     fill: Some(Color::new(255, 0, 0, 255)),
                     stroke: None,
                     stroke_width: 0.0,
+                    stitch: crate::StitchParams::default(),
                 },
                 Some(layer),
             )
@@ -1190,6 +1199,7 @@ mod tests {
                     fill: Some(Color::new(0, 0, 255, 255)),
                     stroke: None,
                     stroke_width: 0.0,
+                    stitch: crate::StitchParams::default(),
                 },
                 Some(layer),
             )
@@ -1224,6 +1234,7 @@ mod tests {
                     fill: Some(Color::new(255, 0, 0, 255)),
                     stroke: None,
                     stroke_width: 0.0,
+                    stitch: crate::StitchParams::default(),
                 },
                 Some(layer),
             )
@@ -1265,6 +1276,7 @@ mod tests {
                     fill: Some(Color::new(255, 0, 0, 255)),
                     stroke: None,
                     stroke_width: 0.0,
+                    stitch: crate::StitchParams::default(),
                 },
                 Some(layer),
             )
@@ -1308,6 +1320,7 @@ mod tests {
                     fill: None,
                     stroke: None,
                     stroke_width: 0.0,
+                    stitch: crate::StitchParams::default(),
                 },
                 Some(layer),
             )
@@ -1321,6 +1334,7 @@ mod tests {
                     fill: None,
                     stroke: None,
                     stroke_width: 0.0,
+                    stitch: crate::StitchParams::default(),
                 },
                 Some(layer),
             )

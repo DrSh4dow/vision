@@ -42,10 +42,35 @@ impl Color {
 
 /// Stitch type enumeration.
 #[wasm_bindgen]
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum StitchType {
     Running,
     Satin,
+    Tatami,
+}
+
+/// Stitch parameters for an embroidery object.
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub struct StitchParams {
+    #[serde(rename = "type")]
+    pub stitch_type: StitchType,
+    pub density: f64,
+    pub angle: f64,
+    pub underlay_enabled: bool,
+    pub pull_compensation: f64,
+}
+
+impl Default for StitchParams {
+    fn default() -> Self {
+        Self {
+            stitch_type: StitchType::Running,
+            density: crate::constants::DEFAULT_STITCH_DENSITY,
+            angle: 0.0,
+            underlay_enabled: false,
+            pull_compensation: 0.0,
+        }
+    }
 }
 
 /// A single stitch point with metadata.

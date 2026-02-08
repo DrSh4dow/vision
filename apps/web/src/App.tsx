@@ -11,6 +11,7 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { Separator } from "@/components/ui/separator";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ELLIPSE_FILL, ELLIPSE_STROKE, RECT_FILL, RECT_STROKE } from "@/constants/colors";
+import { DEFAULT_STITCH_PARAMS } from "@/constants/embroidery";
 import type { CanvasClickEvent } from "@/hooks/useCanvas";
 import { useCanvas } from "@/hooks/useCanvas";
 import { useEngine } from "@/hooks/useEngine";
@@ -110,6 +111,7 @@ export function App() {
             fill: RECT_FILL,
             stroke: RECT_STROKE,
             stroke_width: 0.15,
+            stitch: { ...DEFAULT_STITCH_PARAMS },
           },
         };
         name = "Rectangle";
@@ -120,6 +122,7 @@ export function App() {
             fill: ELLIPSE_FILL,
             stroke: ELLIPSE_STROKE,
             stroke_width: 0.15,
+            stitch: { ...DEFAULT_STITCH_PARAMS },
           },
         };
         name = "Ellipse";
