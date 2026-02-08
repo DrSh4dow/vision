@@ -13,7 +13,7 @@ use crate::{Point, Stitch};
 /// # Returns
 /// A list of `Stitch` structs with positions and metadata.
 pub fn generate_running_stitches(points: &[Point], stitch_length: f64) -> Vec<Stitch> {
-    if points.len() < 2 {
+    if points.len() < 2 || stitch_length <= 0.0 {
         return vec![];
     }
 
@@ -36,7 +36,7 @@ pub fn generate_running_stitches(points: &[Point], stitch_length: f64) -> Vec<St
         let dy = p1.y - p0.y;
         let seg_len = (dx * dx + dy * dy).sqrt();
 
-        if seg_len == 0.0 {
+        if seg_len < f64::EPSILON {
             continue;
         }
 
@@ -141,5 +141,53 @@ mod tests {
         assert!(flat.len() >= 4);
         assert_eq!(flat[0], 0.0);
         assert_eq!(flat[1], 0.0);
+    }
+
+    #[test]
+    fn test_running_stitches_zero_length() {
+        let points = vec![Point::new(0.0, 0.0), Point::new(10.0, 0.0)];
+        let stitches = generate_running_stitches(&points, 0.0);
+        assert!(
+            stitches.is_empty(),
+            "Zero stitch_length should return empty"
+        );
+    }
+
+    #[test]
+    fn test_running_stitches_negative_length() {
+        let points = vec![Point::new(0.0, 0.0), Point::new(10.0, 0.0)];
+        let stitches = generate_running_stitches(&points, -5.0);
+        assert!(
+            stitches.is_empty(),
+            "Negative stitch_length should return empty"
+        );
+    }
+
+    #[test]
+    fn test_running_stitches_diagonal() {
+        let points = vec![Point::new(0.0, 0.0), Point::new(3.0, 4.0)];
+        let stitches = generate_running_stitches(&points, 2.5);
+
+        // Path length is 5.0, stitch_length 2.5 → 2 interior + start + end
+        assert!(stitches.len() >= 3);
+        let last = &stitches[stitches.len() - 1];
+        assert!((last.position.x - 3.0).abs() < 1e-10);
+        assert!((last.position.y - 4.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_running_stitches_zero_length_segment() {
+        // Path with a duplicated point (zero-length segment)
+        let points = vec![
+            Point::new(0.0, 0.0),
+            Point::new(5.0, 0.0),
+            Point::new(5.0, 0.0), // duplicate
+            Point::new(10.0, 0.0),
+        ];
+        let stitches = generate_running_stitches(&points, 3.0);
+
+        assert!(stitches.len() >= 2);
+        let last = &stitches[stitches.len() - 1];
+        assert_eq!(last.position.x, 10.0);
     }
 }

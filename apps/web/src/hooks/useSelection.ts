@@ -4,11 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 /** Selection state and actions. */
 export interface UseSelectionResult {
   selectedIds: Set<number>;
-  hoveredId: number | null;
   selectNode: (id: number, addToSelection?: boolean) => void;
   deselectAll: () => void;
   deleteSelected: () => void;
-  setHoveredId: (id: number | null) => void;
 }
 
 /**
@@ -19,7 +17,6 @@ export function useSelection(
   refreshScene: () => void,
 ): UseSelectionResult {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [hoveredId, setHoveredId] = useState<number | null>(null);
 
   const selectNode = useCallback((id: number, addToSelection = false) => {
     setSelectedIds((prev) => {
@@ -102,10 +99,8 @@ export function useSelection(
 
   return {
     selectedIds,
-    hoveredId,
     selectNode,
     deselectAll,
     deleteSelected,
-    setHoveredId,
   };
 }

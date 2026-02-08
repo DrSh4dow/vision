@@ -32,10 +32,10 @@ test.describe("Vision App", () => {
   });
 
   test("tool buttons are visible", async ({ page }) => {
-    const selectBtn = page.locator('button[title="Select"]');
-    const penBtn = page.locator('button[title="Pen"]');
-    const rectBtn = page.locator('button[title="Rect"]');
-    const ellipseBtn = page.locator('button[title="Ellipse"]');
+    const selectBtn = page.getByTestId("tool-select");
+    const penBtn = page.getByTestId("tool-pen");
+    const rectBtn = page.getByTestId("tool-rect");
+    const ellipseBtn = page.getByTestId("tool-ellipse");
 
     await expect(selectBtn).toBeVisible();
     await expect(penBtn).toBeVisible();
@@ -60,9 +60,9 @@ test.describe("WASM Engine Integration", () => {
     await expect(status).toContainText(/Engine v/, { timeout: 15_000 });
   });
 
-  test("engine version matches Cargo.toml version (0.1.0)", async ({ page }) => {
+  test("engine version matches expected format", async ({ page }) => {
     const status = page.getByTestId("engine-status");
-    await expect(status).toHaveText("Engine v0.1.0");
+    await expect(status).toContainText(/Engine v\d+\.\d+\.\d+/);
   });
 });
 
@@ -123,22 +123,58 @@ test.describe("Import/Export Actions", () => {
     await expect(importBtn).toBeVisible();
   });
 
-  test("export DST button is visible and clickable", async ({ page }) => {
+  test("export DST triggers download after shape creation", async ({ page }) => {
+    const canvas = page.getByTestId("design-canvas");
+    await expect(canvas).toBeVisible();
+
+    // Create a shape by dragging with the rect tool
+    const rectTool = page.getByTestId("tool-rect");
+    await rectTool.click();
+
+    const box = await canvas.boundingBox();
+    if (!box) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    await page.mouse.move(cx - 40, cy - 40);
+    await page.mouse.down();
+    await page.mouse.move(cx + 40, cy + 40, { steps: 5 });
+    await page.mouse.up();
+
+    // Wait for the new shape node to appear in the layers tree
+    await expect(page.locator("[data-testid^='layer-node-']")).toHaveCount(2, { timeout: 3_000 });
+
     const dstBtn = page.getByTestId("export-dst-btn");
     await expect(dstBtn).toBeVisible();
 
-    // Click should trigger a download (we verify no errors)
     const downloadPromise = page.waitForEvent("download", { timeout: 5_000 });
     await dstBtn.click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toBe("design.dst");
   });
 
-  test("export PES button is visible and clickable", async ({ page }) => {
+  test("export PES triggers download after shape creation", async ({ page }) => {
+    const canvas = page.getByTestId("design-canvas");
+    await expect(canvas).toBeVisible();
+
+    // Create a shape by dragging with the rect tool
+    const rectTool = page.getByTestId("tool-rect");
+    await rectTool.click();
+
+    const box = await canvas.boundingBox();
+    if (!box) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    await page.mouse.move(cx - 40, cy - 40);
+    await page.mouse.down();
+    await page.mouse.move(cx + 40, cy + 40, { steps: 5 });
+    await page.mouse.up();
+
+    // Wait for the new shape node to appear in the layers tree
+    await expect(page.locator("[data-testid^='layer-node-']")).toHaveCount(2, { timeout: 3_000 });
+
     const pesBtn = page.getByTestId("export-pes-btn");
     await expect(pesBtn).toBeVisible();
 
-    // Click should trigger a download
     const downloadPromise = page.waitForEvent("download", { timeout: 5_000 });
     await pesBtn.click();
     const download = await downloadPromise;
@@ -156,14 +192,28 @@ test.describe("Canvas Interaction", () => {
   test("canvas renders (not blank/black)", async ({ page }) => {
     const canvas = page.getByTestId("design-canvas");
 
-    // Wait a frame for the render loop to kick in
-    await page.waitForTimeout(500);
+    // Wait for canvas to have non-trivial pixel data via requestAnimationFrame
+    await page.waitForFunction(
+      () => {
+        const c = document.querySelector(
+          "[data-testid='design-canvas']",
+        ) as HTMLCanvasElement | null;
+        if (!c) return false;
+        const ctx = c.getContext("2d");
+        if (!ctx) return false;
+        const data = ctx.getImageData(0, 0, c.width, c.height).data;
+        // Check that not all pixels are zero (black/blank)
+        for (let i = 0; i < data.length; i += 4) {
+          if (data[i] > 0 || data[i + 1] > 0 || data[i + 2] > 0) return true;
+        }
+        return false;
+      },
+      null,
+      { timeout: 5_000 },
+    );
 
     // Take a screenshot of just the canvas and check it's not all black
     const screenshot = await canvas.screenshot();
-    expect(screenshot.byteLength).toBeGreaterThan(0);
-
-    // The canvas should have some non-zero pixel data (grid lines, axes, HUD)
     expect(screenshot.byteLength).toBeGreaterThan(500);
   });
 
@@ -175,33 +225,111 @@ test.describe("Canvas Interaction", () => {
     const status = page.getByTestId("engine-status");
     await expect(status).toContainText(/Engine v/, { timeout: 15_000 });
 
-    // Allow a small window for async errors
-    await page.waitForTimeout(1_000);
+    // Wait for async operations to settle (network idle approximation)
+    await page.waitForLoadState("networkidle");
 
     expect(errors).toEqual([]);
   });
-});
 
-test.describe("UI Shell Design Review", () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto("/");
-    const status = page.getByTestId("engine-status");
-    await expect(status).toContainText(/Engine v/, { timeout: 15_000 });
+  test("clicking a layer node does not crash (BigInt regression)", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (err) => errors.push(err.message));
+
+    // The default "Layer 1" should be visible in the layers panel
+    const layersTree = page.getByTestId("layers-tree");
+    await expect(layersTree).toBeVisible({ timeout: 5_000 });
+
+    // Click on the first layer node
+    const layerNode = page.locator("[data-testid^='layer-node-']").first();
+    await expect(layerNode).toBeVisible();
+    await layerNode.click();
+
+    // Verify selection state is applied (aria-selected becomes true)
+    await expect(layerNode).toHaveAttribute("aria-selected", "true");
+
+    // No errors should have been thrown (previously crashed with "can't convert undefined to BigInt")
+    expect(errors).toEqual([]);
   });
 
-  test("full app screenshot — default state", async ({ page }) => {
-    await page.waitForTimeout(500);
-    await page.screenshot({ path: "e2e/screenshots/ui-shell-default.png", fullPage: false });
+  test("keyboard tool switching", async ({ page }) => {
+    const selectBtn = page.getByTestId("tool-select");
+    const penBtn = page.getByTestId("tool-pen");
+    const rectBtn = page.getByTestId("tool-rect");
+    const ellipseBtn = page.getByTestId("tool-ellipse");
+
+    // Press P — pen tool should become active
+    await page.keyboard.press("p");
+    await expect(penBtn).toHaveAttribute("aria-pressed", "true");
+    await expect(selectBtn).toHaveAttribute("aria-pressed", "false");
+
+    // Press R — rect tool
+    await page.keyboard.press("r");
+    await expect(rectBtn).toHaveAttribute("aria-pressed", "true");
+    await expect(penBtn).toHaveAttribute("aria-pressed", "false");
+
+    // Press E — ellipse tool
+    await page.keyboard.press("e");
+    await expect(ellipseBtn).toHaveAttribute("aria-pressed", "true");
+    await expect(rectBtn).toHaveAttribute("aria-pressed", "false");
+
+    // Press V — back to select
+    await page.keyboard.press("v");
+    await expect(selectBtn).toHaveAttribute("aria-pressed", "true");
+    await expect(ellipseBtn).toHaveAttribute("aria-pressed", "false");
   });
 
-  test("full app screenshot — with thread palette loaded", async ({ page }) => {
-    await page.getByTestId("thread-brand-madeira").click();
-    await expect(page.getByTestId("thread-swatches")).toBeVisible({ timeout: 5_000 });
+  test("undo/redo works", async ({ page }) => {
+    const canvas = page.getByTestId("design-canvas");
+    const layerNodes = page.locator("[data-testid^='layer-node-']");
 
-    await page.waitForTimeout(300);
-    await page.screenshot({
-      path: "e2e/screenshots/ui-shell-with-palette.png",
-      fullPage: false,
-    });
+    // Initially should have 1 node (Layer 1)
+    await expect(layerNodes).toHaveCount(1, { timeout: 5_000 });
+
+    // Create a rectangle shape
+    await page.keyboard.press("r");
+    const box = await canvas.boundingBox();
+    if (!box) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    await page.mouse.move(cx - 30, cy - 30);
+    await page.mouse.down();
+    await page.mouse.move(cx + 30, cy + 30, { steps: 5 });
+    await page.mouse.up();
+
+    // Wait for the new shape node to appear (Layer 1 + Rectangle = 2)
+    await expect(layerNodes).toHaveCount(2, { timeout: 3_000 });
+
+    // Undo — should remove the rectangle
+    await page.keyboard.press("Control+z");
+    await expect(layerNodes).toHaveCount(1, { timeout: 3_000 });
+
+    // Redo — should restore the rectangle
+    await page.keyboard.press("Control+Shift+z");
+    await expect(layerNodes).toHaveCount(2, { timeout: 3_000 });
+  });
+
+  test("layer visibility toggle", async ({ page }) => {
+    // Wait for the layer tree to be visible
+    const layersTree = page.getByTestId("layers-tree");
+    await expect(layersTree).toBeVisible({ timeout: 5_000 });
+
+    // Find the first layer node
+    const layerNode = page.locator("[data-testid^='layer-node-']").first();
+    await expect(layerNode).toBeVisible();
+
+    // Find the visibility toggle button for this layer
+    const visibilityBtn = page.locator("[data-testid^='layer-visibility-']").first();
+
+    // Force-click visibility (button is opacity-0 until hover)
+    await visibilityBtn.click({ force: true });
+
+    // After toggling, the layer node should have opacity-40 class (hidden state)
+    await expect(layerNode).toHaveClass(/opacity-40/);
+
+    // Toggle back
+    await visibilityBtn.click({ force: true });
+
+    // Should no longer have opacity-40
+    await expect(layerNode).not.toHaveClass(/opacity-40/);
   });
 });

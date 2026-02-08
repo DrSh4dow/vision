@@ -137,10 +137,12 @@ pub fn write_pec_block(design: &ExportDesign) -> Vec<u8> {
     pec.extend(std::iter::repeat_n(20u8, padding_count));
 
     // Pad to fixed color list size (always write at least to fill expected area)
-    let color_list_size = 463; // Standard PEC header offset before thumbnail
     let current_size = pec.len();
-    if current_size < color_list_size {
-        pec.extend(std::iter::repeat_n(0x20u8, color_list_size - current_size));
+    if current_size < crate::constants::PEC_COLOR_LIST_SIZE {
+        pec.extend(std::iter::repeat_n(
+            0x20u8,
+            crate::constants::PEC_COLOR_LIST_SIZE - current_size,
+        ));
     }
 
     // Thumbnail (blank — 6 rows x 38 bytes = 228 bytes of zeros)
@@ -218,7 +220,10 @@ fn encode_pec_stitch(dx: i32, dy: i32, is_jump: bool, out: &mut Vec<u8>) {
 }
 
 fn encode_pec_axis(val: i32, is_jump: bool, out: &mut Vec<u8>) {
-    if val.abs() < 64 && !is_jump {
+    let small_max = crate::constants::PEC_SMALL_DELTA_MAX;
+    let large_max = crate::constants::PEC_LARGE_DELTA_MAX;
+
+    if val.abs() <= small_max && !is_jump {
         // Single byte: 7-bit value
         if val < 0 {
             out.push((val + 128) as u8);
@@ -227,7 +232,7 @@ fn encode_pec_axis(val: i32, is_jump: bool, out: &mut Vec<u8>) {
         }
     } else {
         // Two bytes: 12-bit signed with flag
-        let val = val.clamp(-2048, 2047);
+        let val = val.clamp(-large_max - 1, large_max);
         let unsigned_val = if val < 0 {
             (val + 4096) as u16
         } else {

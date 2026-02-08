@@ -2,6 +2,7 @@ import type { SceneNodeInfo, VisionEngine } from "@vision/wasm-bridge";
 import { useCallback, useEffect, useState } from "react";
 
 import { Input } from "@/components/ui/input";
+import { firstOf } from "@/lib/utils";
 
 interface PropertiesPanelProps {
   engine: VisionEngine;
@@ -19,13 +20,14 @@ export function PropertiesPanel({ engine, selectedIds, onRefreshScene }: Propert
       return;
     }
 
-    const id = [...selectedIds][0];
+    const id = firstOf(selectedIds);
+    if (id === undefined) return;
     const info = engine.sceneGetNode(id);
     setNodeInfo(info);
   }, [engine, selectedIds]);
 
   if (selectedIds.size === 0) {
-    return <p className="text-xs italic text-muted-foreground/60">Select an object</p>;
+    return <p className="text-xs italic text-muted-foreground/80">Select an object</p>;
   }
 
   if (selectedIds.size > 1) {
@@ -40,7 +42,7 @@ export function PropertiesPanel({ engine, selectedIds, onRefreshScene }: Propert
   }
 
   if (!nodeInfo) {
-    return <p className="text-xs italic text-muted-foreground/60">Loading...</p>;
+    return <p className="text-xs italic text-muted-foreground/80">Loading...</p>;
   }
 
   return (
@@ -54,7 +56,8 @@ export function PropertiesPanel({ engine, selectedIds, onRefreshScene }: Propert
           className="h-7 rounded-md bg-surface px-2 text-xs"
           value={nodeInfo.name}
           onChange={(e) => {
-            const id = [...selectedIds][0];
+            const id = firstOf(selectedIds);
+            if (id === undefined) return;
             engine.sceneRenameNode(id, e.target.value);
             setNodeInfo({ ...nodeInfo, name: e.target.value });
           }}
@@ -82,14 +85,15 @@ export function PropertiesPanel({ engine, selectedIds, onRefreshScene }: Propert
 // ============================================================================
 
 function PropLabel({ children, htmlFor }: { children: React.ReactNode; htmlFor?: string }) {
-  return (
-    <label
-      className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70"
-      htmlFor={htmlFor}
-    >
-      {children}
-    </label>
-  );
+  const className = "text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80";
+  if (htmlFor) {
+    return (
+      <label className={className} htmlFor={htmlFor}>
+        {children}
+      </label>
+    );
+  }
+  return <span className={className}>{children}</span>;
 }
 
 // ============================================================================
@@ -113,7 +117,8 @@ function TransformFields({
 
   const updateTransform = useCallback(
     (field: string, value: number) => {
-      const id = [...selectedIds][0];
+      const id = firstOf(selectedIds);
+      if (id === undefined) return;
       const newTransform = {
         x: field === "x" ? value : t.x,
         y: field === "y" ? value : t.y,
@@ -193,7 +198,7 @@ function ShapeFields({ nodeInfo }: { nodeInfo: SceneNodeInfo }) {
         <span className="inline-flex h-5 items-center rounded-full bg-secondary px-2 text-[10px] font-medium text-secondary-foreground">
           {shapeType}
         </span>
-        <span className="text-[10px] text-muted-foreground/60">{shapeDetails}</span>
+        <span className="text-[10px] text-muted-foreground/80">{shapeDetails}</span>
       </div>
 
       {/* Fill & Stroke */}
@@ -204,7 +209,7 @@ function ShapeFields({ nodeInfo }: { nodeInfo: SceneNodeInfo }) {
               className="h-5 w-5 shrink-0 rounded-md border border-border/40"
               style={{ backgroundColor: `rgb(${fill.r},${fill.g},${fill.b})` }}
             />
-            <span className="text-[10px] text-muted-foreground/70">Fill</span>
+            <span className="text-[10px] text-muted-foreground/80">Fill</span>
             <span className="ml-auto font-mono text-[10px] text-muted-foreground/50">
               {toHex(fill.r, fill.g, fill.b)}
             </span>
@@ -217,7 +222,7 @@ function ShapeFields({ nodeInfo }: { nodeInfo: SceneNodeInfo }) {
               className="h-5 w-5 shrink-0 rounded-md border border-border/40"
               style={{ backgroundColor: `rgb(${stroke.r},${stroke.g},${stroke.b})` }}
             />
-            <span className="text-[10px] text-muted-foreground/70">Stroke</span>
+            <span className="text-[10px] text-muted-foreground/80">Stroke</span>
             <span className="ml-auto font-mono text-[10px] text-muted-foreground/50">
               {stroke_width.toFixed(2)}
             </span>
@@ -247,10 +252,15 @@ function PropInput({
     setText(value.toFixed(1));
   }, [value]);
 
+  const propId = `prop-${label.toLowerCase()}`;
+
   return (
     <div className="flex items-center gap-1.5">
-      <span className="w-4 text-[10px] font-medium text-muted-foreground/60">{label}</span>
+      <label htmlFor={propId} className="w-4 text-[10px] font-medium text-muted-foreground/80">
+        {label}
+      </label>
       <Input
+        id={propId}
         type="text"
         className="h-6 rounded-md bg-surface px-1.5 text-[11px] tabular-nums"
         value={text}

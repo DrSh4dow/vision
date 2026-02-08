@@ -21,11 +21,14 @@ interface EngineState {
  * Compatible with React StrictMode (effects run twice in dev).
  */
 export function useEngine(): EngineState {
-  const [state, setState] = useState<EngineState>({
-    engine: getEngine(),
-    loading: !getEngine(),
-    error: null,
-    version: null,
+  const [state, setState] = useState<EngineState>(() => {
+    const cached = getEngine();
+    return {
+      engine: cached,
+      loading: !cached,
+      error: null,
+      version: null,
+    };
   });
 
   useEffect(() => {

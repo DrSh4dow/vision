@@ -110,8 +110,7 @@ fn write_body(design: &ExportDesign, out: &mut Vec<u8>) -> Result<(), String> {
                 encode_move(dx, dy, MoveType::ColorChange, out);
             }
             ExportStitchType::End => {
-                // End command: color change with 0x00 0x00 0xF3
-                out.extend_from_slice(&[0x00, 0x00, 0xF3]);
+                out.extend_from_slice(&crate::constants::DST_END_MARKER);
             }
         }
 
@@ -126,7 +125,7 @@ fn write_body(design: &ExportDesign, out: &mut Vec<u8>) -> Result<(), String> {
         .is_none_or(|s| s.stitch_type != ExportStitchType::End);
 
     if needs_end {
-        out.extend_from_slice(&[0x00, 0x00, 0xF3]);
+        out.extend_from_slice(&crate::constants::DST_END_MARKER);
     }
 
     Ok(())

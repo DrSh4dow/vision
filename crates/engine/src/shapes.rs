@@ -79,8 +79,7 @@ impl RectShape {
             path.close();
         } else {
             // Rounded corners using cubic bezier approximation of quarter circles.
-            // Magic number for cubic bezier arc approximation: kappa ≈ 0.5522847498
-            let k = r * 0.5522847498;
+            let k = r * crate::constants::KAPPA;
 
             path.move_to(Point::new(r, 0.0));
             // Top edge
@@ -144,8 +143,8 @@ impl EllipseShape {
         let rx = self.rx;
         let ry = self.ry;
         // Kappa for cubic bezier circle approximation
-        let kx = rx * 0.5522847498;
-        let ky = ry * 0.5522847498;
+        let kx = rx * crate::constants::KAPPA;
+        let ky = ry * crate::constants::KAPPA;
 
         let mut path = VectorPath::new();
 

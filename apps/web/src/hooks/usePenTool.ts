@@ -1,6 +1,7 @@
 import type { NodeKindData, PathCommand, VisionEngine } from "@vision/wasm-bridge";
 import { useCallback, useRef, useState } from "react";
 
+import { PEN_FILL, PEN_STROKE } from "@/constants/colors";
 import type { DesignPoint } from "@/types/design";
 
 export interface PenToolState {
@@ -16,8 +17,6 @@ export interface UsePenToolResult {
   addPoint: (point: DesignPoint) => void;
   /** Finish the path (open path). Called on Enter or Escape. */
   finishPath: () => void;
-  /** Close the path (click near start point). */
-  closePath: () => void;
   /** Cancel the current path. */
   cancelPath: () => void;
 }
@@ -42,7 +41,7 @@ export function usePenTool(
       if (!engine || points.length < 2) return;
 
       const tree = engine.sceneGetTree();
-      const layerId = tree.length > 0 ? tree[0].id["0"] : undefined;
+      const layerId = tree.length > 0 ? tree[0].id : undefined;
 
       // Build path commands
       const commands: PathCommand[] = [];
@@ -62,8 +61,8 @@ export function usePenTool(
               closed,
             },
           },
-          fill: closed ? { r: 88, g: 166, b: 255, a: 40 } : null,
-          stroke: { r: 88, g: 166, b: 255, a: 255 },
+          fill: closed ? PEN_FILL : null,
+          stroke: PEN_STROKE,
           stroke_width: 0.15,
         },
       };
@@ -109,15 +108,6 @@ export function usePenTool(
     setPenState({ points: [], isDrawing: false });
   }, [createPathNode]);
 
-  const closePath = useCallback(() => {
-    const points = pointsRef.current;
-    if (points.length >= 3) {
-      createPathNode(points, true);
-    }
-    pointsRef.current = [];
-    setPenState({ points: [], isDrawing: false });
-  }, [createPathNode]);
-
   const cancelPath = useCallback(() => {
     pointsRef.current = [];
     setPenState({ points: [], isDrawing: false });
@@ -127,7 +117,6 @@ export function usePenTool(
     penState,
     addPoint,
     finishPath,
-    closePath,
     cancelPath,
   };
 }

@@ -118,8 +118,8 @@ fn parse_svg_rect(node: &roxmltree::Node) -> Option<VectorPath> {
 
     if rx > 0.0 && ry > 0.0 {
         // Rounded rectangle
-        let kx = rx * 0.5522847498;
-        let ky = ry * 0.5522847498;
+        let kx = rx * crate::constants::KAPPA;
+        let ky = ry * crate::constants::KAPPA;
 
         path.move_to(Point::new(x + rx, y));
         path.line_to(Point::new(x + w - rx, y));
@@ -180,8 +180,8 @@ fn parse_svg_ellipse(node: &roxmltree::Node) -> Option<VectorPath> {
 
 /// Convert an ellipse to a cubic bezier path (4-arc approximation).
 fn ellipse_to_path(cx: f64, cy: f64, rx: f64, ry: f64) -> VectorPath {
-    let kx = rx * 0.5522847498;
-    let ky = ry * 0.5522847498;
+    let kx = rx * crate::constants::KAPPA;
+    let ky = ry * crate::constants::KAPPA;
 
     let mut path = VectorPath::new();
     // Start at top

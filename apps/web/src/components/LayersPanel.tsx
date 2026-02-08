@@ -40,7 +40,7 @@ export function LayersPanel({
     const layerIds = new Set<number>();
     for (const node of t) {
       if (typeof node.kind !== "string" && "Layer" in node.kind) {
-        layerIds.add(node.id["0"]);
+        layerIds.add(node.id);
       }
     }
     setExpanded((prev) => {
@@ -104,14 +104,14 @@ export function LayersPanel({
   );
 
   if (tree.length === 0) {
-    return <p className="px-1.5 text-xs italic text-muted-foreground/60">No layers yet</p>;
+    return <p className="px-1.5 text-xs italic text-muted-foreground/80">No layers yet</p>;
   }
 
   return (
-    <div className="flex flex-col" data-testid="layers-tree">
+    <div className="flex flex-col" data-testid="layers-tree" role="tree" aria-label="Scene layers">
       {tree.map((node) => (
         <LayerTreeNode
-          key={node.id["0"]}
+          key={node.id}
           node={node}
           depth={0}
           selectedIds={selectedIds}
@@ -124,6 +124,11 @@ export function LayersPanel({
       ))}
     </div>
   );
+}
+
+/** Type guard for layer node kind. */
+function isLayerKind(kind: TreeNodeKind): kind is { Layer: { visible: boolean; locked: boolean } } {
+  return typeof kind !== "string" && "Layer" in kind;
 }
 
 function LayerTreeNode({
@@ -145,7 +150,7 @@ function LayerTreeNode({
   onToggleVisibility: (id: number, kind: TreeNodeKind) => void;
   onToggleLock: (id: number, kind: TreeNodeKind) => void;
 }) {
-  const id = node.id["0"];
+  const id = node.id;
   const isSelected = selectedIds.has(id);
   const hasChildren = node.children.length > 0;
   const isExpanded = expanded.has(id);
@@ -154,10 +159,9 @@ function LayerTreeNode({
 
   let visible = true;
   let locked = false;
-  if (isLayer) {
-    const layerKind = node.kind as { Layer: { visible: boolean; locked: boolean } };
-    visible = layerKind.Layer.visible;
-    locked = layerKind.Layer.locked;
+  if (isLayer && isLayerKind(node.kind)) {
+    visible = node.kind.Layer.visible;
+    locked = node.kind.Layer.locked;
   }
 
   return (
@@ -175,8 +179,29 @@ function LayerTreeNode({
         onClick={(e) => onSelect(id, e.shiftKey)}
         onKeyDown={(e) => {
           if (e.key === "Enter") onSelect(id);
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            const next = e.currentTarget.nextElementSibling as HTMLElement | null;
+            next?.focus();
+          }
+          if (e.key === "ArrowUp") {
+            e.preventDefault();
+            const prev = e.currentTarget.previousElementSibling as HTMLElement | null;
+            prev?.focus();
+          }
+          if (e.key === "ArrowLeft") {
+            e.preventDefault();
+            if (hasChildren && isExpanded) onToggleExpanded(id);
+          }
+          if (e.key === "ArrowRight") {
+            e.preventDefault();
+            if (hasChildren && !isExpanded) onToggleExpanded(id);
+          }
         }}
         role="treeitem"
+        aria-selected={isSelected}
+        aria-level={depth + 1}
+        {...(hasChildren ? { "aria-expanded": isExpanded } : {})}
         tabIndex={0}
       >
         {/* Indent guide line */}
@@ -196,6 +221,7 @@ function LayerTreeNode({
               e.stopPropagation();
               onToggleExpanded(id);
             }}
+            aria-label={isExpanded ? "Collapse" : "Expand"}
           >
             {isExpanded ? (
               <ChevronDown className="h-3 w-3" />
@@ -208,7 +234,7 @@ function LayerTreeNode({
         )}
 
         {/* Kind icon */}
-        <span className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground/60">
+        <span className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground/80">
           {isLayer ? (
             <Layers className="h-3 w-3" />
           ) : isGroup ? (
@@ -240,10 +266,12 @@ function LayerTreeNode({
                 e.stopPropagation();
                 onToggleVisibility(id, node.kind);
               }}
+              data-testid={`layer-visibility-${id}`}
+              aria-label={visible ? "Hide layer" : "Show layer"}
               title={visible ? "Hide layer" : "Show layer"}
             >
               {visible ? (
-                <Eye className="h-3 w-3 text-muted-foreground/60" />
+                <Eye className="h-3 w-3 text-muted-foreground/80" />
               ) : (
                 <EyeOff className="h-3 w-3 text-muted-foreground" />
               )}
@@ -260,12 +288,13 @@ function LayerTreeNode({
                 e.stopPropagation();
                 onToggleLock(id, node.kind);
               }}
+              aria-label={locked ? "Unlock layer" : "Lock layer"}
               title={locked ? "Unlock layer" : "Lock layer"}
             >
               {locked ? (
                 <Lock className="h-3 w-3 text-muted-foreground" />
               ) : (
-                <Unlock className="h-3 w-3 text-muted-foreground/60" />
+                <Unlock className="h-3 w-3 text-muted-foreground/80" />
               )}
             </button>
           </div>
@@ -277,7 +306,7 @@ function LayerTreeNode({
         isExpanded &&
         node.children.map((child) => (
           <LayerTreeNode
-            key={child.id["0"]}
+            key={child.id}
             node={child}
             depth={depth + 1}
             selectedIds={selectedIds}

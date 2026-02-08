@@ -13,5 +13,8 @@
   "files": ["src", "pkg"],
   "devDependencies": {
     "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
   }
 }

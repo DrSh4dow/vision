@@ -9,13 +9,42 @@
 
 use super::ExportDesign;
 
+/// Maximum number of stitches that fit in a single PES CSewSeg block (u16).
+const MAX_PES_STITCH_COUNT: usize = u16::MAX as usize;
+
+/// Maximum coordinate extent in 0.1mm units that fits in PES CEmbOne (i16).
+const MAX_PES_COORDINATE: f64 = i16::MAX as f64 / 10.0; // ~3276.7mm
+
 /// Export a design to PES v1 format.
 ///
-/// Returns the binary PES file data.
+/// Returns the binary PES file data, or an error if the design exceeds
+/// PES format limits (>65535 stitches or coordinates outside i16 range).
 pub fn export_pes(design: &ExportDesign) -> Result<Vec<u8>, String> {
+    // Validate stitch count fits in u16
+    let unit_stitches = design.stitches_in_units();
+    if unit_stitches.len() > MAX_PES_STITCH_COUNT {
+        return Err(format!(
+            "PES format supports at most {} stitches, design has {}",
+            MAX_PES_STITCH_COUNT,
+            unit_stitches.len()
+        ));
+    }
+
+    // Validate coordinate extents fit in i16 (0.1mm units)
+    let (min_x, min_y, max_x, max_y) = design.extents();
+    if min_x < -MAX_PES_COORDINATE
+        || max_x > MAX_PES_COORDINATE
+        || min_y < -MAX_PES_COORDINATE
+        || max_y > MAX_PES_COORDINATE
+    {
+        return Err(format!(
+            "PES format coordinate range is +/-{:.1}mm, design extents are ({:.1}, {:.1}) to ({:.1}, {:.1})",
+            MAX_PES_COORDINATE, min_x, min_y, max_x, max_y
+        ));
+    }
+
     let mut output = Vec::new();
 
-    // We'll write a placeholder for the PEC offset and come back to fill it in
     // PES Header: "#PES0001" (8 bytes) + PEC offset (4 bytes LE)
     output.extend_from_slice(b"#PES0001");
 
@@ -33,8 +62,8 @@ pub fn export_pes(design: &ExportDesign) -> Result<Vec<u8>, String> {
     // CEmbOne block
     write_cembone(&mut output, design);
 
-    // CSewSeg block
-    write_csewseg(&mut output, design);
+    // CSewSeg block (pass pre-computed unit stitches)
+    write_csewseg(&mut output, design, &unit_stitches);
 
     // Now write the PEC block and record its offset
     let pec_offset = output.len() as u32;
@@ -81,12 +110,18 @@ fn write_cembone(out: &mut Vec<u8>, design: &ExportDesign) {
     write_f32_le(out, 0.0); // translate Y
 }
 
-/// Write the CSewSeg block (stitch segment data).
-fn write_csewseg(out: &mut Vec<u8>, design: &ExportDesign) {
-    let unit_stitches = design.stitches_in_units();
+/// Default PEC color index for designs with no color information.
+const DEFAULT_PEC_COLOR_BLACK: u16 = 20;
 
-    // Segment block: we write all stitches as a single segment
-    // Stitch type: 0 = normal, 1 = jump, 2 = trim
+/// Write the CSewSeg block (stitch segment data).
+///
+/// Accepts pre-validated unit stitches (already checked to fit in u16 count
+/// and i16 coordinate range).
+fn write_csewseg(
+    out: &mut Vec<u8>,
+    design: &ExportDesign,
+    unit_stitches: &[(i32, i32, super::ExportStitchType)],
+) {
     // Color list count
     let num_colors = (design.color_change_count() + 1).max(1) as u16;
     write_u16_le(out, num_colors);
@@ -101,14 +136,14 @@ fn write_csewseg(out: &mut Vec<u8>, design: &ExportDesign) {
     // If no colors, write a default
     if design.colors.is_empty() {
         write_u16_le(out, 0);
-        write_u16_le(out, 20); // Black
+        write_u16_le(out, DEFAULT_PEC_COLOR_BLACK);
     }
 
-    // Stitch count
+    // Stitch count (safe: validated by export_pes before calling)
     write_u16_le(out, unit_stitches.len() as u16);
 
-    // Write each stitch coordinate (s16 LE pairs)
-    for (x, y, _) in &unit_stitches {
+    // Write each stitch coordinate (s16 LE pairs, safe: validated by export_pes)
+    for (x, y, _) in unit_stitches {
         write_s16_le(out, *x as i16);
         write_s16_le(out, *y as i16);
     }
@@ -262,5 +297,54 @@ mod tests {
         let data = export_pes(&design).unwrap();
         // PEC block should end with 0xFF
         assert_eq!(*data.last().unwrap(), 0xFF);
+    }
+
+    #[test]
+    fn test_pes_rejects_stitch_count_overflow() {
+        // Create a design with more than u16::MAX stitches
+        let count = u16::MAX as usize + 1;
+        let stitches: Vec<ExportStitch> = (0..count)
+            .map(|i| ExportStitch {
+                x: (i as f64) * 0.01, // Keep coordinates small to stay in i16 range
+                y: 0.0,
+                stitch_type: ExportStitchType::Normal,
+            })
+            .collect();
+
+        let design = ExportDesign {
+            name: "overflow".to_string(),
+            stitches,
+            colors: vec![Color::new(0, 0, 0, 255)],
+        };
+
+        let result = export_pes(&design);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("65535"));
+    }
+
+    #[test]
+    fn test_pes_rejects_coordinate_overflow() {
+        // Create a design with coordinates that exceed i16 range in 0.1mm units
+        // i16::MAX = 32767, so 32767 * 0.1mm = 3276.7mm. Go beyond that.
+        let design = ExportDesign {
+            name: "huge".to_string(),
+            stitches: vec![
+                ExportStitch {
+                    x: 0.0,
+                    y: 0.0,
+                    stitch_type: ExportStitchType::Normal,
+                },
+                ExportStitch {
+                    x: 4000.0, // 4000mm > 3276.7mm limit
+                    y: 0.0,
+                    stitch_type: ExportStitchType::Normal,
+                },
+            ],
+            colors: vec![Color::new(0, 0, 0, 255)],
+        };
+
+        let result = export_pes(&design);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("coordinate range"));
     }
 }

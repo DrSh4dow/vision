@@ -69,7 +69,7 @@ pub fn generate_satin_stitches(
         };
     }
 
-    let density = density.max(0.1); // Prevent division by zero
+    let density = density.max(crate::constants::MIN_SATIN_DENSITY);
 
     // Step 1: Parameterize both rails by arc length
     let params1 = parameterize_by_arc_length(rail1);

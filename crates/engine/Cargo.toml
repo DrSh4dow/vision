@@ -8,12 +8,9 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 wasm-bindgen.workspace = true
-js-sys.workspace = true
-web-sys.workspace = true
 log.workspace = true
 wasm-logger.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-geo.workspace = true
 svgtypes.workspace = true
 roxmltree.workspace = true

@@ -95,12 +95,12 @@ impl MeshBatch {
         }
     }
 
-    /// Simple ear-clipping triangulation for convex-ish polygons.
+    /// Fan triangulation for convex and simple polygons.
     ///
-    /// Uses a fan triangulation from the first vertex. This works well for
-    /// convex shapes (rect, ellipse, regular polygons) and is acceptable
-    /// for simple concave shapes. A proper ear-clipping or constrained
-    /// Delaunay triangulation can be added later for complex paths.
+    /// Uses a fan from vertex 0: (0,1,2), (0,2,3), (0,3,4), etc. This is
+    /// correct for convex shapes (rect, ellipse, regular polygons) and
+    /// acceptable for mildly concave shapes. A proper ear-clipping or
+    /// constrained Delaunay triangulation should replace this for complex paths.
     fn triangulate_polygon(
         &mut self,
         points: &[vision_engine::Point],
@@ -135,7 +135,10 @@ impl MeshBatch {
         }
     }
 
-    /// Add a line strip (for shape outlines).
+    /// Add a line strip as vertex pairs for `LineList` topology.
+    ///
+    /// Emits pairs (A,B), (B,C), (C,D) so that `PrimitiveTopology::LineList`
+    /// renders all segments of the strip. N points produce 2*(N-1) vertices.
     fn add_line_strip(
         &mut self,
         points: &[vision_engine::Point],
@@ -143,15 +146,29 @@ impl MeshBatch {
         offset_x: f64,
         offset_y: f64,
     ) {
+        if points.len() < 2 {
+            return;
+        }
+
         let r = color.r as f32 / 255.0;
         let g = color.g as f32 / 255.0;
         let b = color.b as f32 / 255.0;
         let a = color.a as f32 / 255.0;
 
-        for p in points {
+        for pair in points.windows(2) {
+            let p0 = &pair[0];
+            let p1 = &pair[1];
             self.line_vertices.push(Vertex::new(
-                (p.x + offset_x) as f32,
-                (p.y + offset_y) as f32,
+                (p0.x + offset_x) as f32,
+                (p0.y + offset_y) as f32,
+                r,
+                g,
+                b,
+                a,
+            ));
+            self.line_vertices.push(Vertex::new(
+                (p1.x + offset_x) as f32,
+                (p1.y + offset_y) as f32,
                 r,
                 g,
                 b,
@@ -228,12 +245,6 @@ pub fn generate_grid_vertices(
     while y <= bottom {
         let is_major = (y / major_spacing).round() * major_spacing - y < 0.01;
         let color = if is_major { major_color } else { grid_color };
-        vertices.push(Vertex {
-            position: [x.min(left), y], // Use left bound
-            color,
-        });
-        // Fix: use actual left
-        vertices.pop();
         vertices.push(Vertex {
             position: [left, y],
             color,
@@ -445,5 +456,39 @@ mod tests {
         // Fan triangulation of 4 points = 2 triangles = 6 indices
         assert_eq!(batch.fill_indices.len(), 6);
         assert_eq!(batch.fill_indices, vec![0, 1, 2, 0, 2, 3]);
+    }
+
+    #[test]
+    fn test_line_strip_vertex_count() {
+        let mut batch = MeshBatch::new();
+        let points = vec![
+            vision_engine::Point::new(0.0, 0.0),
+            vision_engine::Point::new(5.0, 0.0),
+            vision_engine::Point::new(10.0, 0.0),
+            vision_engine::Point::new(10.0, 5.0),
+        ];
+        let color = Color::new(0, 0, 0, 255);
+        batch.add_line_strip(&points, &color, 0.0, 0.0);
+
+        // 4 points → 3 segments → 6 vertices (pairs for LineList topology)
+        assert_eq!(
+            batch.line_vertices.len(),
+            6,
+            "N points should produce 2*(N-1) vertices for LineList"
+        );
+    }
+
+    #[test]
+    fn test_line_strip_single_point() {
+        let mut batch = MeshBatch::new();
+        let points = vec![vision_engine::Point::new(0.0, 0.0)];
+        let color = Color::new(0, 0, 0, 255);
+        batch.add_line_strip(&points, &color, 0.0, 0.0);
+
+        assert_eq!(
+            batch.line_vertices.len(),
+            0,
+            "Single point should produce no line vertices"
+        );
     }
 }

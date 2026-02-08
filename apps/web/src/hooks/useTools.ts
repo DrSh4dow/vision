@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
+// TODO: Text tool implementation — Phase 2
 /** Available tool types. */
 export type ToolType = "select" | "pen" | "rect" | "ellipse" | "text";
 

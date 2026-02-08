@@ -150,7 +150,7 @@ impl Scene {
 
     /// Allocate and return the next node ID without creating a node.
     /// Used by the command system to pre-allocate IDs.
-    pub fn alloc_next_id(&mut self) -> NodeId {
+    pub(crate) fn alloc_next_id(&mut self) -> NodeId {
         self.alloc_id()
     }
 
@@ -193,8 +193,11 @@ impl Scene {
         self.nodes.insert(id, node);
 
         if let Some(pid) = parent {
-            // Safe: we validated existence above
-            self.nodes.get_mut(&pid).unwrap().children.push(id);
+            self.nodes
+                .get_mut(&pid)
+                .expect("parent validated above")
+                .children
+                .push(id);
         } else {
             self.root_children.push(id);
         }
@@ -239,7 +242,7 @@ impl Scene {
     }
 
     /// Get a mutable reference to a node.
-    pub fn get_node_mut(&mut self, id: NodeId) -> Option<&mut Node> {
+    pub(crate) fn get_node_mut(&mut self, id: NodeId) -> Option<&mut Node> {
         self.nodes.get_mut(&id)
     }
 
@@ -280,7 +283,7 @@ impl Scene {
         }
 
         // Remove from old parent
-        let old_parent = self.nodes.get(&id).unwrap().parent;
+        let old_parent = self.nodes.get(&id).expect("node validated above").parent;
         if let Some(opid) = old_parent {
             if let Some(old_parent_node) = self.nodes.get_mut(&opid) {
                 old_parent_node.children.retain(|c| *c != id);
@@ -291,7 +294,10 @@ impl Scene {
 
         // Add to new parent
         if let Some(npid) = new_parent {
-            let parent_node = self.nodes.get_mut(&npid).unwrap();
+            let parent_node = self
+                .nodes
+                .get_mut(&npid)
+                .expect("new parent validated above");
             let idx = index.unwrap_or(parent_node.children.len());
             let idx = idx.min(parent_node.children.len());
             parent_node.children.insert(idx, id);
@@ -302,7 +308,10 @@ impl Scene {
         }
 
         // Update the node's parent reference
-        self.nodes.get_mut(&id).unwrap().parent = new_parent;
+        self.nodes
+            .get_mut(&id)
+            .expect("node validated above")
+            .parent = new_parent;
 
         Ok(())
     }
@@ -320,7 +329,11 @@ impl Scene {
         let parent = node.parent;
 
         let siblings = if let Some(pid) = parent {
-            &mut self.nodes.get_mut(&pid).unwrap().children
+            &mut self
+                .nodes
+                .get_mut(&pid)
+                .expect("parent exists if child exists")
+                .children
         } else {
             &mut self.root_children
         };
@@ -416,7 +429,11 @@ impl Scene {
         self.nodes.insert(id, node);
 
         if let Some(pid) = parent {
-            self.nodes.get_mut(&pid).unwrap().children.push(id);
+            self.nodes
+                .get_mut(&pid)
+                .expect("parent validated above")
+                .children
+                .push(id);
         } else {
             self.root_children.push(id);
         }
@@ -426,7 +443,7 @@ impl Scene {
 
     /// Restore a node directly into the nodes map (for undo).
     /// Does NOT update parent/children linkage — call `reattach_node` after.
-    pub fn restore_node(&mut self, node: Node) -> Result<(), String> {
+    pub(crate) fn restore_node(&mut self, node: Node) -> Result<(), String> {
         let id = node.id;
         if id.0 >= self.next_id {
             self.next_id = id.0 + 1;
@@ -436,7 +453,7 @@ impl Scene {
     }
 
     /// Re-attach a restored node to its parent at a specific index (for undo).
-    pub fn reattach_node(
+    pub(crate) fn reattach_node(
         &mut self,
         id: NodeId,
         parent: Option<NodeId>,
@@ -502,11 +519,12 @@ impl Scene {
 
                 // For open paths / strokes, check proximity to path
                 if !bbox.is_empty() {
+                    let tol = crate::constants::HIT_TEST_TOLERANCE;
                     let expanded = crate::path::BoundingBox::new(
-                        bbox.min_x - 3.0,
-                        bbox.min_y - 3.0,
-                        bbox.max_x + 3.0,
-                        bbox.max_y + 3.0,
+                        bbox.min_x - tol,
+                        bbox.min_y - tol,
+                        bbox.max_x + tol,
+                        bbox.max_y + tol,
                     );
                     if expanded.contains(test_point) {
                         // Close enough to bounding box — check stroke hit
@@ -608,13 +626,16 @@ impl Scene {
     pub fn get_tree(&self) -> Vec<TreeNode> {
         self.root_children
             .iter()
-            .map(|&id| self.build_tree_node(id))
+            .filter_map(|&id| self.build_tree_node(id))
             .collect()
     }
 
     /// Recursive helper for building tree nodes.
-    fn build_tree_node(&self, id: NodeId) -> TreeNode {
-        let node = self.nodes.get(&id).expect("node must exist in tree");
+    ///
+    /// Returns `None` if the node is missing (indicates an inconsistent scene
+    /// graph, which is logged but does not crash the WASM module).
+    fn build_tree_node(&self, id: NodeId) -> Option<TreeNode> {
+        let node = self.nodes.get(&id)?;
         let kind_type = match &node.kind {
             NodeKind::Layer {
                 visible, locked, ..
@@ -626,16 +647,16 @@ impl Scene {
             NodeKind::Shape { .. } => TreeNodeKind::Shape,
         };
 
-        TreeNode {
+        Some(TreeNode {
             id,
             name: node.name.clone(),
             kind: kind_type,
             children: node
                 .children
                 .iter()
-                .map(|&cid| self.build_tree_node(cid))
+                .filter_map(|&cid| self.build_tree_node(cid))
                 .collect(),
-        }
+        })
     }
 
     /// Iterate over all nodes in depth-first order.
@@ -729,7 +750,7 @@ fn compose_transforms(parent: &Transform, child: &Transform) -> Transform {
 
 /// Check if a point is within `tolerance` distance of any segment in a path.
 fn point_near_path(path: &crate::path::VectorPath, test: crate::Point, tolerance: f64) -> bool {
-    let points = path.flatten(0.5);
+    let points = path.flatten(crate::constants::DEFAULT_FLATTEN_TOLERANCE);
     if points.len() < 2 {
         return false;
     }
@@ -1105,5 +1126,210 @@ mod tests {
 
         assert_eq!(scene.node_count(), 3);
         assert_eq!(scene.get_node(layer).unwrap().children.len(), 2);
+    }
+
+    #[test]
+    fn test_hit_test_shape() {
+        let mut scene = Scene::new();
+        let id = scene
+            .add_node(
+                "Rect",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(10.0, 10.0, 0.0)),
+                    fill: Some(Color::new(255, 0, 0, 255)),
+                    stroke: None,
+                    stroke_width: 0.0,
+                },
+                None,
+            )
+            .unwrap();
+
+        // Point inside the rect (0,0)→(10,10) at identity transform
+        let hit = scene.hit_test(5.0, 5.0);
+        assert_eq!(hit, Some(id));
+
+        // Point outside
+        let miss = scene.hit_test(50.0, 50.0);
+        assert!(miss.is_none());
+    }
+
+    #[test]
+    fn test_render_list_ordering() {
+        let mut scene = Scene::new();
+        let layer = scene
+            .add_node(
+                "Layer",
+                NodeKind::Layer {
+                    name: "L1".to_string(),
+                    visible: true,
+                    locked: false,
+                },
+                None,
+            )
+            .unwrap();
+
+        let r1 = scene
+            .add_node(
+                "R1",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(5.0, 5.0, 0.0)),
+                    fill: Some(Color::new(255, 0, 0, 255)),
+                    stroke: None,
+                    stroke_width: 0.0,
+                },
+                Some(layer),
+            )
+            .unwrap();
+
+        let r2 = scene
+            .add_node(
+                "R2",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(5.0, 5.0, 0.0)),
+                    fill: Some(Color::new(0, 0, 255, 255)),
+                    stroke: None,
+                    stroke_width: 0.0,
+                },
+                Some(layer),
+            )
+            .unwrap();
+
+        let items = scene.render_list();
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].id, r1);
+        assert_eq!(items[1].id, r2);
+    }
+
+    #[test]
+    fn test_render_list_hidden_layer_excluded() {
+        let mut scene = Scene::new();
+        let layer = scene
+            .add_node(
+                "Hidden",
+                NodeKind::Layer {
+                    name: "Hidden".to_string(),
+                    visible: false,
+                    locked: false,
+                },
+                None,
+            )
+            .unwrap();
+
+        scene
+            .add_node(
+                "Rect",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(5.0, 5.0, 0.0)),
+                    fill: Some(Color::new(255, 0, 0, 255)),
+                    stroke: None,
+                    stroke_width: 0.0,
+                },
+                Some(layer),
+            )
+            .unwrap();
+
+        let items = scene.render_list();
+        assert!(items.is_empty(), "Hidden layer shapes should not render");
+    }
+
+    #[test]
+    fn test_world_transform_nested() {
+        let mut scene = Scene::new();
+        let layer = scene
+            .add_node(
+                "Layer",
+                NodeKind::Layer {
+                    name: "L1".to_string(),
+                    visible: true,
+                    locked: false,
+                },
+                None,
+            )
+            .unwrap();
+
+        // Set layer transform to (10, 20)
+        scene.get_node_mut(layer).unwrap().transform = Transform {
+            x: 10.0,
+            y: 20.0,
+            rotation: 0.0,
+            scale_x: 1.0,
+            scale_y: 1.0,
+        };
+
+        let rect_id = scene
+            .add_node(
+                "Rect",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(5.0, 5.0, 0.0)),
+                    fill: Some(Color::new(255, 0, 0, 255)),
+                    stroke: None,
+                    stroke_width: 0.0,
+                },
+                Some(layer),
+            )
+            .unwrap();
+
+        // Set rect transform to (3, 4)
+        scene.get_node_mut(rect_id).unwrap().transform = Transform {
+            x: 3.0,
+            y: 4.0,
+            rotation: 0.0,
+            scale_x: 1.0,
+            scale_y: 1.0,
+        };
+
+        let world = scene.world_transform(rect_id);
+        // World transform should be (10+3, 20+4) = (13, 24)
+        assert!((world.x - 13.0).abs() < 1e-10);
+        assert!((world.y - 24.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_get_tree_structure() {
+        let mut scene = Scene::new();
+        let layer = scene
+            .add_node(
+                "Layer",
+                NodeKind::Layer {
+                    name: "L1".to_string(),
+                    visible: true,
+                    locked: false,
+                },
+                None,
+            )
+            .unwrap();
+
+        let _r1 = scene
+            .add_node(
+                "R1",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(5.0, 5.0, 0.0)),
+                    fill: None,
+                    stroke: None,
+                    stroke_width: 0.0,
+                },
+                Some(layer),
+            )
+            .unwrap();
+
+        let _r2 = scene
+            .add_node(
+                "R2",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(5.0, 5.0, 0.0)),
+                    fill: None,
+                    stroke: None,
+                    stroke_width: 0.0,
+                },
+                Some(layer),
+            )
+            .unwrap();
+
+        let tree = scene.get_tree();
+        assert_eq!(tree.len(), 1, "One root node (Layer)");
+        assert_eq!(tree[0].name, "Layer");
+        assert_eq!(tree[0].children.len(), 2, "Layer has 2 children");
+        assert_eq!(tree[0].children[0].name, "R1");
+        assert_eq!(tree[0].children[1].name, "R2");
     }
 }

@@ -10,7 +10,7 @@ use crate::shapes::ShapeData;
 
 /// A reversible scene mutation.
 #[derive(Debug, Clone)]
-pub enum SceneCommand {
+pub(crate) enum SceneCommand {
     /// Add a node to the scene.
     AddNode {
         id: NodeId,
@@ -85,13 +85,13 @@ pub enum SceneCommand {
 
 /// Snapshot of a single node for undo restore.
 #[derive(Debug, Clone)]
-pub struct NodeSnapshot {
-    pub node: Node,
+pub(crate) struct NodeSnapshot {
+    pub(crate) node: Node,
 }
 
 /// Manages the undo/redo history for a scene.
 #[derive(Debug)]
-pub struct CommandHistory {
+pub(crate) struct CommandHistory {
     undo_stack: Vec<SceneCommand>,
     redo_stack: Vec<SceneCommand>,
     /// Maximum number of undo steps.
@@ -143,11 +143,13 @@ impl CommandHistory {
     }
 
     /// Returns how many undo steps are available.
+    #[allow(dead_code)]
     pub fn undo_count(&self) -> usize {
         self.undo_stack.len()
     }
 
     /// Returns how many redo steps are available.
+    #[allow(dead_code)]
     pub fn redo_count(&self) -> usize {
         self.redo_stack.len()
     }
@@ -161,7 +163,7 @@ impl CommandHistory {
 
 impl Default for CommandHistory {
     fn default() -> Self {
-        Self::new(200)
+        Self::new(crate::constants::DEFAULT_MAX_HISTORY)
     }
 }
 
@@ -338,7 +340,7 @@ fn restore_snapshot(
 }
 
 /// Helper to build a RemoveNode command by snapshotting the subtree first.
-pub fn build_remove_command(scene: &Scene, id: NodeId) -> Result<SceneCommand, String> {
+pub(crate) fn build_remove_command(scene: &Scene, id: NodeId) -> Result<SceneCommand, String> {
     let node = scene
         .get_node(id)
         .ok_or_else(|| format!("Node {:?} not found", id))?;

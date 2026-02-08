@@ -214,7 +214,7 @@ static MADEIRA_RAYON: [ThreadEntry; 80] = [
     },
     ThreadEntry {
         brand: ThreadBrand::MadeiraRayon,
-        code: "1037",
+        code: "1038",
         name: "Coral",
         r: 255,
         g: 127,
@@ -222,7 +222,7 @@ static MADEIRA_RAYON: [ThreadEntry; 80] = [
     },
     ThreadEntry {
         brand: ThreadBrand::MadeiraRayon,
-        code: "1147",
+        code: "1148",
         name: "Salmon",
         r: 250,
         g: 128,
@@ -1836,7 +1836,7 @@ static SULKY_RAYON: [ThreadEntry; 80] = [
     },
     ThreadEntry {
         brand: ThreadBrand::SulkyRayon,
-        code: "1510",
+        code: "1511",
         name: "Bright Green",
         r: 0,
         g: 230,
@@ -2050,5 +2050,27 @@ mod tests {
     fn test_find_nearest_color_white() {
         let entry = find_nearest_color(ThreadBrand::SulkyRayon, 255, 255, 255);
         assert_eq!(entry.name, "Bright White");
+    }
+
+    #[test]
+    fn test_no_duplicate_codes_per_brand() {
+        let brands = [
+            ThreadBrand::MadeiraRayon,
+            ThreadBrand::IsacordPolyester,
+            ThreadBrand::SulkyRayon,
+        ];
+        for brand in brands {
+            let palette = list_brand(brand);
+            let mut seen = std::collections::HashSet::new();
+            for entry in palette {
+                assert!(
+                    seen.insert(entry.code),
+                    "Duplicate thread code '{}' found in {:?} (name: '{}')",
+                    entry.code,
+                    brand,
+                    entry.name
+                );
+            }
+        }
     }
 }
