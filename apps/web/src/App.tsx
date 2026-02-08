@@ -240,7 +240,7 @@ export function App() {
 
           {/* Canvas + floating toolbar */}
           <main className="relative flex-1 overflow-hidden">
-            <div role="application" aria-label="Design canvas">
+            <div role="application" aria-label="Design canvas" className="h-full w-full">
               <canvas ref={canvasRef} className="block h-full w-full" data-testid="design-canvas" />
             </div>
 
