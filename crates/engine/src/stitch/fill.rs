@@ -85,7 +85,7 @@ pub fn generate_tatami_fill(
         let left_to_right = row % 2 == 0;
         let row_single = segments.len() == 1;
         let mut emit_segment = |idx: usize, x0: f64, x1: f64| {
-            let (mut start_x, mut end_x) = if left_to_right { (x0, x1) } else { (x1, x0) };
+            let (mut start_x, end_x) = if left_to_right { (x0, x1) } else { (x1, x0) };
             if row % 2 == 1 {
                 let stagger = density * 0.5;
                 if left_to_right {

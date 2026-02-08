@@ -180,6 +180,28 @@ test.describe("Import/Export Actions", () => {
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toBe("design.pes");
   });
+
+  test("satin controls are available for selected shapes", async ({ page }) => {
+    const canvas = page.getByTestId("design-canvas");
+    await expect(canvas).toBeVisible();
+
+    await page.getByTestId("tool-rect").click();
+    const box = await canvas.boundingBox();
+    if (!box) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    await page.mouse.move(cx - 40, cy - 40);
+    await page.mouse.down();
+    await page.mouse.move(cx + 40, cy + 40, { steps: 5 });
+    await page.mouse.up();
+
+    const stitchType = page.getByTestId("prop-stitch-type");
+    await expect(stitchType).toBeVisible();
+    await stitchType.selectOption("satin");
+
+    await expect(page.getByTestId("prop-underlay-enabled")).toBeVisible();
+    await expect(page.locator("#prop-pull-comp")).toBeVisible();
+  });
 });
 
 test.describe("Canvas Interaction", () => {

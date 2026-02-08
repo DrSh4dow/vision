@@ -119,6 +119,7 @@ export type {
 export const STITCH_TYPE_MAP: Record<number, StitchType> = {
   [WasmStitchType.Running]: "running",
   [WasmStitchType.Satin]: "satin",
+  [WasmStitchType.Tatami]: "tatami",
 };
 
 // ============================================================================

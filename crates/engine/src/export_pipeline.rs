@@ -6,17 +6,22 @@
 //! Generates running stitches along outlines and tatami fills for closed shapes.
 //! Spiral/contour fill variants will be added in Phase 2.
 
+use crate::Color;
+use crate::Point;
+use crate::StitchType;
 use crate::constants::{DEFAULT_FLATTEN_TOLERANCE, DEFAULT_STITCH_LENGTH};
 use crate::format::{ExportDesign, ExportStitch, ExportStitchType};
 use crate::scene::{NodeKind, Scene};
 use crate::stitch::fill::generate_tatami_fill;
 use crate::stitch::running::generate_running_stitches;
-use crate::Color;
-use crate::Point;
-use crate::StitchType;
+use crate::stitch::satin::{UnderlayConfig, generate_satin_stitches};
 
 /// Minimum number of points required to generate stitches from a path.
 const MIN_POINTS_FOR_STITCHES: usize = 2;
+/// Minimum satin width used when shape stroke width is tiny.
+const MIN_SATIN_WIDTH_MM: f64 = 0.6;
+/// Default zigzag spacing for satin underlay.
+const DEFAULT_SATIN_ZIGZAG_SPACING_MM: f64 = 2.0;
 
 /// Convert the current scene graph into an `ExportDesign` ready for file export.
 ///
@@ -50,6 +55,7 @@ pub fn scene_to_export_design(scene: &Scene, stitch_length: f64) -> Result<Expor
             shape,
             stroke,
             fill,
+            stroke_width,
             stitch,
             ..
         } = &item.kind
@@ -72,6 +78,30 @@ pub fn scene_to_export_design(scene: &Scene, stitch_length: f64) -> Result<Expor
             .collect();
 
         let (shape_stitches, color) = match stitch.stitch_type {
+            StitchType::Satin => {
+                let color = match (stroke, fill) {
+                    (Some(c), _) => *c,
+                    (None, Some(c)) => *c,
+                    (None, None) => continue,
+                };
+                let satin = generate_satin_shape_stitches(
+                    &world_points,
+                    stitch.density,
+                    stitch.pull_compensation,
+                    stitch.underlay_enabled,
+                    stitch_length,
+                    *stroke_width,
+                );
+
+                if satin.is_empty() {
+                    (
+                        generate_running_stitches(&world_points, stitch_length),
+                        color,
+                    )
+                } else {
+                    (satin, color)
+                }
+            }
             StitchType::Tatami => {
                 let subpaths = path.flatten_subpaths(DEFAULT_FLATTEN_TOLERANCE);
                 let world_subpaths: Vec<Vec<Point>> = subpaths
@@ -193,6 +223,93 @@ pub fn scene_to_export_design(scene: &Scene, stitch_length: f64) -> Result<Expor
         stitches,
         colors,
     })
+}
+
+/// Generate satin stitches for a shape by offsetting a centerline into two rails.
+fn generate_satin_shape_stitches(
+    world_points: &[Point],
+    density: f64,
+    pull_compensation: f64,
+    underlay_enabled: bool,
+    stitch_length: f64,
+    stroke_width: f64,
+) -> Vec<crate::Stitch> {
+    let mut centerline = world_points.to_vec();
+    if centerline.len() >= 2 {
+        let first = centerline[0];
+        let last = centerline[centerline.len() - 1];
+        if distance(first, last) <= f64::EPSILON {
+            centerline.pop();
+        }
+    }
+
+    if centerline.len() < MIN_POINTS_FOR_STITCHES {
+        return vec![];
+    }
+
+    let width = stroke_width.max(MIN_SATIN_WIDTH_MM);
+    let Some((rail1, rail2)) = build_satin_rails(&centerline, width) else {
+        return vec![];
+    };
+
+    let underlay = UnderlayConfig {
+        center_walk: underlay_enabled,
+        edge_walk: false,
+        zigzag: false,
+        zigzag_spacing: DEFAULT_SATIN_ZIGZAG_SPACING_MM,
+        stitch_length,
+    };
+
+    generate_satin_stitches(&rail1, &rail2, density, pull_compensation, &underlay).stitches
+}
+
+/// Build two offset rails around a centerline polyline for satin generation.
+fn build_satin_rails(centerline: &[Point], width: f64) -> Option<(Vec<Point>, Vec<Point>)> {
+    if centerline.len() < MIN_POINTS_FOR_STITCHES {
+        return None;
+    }
+
+    let half_width = width * 0.5;
+    let mut rail1: Vec<Point> = Vec::with_capacity(centerline.len());
+    let mut rail2: Vec<Point> = Vec::with_capacity(centerline.len());
+    let mut fallback_normal = (0.0_f64, 1.0_f64);
+
+    for idx in 0..centerline.len() {
+        let tangent = if idx == 0 {
+            vector(centerline[0], centerline[1])
+        } else if idx + 1 == centerline.len() {
+            vector(centerline[idx - 1], centerline[idx])
+        } else {
+            vector(centerline[idx - 1], centerline[idx + 1])
+        };
+
+        let tangent_len = (tangent.0 * tangent.0 + tangent.1 * tangent.1).sqrt();
+        let (nx, ny) = if tangent_len <= f64::EPSILON {
+            fallback_normal
+        } else {
+            let tx = tangent.0 / tangent_len;
+            let ty = tangent.1 / tangent_len;
+            let normal = (-ty, tx);
+            fallback_normal = normal;
+            normal
+        };
+
+        let p = centerline[idx];
+        rail1.push(Point::new(p.x + nx * half_width, p.y + ny * half_width));
+        rail2.push(Point::new(p.x - nx * half_width, p.y - ny * half_width));
+    }
+
+    Some((rail1, rail2))
+}
+
+fn vector(a: Point, b: Point) -> (f64, f64) {
+    (b.x - a.x, b.y - a.y)
+}
+
+fn distance(a: Point, b: Point) -> f64 {
+    let dx = a.x - b.x;
+    let dy = a.y - b.y;
+    (dx * dx + dy * dy).sqrt()
 }
 
 /// Apply a 2D affine transform matrix [a, b, c, d, tx, ty] to a point.
@@ -395,6 +512,39 @@ mod tests {
         let design = scene_to_export_design(&scene, 2.0).unwrap();
         assert!(!design.stitches.is_empty());
         assert_eq!(design.colors[0].g, 200);
+    }
+
+    #[test]
+    fn test_export_pipeline_satin_fill() {
+        let mut scene = Scene::new();
+        let mut stitch = crate::StitchParams::default();
+        stitch.stitch_type = crate::StitchType::Satin;
+        stitch.density = 0.5;
+        stitch.underlay_enabled = true;
+        stitch.pull_compensation = 0.2;
+
+        scene
+            .add_node(
+                "Satin",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(16.0, 4.0, 0.0)),
+                    fill: Some(Color::new(200, 50, 20, 255)),
+                    stroke: Some(Color::new(20, 20, 20, 255)),
+                    stroke_width: 1.0,
+                    stitch,
+                },
+                None,
+            )
+            .unwrap();
+
+        let design = scene_to_export_design(&scene, 2.0).unwrap();
+        assert!(!design.stitches.is_empty());
+        assert_eq!(design.colors[0].r, 20);
+
+        let has_jump_or_trim = design.stitches.iter().any(|s| {
+            s.stitch_type == ExportStitchType::Jump || s.stitch_type == ExportStitchType::Trim
+        });
+        assert!(has_jump_or_trim);
     }
 
     #[test]

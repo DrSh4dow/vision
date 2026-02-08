@@ -66,6 +66,7 @@ impl MeshBatch {
             fill,
             stroke,
             stroke_width,
+            ..
         } = &node.kind
         {
             let path = shape.to_path();
@@ -335,6 +336,7 @@ mod tests {
                     fill: Some(Color::new(255, 0, 0, 255)),
                     stroke: None,
                     stroke_width: 0.0,
+                    stitch: vision_engine::StitchParams::default(),
                 },
                 None,
             )
@@ -363,6 +365,7 @@ mod tests {
                     fill: None,
                     stroke: Some(Color::new(0, 0, 0, 255)),
                     stroke_width: 1.0,
+                    stitch: vision_engine::StitchParams::default(),
                 },
                 None,
             )
@@ -399,6 +402,7 @@ mod tests {
                     fill: Some(Color::new(255, 0, 0, 255)),
                     stroke: None,
                     stroke_width: 0.0,
+                    stitch: vision_engine::StitchParams::default(),
                 },
                 Some(layer),
             )

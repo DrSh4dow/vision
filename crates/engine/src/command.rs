@@ -3,10 +3,10 @@
 //! Every scene mutation goes through the command system so it can be reversed.
 //! Commands store minimal before/after state for efficient undo/redo.
 
+use crate::Color;
 use crate::path::PathCommand;
 use crate::scene::{Node, NodeId, NodeKind, Scene, Transform};
 use crate::shapes::ShapeData;
-use crate::Color;
 
 /// A reversible scene mutation.
 #[derive(Debug, Clone)]

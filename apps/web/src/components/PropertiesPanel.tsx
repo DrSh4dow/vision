@@ -262,6 +262,7 @@ function StitchFields({
   const kind = nodeInfo.kind;
   const shapeKind = typeof kind === "string" || !("Shape" in kind) ? null : kind.Shape;
   const stitch = shapeKind?.stitch ?? DEFAULT_STITCH_PARAMS;
+  const isSatin = stitch.type === "satin";
 
   const updateStitch = useCallback(
     (next: StitchParams) => {
@@ -302,6 +303,7 @@ function StitchFields({
           data-testid="prop-stitch-type"
         >
           <option value="running">Running</option>
+          <option value="satin">Satin</option>
           <option value="tatami">Tatami</option>
         </select>
       </div>
@@ -323,6 +325,35 @@ function StitchFields({
           onChange={(value) => updateStitch({ ...stitch, angle: value })}
         />
       </div>
+
+      {isSatin && (
+        <div className="grid grid-cols-2 gap-2">
+          <LabeledNumberField
+            id="prop-pull-comp"
+            label="Pull Comp"
+            value={stitch.pull_compensation}
+            step={0.05}
+            min={0}
+            onChange={(value) => updateStitch({ ...stitch, pull_compensation: value })}
+          />
+          <div className="flex flex-col gap-1">
+            <PropLabel htmlFor="prop-underlay-enabled">Underlay</PropLabel>
+            <label
+              htmlFor="prop-underlay-enabled"
+              className="flex h-7 items-center gap-2 rounded-md border border-border/40 bg-surface px-2 text-xs"
+            >
+              <input
+                id="prop-underlay-enabled"
+                type="checkbox"
+                checked={stitch.underlay_enabled}
+                onChange={(e) => updateStitch({ ...stitch, underlay_enabled: e.target.checked })}
+                data-testid="prop-underlay-enabled"
+              />
+              <span>Center walk</span>
+            </label>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
