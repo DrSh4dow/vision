@@ -148,6 +148,12 @@ impl Scene {
         id
     }
 
+    /// Allocate and return the next node ID without creating a node.
+    /// Used by the command system to pre-allocate IDs.
+    pub fn alloc_next_id(&mut self) -> NodeId {
+        self.alloc_id()
+    }
+
     /// Add a new node to the scene.
     ///
     /// # Arguments
@@ -374,6 +380,264 @@ impl Scene {
         bbox
     }
 
+    /// Add a node with a specific pre-allocated ID.
+    /// Used by the command system for deterministic undo/redo.
+    pub fn add_node_with_id(
+        &mut self,
+        id: NodeId,
+        name: &str,
+        kind: NodeKind,
+        parent: Option<NodeId>,
+    ) -> Result<NodeId, String> {
+        if let Some(pid) = parent
+            && !self.nodes.contains_key(&pid)
+        {
+            return Err(format!("Parent node {:?} does not exist", pid));
+        }
+
+        if self.nodes.contains_key(&id) {
+            return Err(format!("Node {:?} already exists", id));
+        }
+
+        // Ensure next_id stays ahead
+        if id.0 >= self.next_id {
+            self.next_id = id.0 + 1;
+        }
+
+        let node = Node {
+            id,
+            name: name.to_string(),
+            transform: Transform::identity(),
+            kind,
+            children: Vec::new(),
+            parent,
+        };
+
+        self.nodes.insert(id, node);
+
+        if let Some(pid) = parent {
+            self.nodes.get_mut(&pid).unwrap().children.push(id);
+        } else {
+            self.root_children.push(id);
+        }
+
+        Ok(id)
+    }
+
+    /// Restore a node directly into the nodes map (for undo).
+    /// Does NOT update parent/children linkage — call `reattach_node` after.
+    pub fn restore_node(&mut self, node: Node) -> Result<(), String> {
+        let id = node.id;
+        if id.0 >= self.next_id {
+            self.next_id = id.0 + 1;
+        }
+        self.nodes.insert(id, node);
+        Ok(())
+    }
+
+    /// Re-attach a restored node to its parent at a specific index (for undo).
+    pub fn reattach_node(
+        &mut self,
+        id: NodeId,
+        parent: Option<NodeId>,
+        index: usize,
+    ) -> Result<(), String> {
+        if let Some(pid) = parent {
+            let parent_node = self
+                .nodes
+                .get_mut(&pid)
+                .ok_or_else(|| format!("Parent {:?} not found", pid))?;
+            let idx = index.min(parent_node.children.len());
+            parent_node.children.insert(idx, id);
+        } else {
+            let idx = index.min(self.root_children.len());
+            self.root_children.insert(idx, id);
+        }
+
+        // Also re-attach children of this node to their parent references
+        let children: Vec<NodeId> = self
+            .nodes
+            .get(&id)
+            .map(|n| n.children.clone())
+            .unwrap_or_default();
+        for child_id in children {
+            if let Some(child) = self.nodes.get_mut(&child_id) {
+                child.parent = Some(id);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Hit-test: find the topmost node at a given point (in world coordinates).
+    ///
+    /// Traverses in reverse depth-first order (topmost visually = last drawn = checked first).
+    /// Only tests Shape nodes. Respects layer visibility.
+    pub fn hit_test(&self, x: f64, y: f64) -> Option<NodeId> {
+        // Traverse in reverse drawing order (last drawn = topmost)
+        let all_nodes = self.iter_depth_first();
+        for &id in all_nodes.iter().rev() {
+            let Some(node) = self.nodes.get(&id) else {
+                continue;
+            };
+
+            // Skip invisible layers and their children
+            if self.is_in_hidden_layer(id) {
+                continue;
+            }
+
+            if let NodeKind::Shape { ref shape, .. } = node.kind {
+                // Transform the test point into local space
+                let local_x = x - node.transform.x;
+                let local_y = y - node.transform.y;
+                // TODO: handle rotation/scale in local space transform
+
+                let test_point = crate::Point::new(local_x, local_y);
+
+                // First check bounding box (fast reject)
+                let bbox = shape.bounding_box();
+                if bbox.contains(test_point) && shape.contains_point(test_point) {
+                    return Some(id);
+                }
+
+                // For open paths / strokes, check proximity to path
+                if !bbox.is_empty() {
+                    let expanded = crate::path::BoundingBox::new(
+                        bbox.min_x - 3.0,
+                        bbox.min_y - 3.0,
+                        bbox.max_x + 3.0,
+                        bbox.max_y + 3.0,
+                    );
+                    if expanded.contains(test_point) {
+                        // Close enough to bounding box — check stroke hit
+                        let path = shape.to_path();
+                        if point_near_path(&path, test_point, 3.0) {
+                            return Some(id);
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Check if a node is inside a hidden (invisible) layer.
+    fn is_in_hidden_layer(&self, id: NodeId) -> bool {
+        let mut current = Some(id);
+        while let Some(cid) = current {
+            if let Some(node) = self.nodes.get(&cid) {
+                if let NodeKind::Layer { visible, .. } = &node.kind
+                    && !visible
+                {
+                    return true;
+                }
+                current = node.parent;
+            } else {
+                break;
+            }
+        }
+        false
+    }
+
+    /// Get the world-space transform for a node by composing parent transforms.
+    pub fn world_transform(&self, id: NodeId) -> Transform {
+        let mut chain = Vec::new();
+        let mut current = Some(id);
+        while let Some(cid) = current {
+            if let Some(node) = self.nodes.get(&cid) {
+                chain.push(node.transform);
+                current = node.parent;
+            } else {
+                break;
+            }
+        }
+
+        // Compose from root to leaf
+        let mut result = Transform::identity();
+        for t in chain.into_iter().rev() {
+            result = compose_transforms(&result, &t);
+        }
+        result
+    }
+
+    /// Get the render list: depth-first traversal with computed world transforms.
+    /// Only returns visible shape nodes.
+    pub fn render_list(&self) -> Vec<RenderItem> {
+        let mut items = Vec::new();
+        for &root_id in &self.root_children {
+            self.collect_render_items(root_id, &Transform::identity(), &mut items);
+        }
+        items
+    }
+
+    /// Recursive helper for building the render list.
+    fn collect_render_items(
+        &self,
+        id: NodeId,
+        parent_transform: &Transform,
+        out: &mut Vec<RenderItem>,
+    ) {
+        let Some(node) = self.nodes.get(&id) else {
+            return;
+        };
+
+        // Skip invisible layers
+        if let NodeKind::Layer { visible, .. } = &node.kind
+            && !visible
+        {
+            return;
+        }
+
+        let world = compose_transforms(parent_transform, &node.transform);
+
+        if let NodeKind::Shape { .. } = &node.kind {
+            out.push(RenderItem {
+                id,
+                world_transform: world.to_matrix(),
+                kind: node.kind.clone(),
+                name: node.name.clone(),
+            });
+        }
+
+        for &child_id in &node.children {
+            self.collect_render_items(child_id, &world, out);
+        }
+    }
+
+    /// Get the full tree structure for the layers panel.
+    pub fn get_tree(&self) -> Vec<TreeNode> {
+        self.root_children
+            .iter()
+            .map(|&id| self.build_tree_node(id))
+            .collect()
+    }
+
+    /// Recursive helper for building tree nodes.
+    fn build_tree_node(&self, id: NodeId) -> TreeNode {
+        let node = self.nodes.get(&id).expect("node must exist in tree");
+        let kind_type = match &node.kind {
+            NodeKind::Layer {
+                visible, locked, ..
+            } => TreeNodeKind::Layer {
+                visible: *visible,
+                locked: *locked,
+            },
+            NodeKind::Group => TreeNodeKind::Group,
+            NodeKind::Shape { .. } => TreeNodeKind::Shape,
+        };
+
+        TreeNode {
+            id,
+            name: node.name.clone(),
+            kind: kind_type,
+            children: node
+                .children
+                .iter()
+                .map(|&cid| self.build_tree_node(cid))
+                .collect(),
+        }
+    }
+
     /// Iterate over all nodes in depth-first order.
     pub fn iter_depth_first(&self) -> Vec<NodeId> {
         let mut result = Vec::new();
@@ -398,6 +662,108 @@ impl Default for Scene {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// An item in the render list — a visible shape with its computed world transform.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct RenderItem {
+    /// Node ID.
+    pub id: NodeId,
+    /// Computed world transform as `[a, b, c, d, tx, ty]`.
+    pub world_transform: [f64; 6],
+    /// Node kind (always Shape for render items).
+    pub kind: NodeKind,
+    /// Display name.
+    pub name: String,
+}
+
+/// A node in the tree view (for layers panel).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TreeNode {
+    /// Node ID.
+    pub id: NodeId,
+    /// Display name.
+    pub name: String,
+    /// Kind of this tree node.
+    pub kind: TreeNodeKind,
+    /// Child tree nodes.
+    pub children: Vec<TreeNode>,
+}
+
+/// Simplified node kind for the tree view.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum TreeNodeKind {
+    Layer { visible: bool, locked: bool },
+    Group,
+    Shape,
+}
+
+/// Compose two 2D affine transforms: result = parent * child.
+fn compose_transforms(parent: &Transform, child: &Transform) -> Transform {
+    let pm = parent.to_matrix();
+    let cm = child.to_matrix();
+
+    // Matrix multiplication of two 2x3 affine matrices
+    // [a c tx]   [a' c' tx']   [aa'+cb'  ac'+cd'  atx'+ctx'+tx]
+    // [b d ty] x [b' d' ty'] = [ba'+db'  bc'+dd'  btx'+dty'+ty]
+    let a = pm[0] * cm[0] + pm[2] * cm[1];
+    let b = pm[1] * cm[0] + pm[3] * cm[1];
+    let c = pm[0] * cm[2] + pm[2] * cm[3];
+    let d = pm[1] * cm[2] + pm[3] * cm[3];
+    let tx = pm[0] * cm[4] + pm[2] * cm[5] + pm[4];
+    let ty = pm[1] * cm[4] + pm[3] * cm[5] + pm[5];
+
+    // Decompose back to Transform fields
+    let scale_x = (a * a + b * b).sqrt();
+    let scale_y = (c * c + d * d).sqrt();
+    let rotation = b.atan2(a);
+
+    Transform {
+        x: tx,
+        y: ty,
+        rotation,
+        scale_x,
+        scale_y,
+    }
+}
+
+/// Check if a point is within `tolerance` distance of any segment in a path.
+fn point_near_path(path: &crate::path::VectorPath, test: crate::Point, tolerance: f64) -> bool {
+    let points = path.flatten(0.5);
+    if points.len() < 2 {
+        return false;
+    }
+
+    let tol_sq = tolerance * tolerance;
+    for pair in points.windows(2) {
+        let dist_sq = point_to_segment_dist_sq(test, pair[0], pair[1]);
+        if dist_sq <= tol_sq {
+            return true;
+        }
+    }
+    false
+}
+
+/// Squared distance from a point to a line segment.
+fn point_to_segment_dist_sq(p: crate::Point, a: crate::Point, b: crate::Point) -> f64 {
+    let dx = b.x - a.x;
+    let dy = b.y - a.y;
+    let len_sq = dx * dx + dy * dy;
+
+    if len_sq < f64::EPSILON {
+        let ex = p.x - a.x;
+        let ey = p.y - a.y;
+        return ex * ex + ey * ey;
+    }
+
+    let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / len_sq;
+    let t = t.clamp(0.0, 1.0);
+
+    let proj_x = a.x + t * dx;
+    let proj_y = a.y + t * dy;
+    let ex = p.x - proj_x;
+    let ey = p.y - proj_y;
+    ex * ex + ey * ey
 }
 
 #[cfg(test)]

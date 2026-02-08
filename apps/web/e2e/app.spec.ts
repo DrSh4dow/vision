@@ -34,13 +34,13 @@ test.describe("Vision App", () => {
   test("tool buttons are visible", async ({ page }) => {
     const selectBtn = page.locator('button[title="Select"]');
     const penBtn = page.locator('button[title="Pen"]');
-    const shapeBtn = page.locator('button[title="Shape"]');
-    const textBtn = page.locator('button[title="Text"]');
+    const rectBtn = page.locator('button[title="Rect"]');
+    const ellipseBtn = page.locator('button[title="Ellipse"]');
 
     await expect(selectBtn).toBeVisible();
     await expect(penBtn).toBeVisible();
-    await expect(shapeBtn).toBeVisible();
-    await expect(textBtn).toBeVisible();
+    await expect(rectBtn).toBeVisible();
+    await expect(ellipseBtn).toBeVisible();
   });
 
   test("panels are visible (left and right)", async ({ page }) => {
@@ -63,67 +63,6 @@ test.describe("WASM Engine Integration", () => {
   test("engine version matches Cargo.toml version (0.1.0)", async ({ page }) => {
     const status = page.getByTestId("engine-status");
     await expect(status).toHaveText("Engine v0.1.0");
-  });
-
-  test("running stitch demo generates stitches when clicked", async ({ page }) => {
-    const demoBtn = page.getByTestId("stitch-demo-btn");
-    await expect(demoBtn).toBeVisible();
-
-    await demoBtn.click();
-
-    const stitchCount = page.getByTestId("stitch-count");
-    await expect(stitchCount).toBeVisible({ timeout: 5_000 });
-    // Should have generated stitch points
-    await expect(stitchCount).toContainText(/Running: \d+ pts/);
-  });
-
-  test("running stitch demo produces reasonable number of points", async ({ page }) => {
-    const demoBtn = page.getByTestId("stitch-demo-btn");
-    await demoBtn.click();
-
-    const stitchCount = page.getByTestId("stitch-count");
-    await expect(stitchCount).toBeVisible({ timeout: 5_000 });
-
-    const text = await stitchCount.textContent();
-    const match = text?.match(/Running: (\d+) pts/);
-    expect(match).toBeTruthy();
-    if (!match) return;
-
-    const count = parseInt(match[1], 10);
-    // Path: (0,0)->(50,0)->(50,30)->(0,30) with stitch_length=3
-    // Total path ≈ 130mm at 3mm stitches ≈ ~45 points
-    expect(count).toBeGreaterThan(10);
-    expect(count).toBeLessThan(100);
-  });
-
-  test("satin stitch demo generates stitches when clicked", async ({ page }) => {
-    const satinBtn = page.getByTestId("satin-demo-btn");
-    await expect(satinBtn).toBeVisible();
-
-    await satinBtn.click();
-
-    const satinCount = page.getByTestId("satin-count");
-    await expect(satinCount).toBeVisible({ timeout: 5_000 });
-    await expect(satinCount).toContainText(/Satin: \d+ pts/);
-
-    // Satin should produce more stitches than a basic running stitch
-    const text = await satinCount.textContent();
-    const match = text?.match(/Satin: (\d+) pts/);
-    expect(match).toBeTruthy();
-    if (!match) return;
-    const count = parseInt(match[1], 10);
-    expect(count).toBeGreaterThan(20);
-  });
-
-  test("SVG path import demo parses successfully", async ({ page }) => {
-    const svgBtn = page.getByTestId("svg-import-demo-btn");
-    await expect(svgBtn).toBeVisible();
-
-    await svgBtn.click();
-
-    const pathCount = page.getByTestId("svg-path-count");
-    await expect(pathCount).toBeVisible({ timeout: 5_000 });
-    await expect(pathCount).toContainText("Parsed 1 path(s)");
   });
 });
 
@@ -243,57 +182,26 @@ test.describe("Canvas Interaction", () => {
   });
 });
 
-test.describe("Canvas Rendering", () => {
+test.describe("UI Shell Design Review", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
     const status = page.getByTestId("engine-status");
     await expect(status).toContainText(/Engine v/, { timeout: 15_000 });
   });
 
-  test("running stitch demo renders on canvas", async ({ page }) => {
-    // Click the running stitch demo button
-    await page.getByTestId("stitch-demo-btn").click();
-    await expect(page.getByTestId("stitch-count")).toBeVisible({ timeout: 5_000 });
-
-    // Wait for render loop to draw the stitches
-    await page.waitForTimeout(300);
-
-    // Take a full-page screenshot to verify visual output
-    await page.screenshot({ path: "e2e/screenshots/running-stitch-demo.png", fullPage: false });
+  test("full app screenshot — default state", async ({ page }) => {
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: "e2e/screenshots/ui-shell-default.png", fullPage: false });
   });
 
-  test("satin stitch demo renders on canvas", async ({ page }) => {
-    await page.getByTestId("satin-demo-btn").click();
-    await expect(page.getByTestId("satin-count")).toBeVisible({ timeout: 5_000 });
-
-    await page.waitForTimeout(300);
-    await page.screenshot({ path: "e2e/screenshots/satin-stitch-demo.png", fullPage: false });
-  });
-
-  test("SVG path demo renders on canvas", async ({ page }) => {
-    await page.getByTestId("svg-import-demo-btn").click();
-    await expect(page.getByTestId("svg-path-count")).toBeVisible({ timeout: 5_000 });
-
-    await page.waitForTimeout(300);
-    await page.screenshot({ path: "e2e/screenshots/svg-path-demo.png", fullPage: false });
-  });
-
-  test("all demos render together on canvas", async ({ page }) => {
-    // Click all three demo buttons
-    await page.getByTestId("stitch-demo-btn").click();
-    await expect(page.getByTestId("stitch-count")).toBeVisible({ timeout: 5_000 });
-
-    await page.getByTestId("satin-demo-btn").click();
-    await expect(page.getByTestId("satin-count")).toBeVisible({ timeout: 5_000 });
-
-    await page.getByTestId("svg-import-demo-btn").click();
-    await expect(page.getByTestId("svg-path-count")).toBeVisible({ timeout: 5_000 });
-
-    // Also load thread palette for a complete UI screenshot
+  test("full app screenshot — with thread palette loaded", async ({ page }) => {
     await page.getByTestId("thread-brand-madeira").click();
     await expect(page.getByTestId("thread-swatches")).toBeVisible({ timeout: 5_000 });
 
     await page.waitForTimeout(300);
-    await page.screenshot({ path: "e2e/screenshots/all-demos-combined.png", fullPage: false });
+    await page.screenshot({
+      path: "e2e/screenshots/ui-shell-with-palette.png",
+      fullPage: false,
+    });
   });
 });

@@ -144,6 +144,22 @@ impl VectorPath {
         Self { commands, closed }
     }
 
+    /// Create a path from commands with an explicit closed flag.
+    pub fn from_commands_with_closed(commands: Vec<PathCommand>, closed: bool) -> Self {
+        Self { commands, closed }
+    }
+
+    /// Replace all commands in this path.
+    pub fn set_commands(&mut self, commands: Vec<PathCommand>, closed: bool) {
+        self.commands = commands;
+        self.closed = closed;
+    }
+
+    /// Get a mutable reference to the commands.
+    pub fn commands_mut(&mut self) -> &mut Vec<PathCommand> {
+        &mut self.commands
+    }
+
     /// Returns the commands in this path.
     pub fn commands(&self) -> &[PathCommand] {
         &self.commands

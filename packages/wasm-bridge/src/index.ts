@@ -18,6 +18,27 @@ import initWasm, {
   get_thread_palette,
   import_svg_document,
   import_svg_path,
+  scene_add_node,
+  scene_create,
+  scene_get_node,
+  scene_get_path_commands,
+  scene_get_render_list,
+  scene_get_tree,
+  scene_hit_test,
+  scene_move_node,
+  scene_node_bbox,
+  scene_node_count,
+  scene_redo,
+  scene_remove_node,
+  scene_rename_node,
+  scene_reorder_child,
+  scene_set_fill,
+  scene_set_path_commands,
+  scene_set_stroke,
+  scene_set_stroke_width,
+  scene_undo,
+  scene_update_kind,
+  scene_update_transform,
   Color as WasmColor,
   Point as WasmPoint,
   StitchType as WasmStitchType,
@@ -107,6 +128,96 @@ export interface ExportDesign {
 }
 
 // ============================================================================
+// Scene Graph Types
+// ============================================================================
+
+/** 2D affine transform. */
+export interface TransformData {
+  x: number;
+  y: number;
+  rotation: number;
+  scaleX: number;
+  scaleY: number;
+}
+
+/** Path command (matches Rust serde JSON format). */
+export type PathCommand =
+  | { MoveTo: Point }
+  | { LineTo: Point }
+  | { CubicTo: { c1: Point; c2: Point; end: Point } }
+  | { QuadTo: { ctrl: Point; end: Point } }
+  | "Close";
+
+/** Shape kind discriminated union. */
+export type ShapeKindData =
+  | { Path: { commands: PathCommand[]; closed: boolean } }
+  | { Rect: { width: number; height: number; corner_radius: number } }
+  | { Ellipse: { rx: number; ry: number } }
+  | { Polygon: { sides: number; radius: number } };
+
+/** Node kind (matches Rust NodeKind serde JSON format). */
+export type NodeKindData =
+  | { Layer: { name: string; visible: boolean; locked: boolean } }
+  | "Group"
+  | {
+      Shape: {
+        shape: ShapeKindData;
+        fill: Color | null;
+        stroke: Color | null;
+        stroke_width: number;
+      };
+    };
+
+/** Scene node info returned by getNode(). */
+export interface SceneNodeInfo {
+  id: { "0": number };
+  name: string;
+  transform: {
+    x: number;
+    y: number;
+    rotation: number;
+    scale_x: number;
+    scale_y: number;
+  };
+  kind: NodeKindData;
+  children: Array<{ "0": number }>;
+  parent: { "0": number } | null;
+}
+
+/** Tree node kind for layers panel. */
+export type TreeNodeKind = { Layer: { visible: boolean; locked: boolean } } | "Group" | "Shape";
+
+/** Tree node for layers panel. */
+export interface TreeNode {
+  id: { "0": number };
+  name: string;
+  kind: TreeNodeKind;
+  children: TreeNode[];
+}
+
+/** A render item — visible shape with computed world transform. */
+export interface RenderItem {
+  id: { "0": number };
+  world_transform: [number, number, number, number, number, number];
+  kind: NodeKindData;
+  name: string;
+}
+
+/** Axis-aligned bounding box. */
+export interface BoundingBox {
+  min_x: number;
+  min_y: number;
+  max_x: number;
+  max_y: number;
+}
+
+/** Path data with commands and closed flag. */
+export interface PathData {
+  commands: PathCommand[];
+  closed: boolean;
+}
+
+// ============================================================================
 // WASM Stitch Type mapping
 // ============================================================================
 
@@ -138,12 +249,6 @@ export interface VisionEngine {
 
   /**
    * Generate satin stitches between two guide rails.
-   * @param rail1 - First guide rail points.
-   * @param rail2 - Second guide rail points.
-   * @param density - Stitch spacing in mm (0.3-0.5 typical).
-   * @param pullCompensation - Extra width per side in mm (0.1-0.3 typical).
-   * @param underlay - Underlay configuration.
-   * @returns Satin stitch result with stitches and underlay count.
    */
   generateSatinStitches(
     rail1: Point[],
@@ -153,47 +258,22 @@ export interface VisionEngine {
     underlay: UnderlayConfig,
   ): SatinResult;
 
-  /**
-   * Import an SVG path `d` attribute string into vector path data.
-   * @param d - The SVG path `d` attribute string.
-   * @returns Parsed path data as JSON.
-   */
+  /** Import an SVG path `d` attribute string. */
   importSvgPath(d: string): unknown;
 
-  /**
-   * Import all paths from an SVG document.
-   * @param svgContent - The full SVG XML content.
-   * @returns Array of parsed path data.
-   */
+  /** Import all paths from an SVG document. */
   importSvgDocument(svgContent: string): unknown[];
 
-  /**
-   * Get thread palette for a brand.
-   * @param brand - Thread brand identifier.
-   * @returns Array of thread color entries.
-   */
+  /** Get thread palette for a brand. */
   getThreadPalette(brand: ThreadBrand): ThreadColor[];
 
-  /**
-   * Find the nearest thread color in a brand's palette.
-   * @param brand - Thread brand identifier.
-   * @param color - Target RGB color.
-   * @returns The closest matching thread entry.
-   */
+  /** Find the nearest thread color in a brand's palette. */
   findNearestThread(brand: ThreadBrand, color: { r: number; g: number; b: number }): ThreadColor;
 
-  /**
-   * Export design to DST (Tajima) format.
-   * @param design - The design to export.
-   * @returns Binary DST file data.
-   */
+  /** Export design to DST (Tajima) format. */
   exportDst(design: ExportDesign): Uint8Array;
 
-  /**
-   * Export design to PES (Brother) format.
-   * @param design - The design to export.
-   * @returns Binary PES file data.
-   */
+  /** Export design to PES (Brother) format. */
   exportPes(design: ExportDesign): Uint8Array;
 
   /** Create a WASM Point object. */
@@ -204,6 +284,73 @@ export interface VisionEngine {
 
   /** Get the stitch type string from a numeric WASM enum value. */
   stitchTypeName(value: number): StitchType | undefined;
+
+  // ==========================================================================
+  // Scene Graph API
+  // ==========================================================================
+
+  /** Create/reset the global scene. */
+  sceneCreate(): void;
+
+  /** Add a node to the scene. Returns the new node ID. */
+  sceneAddNode(name: string, kind: NodeKindData, parentId?: number): number;
+
+  /** Remove a node and its descendants. */
+  sceneRemoveNode(nodeId: number): void;
+
+  /** Get a node's data. Returns null if not found. */
+  sceneGetNode(nodeId: number): SceneNodeInfo | null;
+
+  /** Update a node's transform. */
+  sceneUpdateTransform(nodeId: number, transform: TransformData): void;
+
+  /** Update a node's kind. */
+  sceneUpdateKind(nodeId: number, kind: NodeKindData): void;
+
+  /** Move a node to a different parent. parentId -1 = root. index -1 = append. */
+  sceneMoveNode(nodeId: number, parentId: number, index: number): void;
+
+  /** Reorder a node within its parent's children. */
+  sceneReorderChild(nodeId: number, newIndex: number): void;
+
+  /** Get the full scene tree (for layers panel). */
+  sceneGetTree(): TreeNode[];
+
+  /** Get the render list (visible shapes with world transforms). */
+  sceneGetRenderList(): RenderItem[];
+
+  /** Hit-test: find topmost node at world coordinates. Returns -1 if none. */
+  sceneHitTest(x: number, y: number): number;
+
+  /** Undo the last scene command. Returns true if something was undone. */
+  sceneUndo(): boolean;
+
+  /** Redo the last undone command. Returns true if something was redone. */
+  sceneRedo(): boolean;
+
+  /** Rename a node. */
+  sceneRenameNode(nodeId: number, newName: string): void;
+
+  /** Set fill color on a shape node. null = no fill. */
+  sceneSetFill(nodeId: number, fill: Color | null): void;
+
+  /** Set stroke color on a shape node. null = no stroke. */
+  sceneSetStroke(nodeId: number, stroke: Color | null): void;
+
+  /** Set stroke width on a shape node. */
+  sceneSetStrokeWidth(nodeId: number, width: number): void;
+
+  /** Get path commands of a Path shape node. */
+  sceneGetPathCommands(nodeId: number): PathData;
+
+  /** Set path commands on a Path shape node. */
+  sceneSetPathCommands(nodeId: number, data: PathData): void;
+
+  /** Get number of nodes in the scene. */
+  sceneNodeCount(): number;
+
+  /** Get bounding box of a node. */
+  sceneNodeBbox(nodeId: number): BoundingBox;
 }
 
 // ============================================================================
@@ -316,6 +463,112 @@ export async function initEngine(): Promise<VisionEngine> {
         new WasmColor(r, g, b, a),
 
       stitchTypeName: (value: number): StitchType | undefined => STITCH_TYPE_MAP[value],
+
+      // ======================================================================
+      // Scene Graph API
+      // ======================================================================
+
+      sceneCreate: (): void => {
+        scene_create();
+      },
+
+      sceneAddNode: (name: string, kind: NodeKindData, parentId?: number): number => {
+        const kindJson = JSON.stringify(kind);
+        const pid = parentId !== undefined ? BigInt(parentId) : BigInt(-1);
+        const id = scene_add_node(name, kindJson, pid);
+        return Number(id);
+      },
+
+      sceneRemoveNode: (nodeId: number): void => {
+        scene_remove_node(BigInt(nodeId));
+      },
+
+      sceneGetNode: (nodeId: number): SceneNodeInfo | null => {
+        const json = scene_get_node(BigInt(nodeId));
+        if (json === "null") return null;
+        return JSON.parse(json) as SceneNodeInfo;
+      },
+
+      sceneUpdateTransform: (nodeId: number, transform: TransformData): void => {
+        scene_update_transform(
+          BigInt(nodeId),
+          transform.x,
+          transform.y,
+          transform.rotation,
+          transform.scaleX,
+          transform.scaleY,
+        );
+      },
+
+      sceneUpdateKind: (nodeId: number, kind: NodeKindData): void => {
+        scene_update_kind(BigInt(nodeId), JSON.stringify(kind));
+      },
+
+      sceneMoveNode: (nodeId: number, parentId: number, index: number): void => {
+        scene_move_node(BigInt(nodeId), BigInt(parentId), index);
+      },
+
+      sceneReorderChild: (nodeId: number, newIndex: number): void => {
+        scene_reorder_child(BigInt(nodeId), newIndex);
+      },
+
+      sceneGetTree: (): TreeNode[] => {
+        const json = scene_get_tree();
+        return JSON.parse(json) as TreeNode[];
+      },
+
+      sceneGetRenderList: (): RenderItem[] => {
+        const json = scene_get_render_list();
+        return JSON.parse(json) as RenderItem[];
+      },
+
+      sceneHitTest: (x: number, y: number): number => {
+        return Number(scene_hit_test(x, y));
+      },
+
+      sceneUndo: (): boolean => {
+        return scene_undo();
+      },
+
+      sceneRedo: (): boolean => {
+        return scene_redo();
+      },
+
+      sceneRenameNode: (nodeId: number, newName: string): void => {
+        scene_rename_node(BigInt(nodeId), newName);
+      },
+
+      sceneSetFill: (nodeId: number, fill: Color | null): void => {
+        const json = fill ? JSON.stringify(fill) : "";
+        scene_set_fill(BigInt(nodeId), json);
+      },
+
+      sceneSetStroke: (nodeId: number, stroke: Color | null): void => {
+        const json = stroke ? JSON.stringify(stroke) : "";
+        scene_set_stroke(BigInt(nodeId), json);
+      },
+
+      sceneSetStrokeWidth: (nodeId: number, width: number): void => {
+        scene_set_stroke_width(BigInt(nodeId), width);
+      },
+
+      sceneGetPathCommands: (nodeId: number): PathData => {
+        const json = scene_get_path_commands(BigInt(nodeId));
+        return JSON.parse(json) as PathData;
+      },
+
+      sceneSetPathCommands: (nodeId: number, data: PathData): void => {
+        scene_set_path_commands(BigInt(nodeId), JSON.stringify(data));
+      },
+
+      sceneNodeCount: (): number => {
+        return scene_node_count();
+      },
+
+      sceneNodeBbox: (nodeId: number): BoundingBox => {
+        const json = scene_node_bbox(BigInt(nodeId));
+        return JSON.parse(json) as BoundingBox;
+      },
     };
 
     engineInstance = instance;

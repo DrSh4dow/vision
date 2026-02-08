@@ -5,6 +5,8 @@
  * Coordinates are in design space (millimeters).
  */
 
+import type { RenderItem } from "@vision/wasm-bridge";
+
 /** A 2D point in design space (mm). */
 export interface DesignPoint {
   x: number;
@@ -26,8 +28,7 @@ export interface ParsedVectorPath {
 }
 
 /** A stitch visualization object — connected stitch points rendered on the canvas. */
-export interface StitchObject {
-  type: "stitches";
+export interface StitchOverlay {
   id: string;
   label: string;
   points: DesignPoint[];
@@ -35,16 +36,12 @@ export interface StitchObject {
   showDots: boolean;
 }
 
-/** A vector path object — SVG-like path commands rendered as strokes. */
-export interface PathObject {
-  type: "path";
-  id: string;
-  label: string;
-  commands: PathCommand[];
-  closed: boolean;
-  color: string;
-  strokeWidth: number;
+/** Canvas render data: scene render items + stitch overlays. */
+export interface CanvasData {
+  /** Scene graph render items (shapes with world transforms). */
+  renderItems: RenderItem[];
+  /** Stitch overlays (computed, not in scene graph). */
+  stitchOverlays: StitchOverlay[];
+  /** Currently selected node IDs. */
+  selectedIds: Set<number>;
 }
-
-/** Union of all renderable design objects. */
-export type DesignObject = StitchObject | PathObject;

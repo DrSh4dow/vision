@@ -1,34 +1,199 @@
 import type {
   ExportDesign,
-  Point,
+  NodeKindData,
+  RenderItem,
   ThreadBrand,
   ThreadColor,
   VisionEngine,
 } from "@vision/wasm-bridge";
-import { Download, FileUp, MousePointer2, Palette, Pen, Shapes, Type } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { Circle, Download, FileUp, MousePointer2, Palette, PenTool, Square } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
+import { LayersPanel } from "@/components/LayersPanel";
+import { PropertiesPanel } from "@/components/PropertiesPanel";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import type { CanvasClickEvent } from "@/hooks/useCanvas";
 import { useCanvas } from "@/hooks/useCanvas";
 import { useEngine } from "@/hooks/useEngine";
-import type { DesignObject, ParsedVectorPath } from "@/types/design";
+import { usePenTool } from "@/hooks/usePenTool";
+import { useSelection } from "@/hooks/useSelection";
+import { useTools } from "@/hooks/useTools";
+import type { CanvasData, DesignPoint, ParsedVectorPath } from "@/types/design";
 
 export function App() {
   const { engine, loading, error, version } = useEngine();
-  const objectsRef = useRef<DesignObject[]>([]);
-  const canvasRef = useCanvas({ ready: !loading && !error, objects: objectsRef });
+  const { activeTool, setActiveTool, cursorStyle } = useTools();
 
-  /** Replace or add a design object by id. */
-  const upsertObject = useCallback((obj: DesignObject) => {
-    objectsRef.current = [...objectsRef.current.filter((o) => o.id !== obj.id), obj];
-  }, []);
+  // Canvas data: scene render items + stitch overlays
+  const canvasDataRef = useRef<CanvasData>({
+    renderItems: [],
+    stitchOverlays: [],
+    selectedIds: new Set(),
+  });
 
-  /** Replace all objects matching an id prefix. */
-  const replaceByPrefix = useCallback((prefix: string, objs: DesignObject[]) => {
-    objectsRef.current = [...objectsRef.current.filter((o) => !o.id.startsWith(prefix)), ...objs];
-  }, []);
+  /** Refresh the render list from the scene graph. */
+  const refreshScene = useCallback(() => {
+    if (!engine) return;
+    const items: RenderItem[] = engine.sceneGetRenderList();
+    canvasDataRef.current = {
+      ...canvasDataRef.current,
+      renderItems: items,
+    };
+  }, [engine]);
+
+  const { selectedIds, selectNode, deselectAll } = useSelection(engine, refreshScene);
+  const { penState, addPoint, finishPath, cancelPath } = usePenTool(
+    engine,
+    refreshScene,
+    selectNode,
+    setActiveTool,
+  );
+
+  // Pen tool keyboard handlers (Enter = finish, Escape = cancel)
+  useEffect(() => {
+    if (activeTool !== "pen") return;
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        finishPath();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        cancelPath();
+        setActiveTool("select");
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [activeTool, finishPath, cancelPath, setActiveTool]);
+
+  // Sync selected IDs into canvas data ref
+  useEffect(() => {
+    canvasDataRef.current = {
+      ...canvasDataRef.current,
+      selectedIds,
+    };
+  }, [selectedIds]);
+
+  /** Handle canvas click (select tool). */
+  const handleCanvasClick = useCallback(
+    (event: CanvasClickEvent) => {
+      if (!engine) return;
+      const hitId = engine.sceneHitTest(event.worldX, event.worldY);
+      if (hitId >= 0) {
+        selectNode(hitId, event.shiftKey);
+      } else {
+        deselectAll();
+      }
+    },
+    [engine, selectNode, deselectAll],
+  );
+
+  /** Handle shape drag end (rect/ellipse tool). */
+  const handleShapeDragEnd = useCallback(
+    (startMm: DesignPoint, endMm: DesignPoint) => {
+      if (!engine) return;
+
+      // Get the default layer
+      const tree = engine.sceneGetTree();
+      const layerId = tree.length > 0 ? tree[0].id["0"] : undefined;
+
+      const minX = Math.min(startMm.x, endMm.x);
+      const minY = Math.min(startMm.y, endMm.y);
+      const w = Math.abs(endMm.x - startMm.x);
+      const h = Math.abs(endMm.y - startMm.y);
+
+      let kind: NodeKindData;
+      let name: string;
+
+      if (activeTool === "rect") {
+        kind = {
+          Shape: {
+            shape: { Rect: { width: w, height: h, corner_radius: 0 } },
+            fill: { r: 88, g: 166, b: 255, a: 60 },
+            stroke: { r: 88, g: 166, b: 255, a: 255 },
+            stroke_width: 0.15,
+          },
+        };
+        name = "Rectangle";
+      } else {
+        kind = {
+          Shape: {
+            shape: { Ellipse: { rx: w / 2, ry: h / 2 } },
+            fill: { r: 249, g: 117, b: 131, a: 60 },
+            stroke: { r: 249, g: 117, b: 131, a: 255 },
+            stroke_width: 0.15,
+          },
+        };
+        name = "Ellipse";
+      }
+
+      const nodeId = engine.sceneAddNode(name, kind, layerId);
+
+      // Position the shape at the drag start point
+      if (activeTool === "rect") {
+        engine.sceneUpdateTransform(nodeId, {
+          x: minX,
+          y: minY,
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+        });
+      } else {
+        // Ellipse is centered at origin, so position at center of drag
+        engine.sceneUpdateTransform(nodeId, {
+          x: minX + w / 2,
+          y: minY + h / 2,
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+        });
+      }
+
+      refreshScene();
+      selectNode(nodeId);
+
+      // Switch back to select tool after creating a shape
+      setActiveTool("select");
+    },
+    [engine, activeTool, refreshScene, selectNode, setActiveTool],
+  );
+
+  /** Handle pen tool click. */
+  const handlePenClick = useCallback(
+    (pointMm: DesignPoint) => {
+      addPoint(pointMm);
+    },
+    [addPoint],
+  );
+
+  const canvasRef = useCanvas({
+    ready: !loading && !error,
+    canvasData: canvasDataRef,
+    activeTool,
+    cursorStyle,
+    engine,
+    onCanvasClick: handleCanvasClick,
+    onShapeDragEnd: handleShapeDragEnd,
+    onPenClick: handlePenClick,
+    penPoints: penState.points,
+  });
+
+  // Track if scene has been initialized
+  const sceneInitRef = useRef(false);
+
+  // Initialize scene graph when engine is ready
+  useEffect(() => {
+    if (!engine || sceneInitRef.current) return;
+    sceneInitRef.current = true;
+    engine.sceneCreate();
+
+    // Create a default layer
+    engine.sceneAddNode("Layer 1", {
+      Layer: { name: "Layer 1", visible: true, locked: false },
+    });
+  }, [engine]);
 
   const statusText = error
     ? `Error: ${error}`
@@ -38,78 +203,117 @@ export function App() {
 
   return (
     <TooltipProvider>
-      <div className="flex h-full flex-col">
-        {/* Toolbar */}
-        <header className="flex h-10 shrink-0 items-center justify-between border-b border-border bg-card px-3">
-          <div className="flex items-center gap-3">
+      <div className="flex h-full flex-col bg-background">
+        {/* ── Top bar ─────────────────────────────────────────────── */}
+        <header className="flex h-9 shrink-0 items-center justify-between border-b border-border/40 bg-panel px-3">
+          <div className="flex items-center gap-2.5">
             <span
-              className="text-sm font-bold tracking-wide text-primary"
+              className="text-[13px] font-semibold tracking-wide text-foreground"
               data-testid="toolbar-brand"
             >
               Vision
             </span>
-            {engine && <ImportExportActions engine={engine} replaceByPrefix={replaceByPrefix} />}
+            {engine && (
+              <>
+                <Separator orientation="vertical" className="!h-4 !bg-border/40" />
+                <ImportExportActions engine={engine} refreshScene={refreshScene} />
+              </>
+            )}
           </div>
-          <span className="text-xs text-muted-foreground" data-testid="engine-status">
+          <span className="text-[10px] text-muted-foreground/70" data-testid="engine-status">
             {statusText}
           </span>
         </header>
 
-        {/* Workspace */}
+        {/* ── Workspace ───────────────────────────────────────────── */}
         <div className="flex flex-1 overflow-hidden">
-          {/* Left panel */}
+          {/* Left panel — Layers */}
           <aside
-            className="flex w-60 shrink-0 flex-col overflow-y-auto border-r border-border bg-card"
+            className="panel-scroll flex w-56 shrink-0 flex-col overflow-y-auto border-r border-border/40 bg-panel"
             data-testid="panel-left"
           >
-            <PanelSection title="Tools">
-              <div className="grid grid-cols-2 gap-1">
-                <ToolButton icon={<MousePointer2 />} label="Select" shortcut="V" />
-                <ToolButton icon={<Pen />} label="Pen" shortcut="P" />
-                <ToolButton icon={<Shapes />} label="Shape" shortcut="S" />
-                <ToolButton icon={<Type />} label="Text" shortcut="T" />
-              </div>
-            </PanelSection>
-
-            <PanelSection title="Layers">
-              <p className="text-xs italic text-muted-foreground">No layers yet</p>
-            </PanelSection>
-
-            {engine && (
-              <PanelSection title="Stitch Demo">
-                <StitchDemo engine={engine} upsertObject={upsertObject} />
-              </PanelSection>
-            )}
-
-            {engine && (
-              <PanelSection title="SVG Import">
-                <SvgImportDemo engine={engine} upsertObject={upsertObject} />
-              </PanelSection>
-            )}
+            <SectionHeader>Layers</SectionHeader>
+            <div className="flex-1 px-1.5 pb-3">
+              {engine ? (
+                <LayersPanel
+                  engine={engine}
+                  selectedIds={selectedIds}
+                  onSelectNode={selectNode}
+                  onRefreshScene={refreshScene}
+                />
+              ) : (
+                <p className="px-1.5 text-xs italic text-muted-foreground/60">No layers yet</p>
+              )}
+            </div>
           </aside>
 
-          {/* Canvas */}
+          {/* Canvas + floating toolbar */}
           <main className="relative flex-1 overflow-hidden">
             <canvas ref={canvasRef} className="block h-full w-full" data-testid="design-canvas" />
+
+            {/* ── Floating Toolbar ─────────────────────────────────── */}
+            <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center pt-3">
+              <div className="pointer-events-auto flex items-center gap-0.5 rounded-xl border border-border/30 bg-card/80 px-1.5 py-1 shadow-2xl shadow-black/50 backdrop-blur-xl">
+                <ToolButton
+                  icon={<MousePointer2 className="!size-[15px]" />}
+                  label="Select"
+                  shortcut="V"
+                  active={activeTool === "select"}
+                  onClick={() => setActiveTool("select")}
+                />
+                <Separator orientation="vertical" className="!mx-0.5 !h-5 !bg-border/30" />
+                <ToolButton
+                  icon={<PenTool className="!size-[15px]" />}
+                  label="Pen"
+                  shortcut="P"
+                  active={activeTool === "pen"}
+                  onClick={() => setActiveTool("pen")}
+                />
+                <ToolButton
+                  icon={<Square className="!size-[15px]" />}
+                  label="Rect"
+                  shortcut="R"
+                  active={activeTool === "rect"}
+                  onClick={() => setActiveTool("rect")}
+                />
+                <ToolButton
+                  icon={<Circle className="!size-[15px]" />}
+                  label="Ellipse"
+                  shortcut="E"
+                  active={activeTool === "ellipse"}
+                  onClick={() => setActiveTool("ellipse")}
+                />
+              </div>
+            </div>
           </main>
 
-          {/* Right panel */}
+          {/* Right panel — Properties + Thread Palette */}
           <aside
-            className="flex w-60 shrink-0 flex-col overflow-y-auto border-l border-border bg-card"
+            className="panel-scroll flex w-56 shrink-0 flex-col overflow-y-auto border-l border-border/40 bg-panel"
             data-testid="panel-right"
           >
-            <PanelSection title="Properties">
-              <p className="text-xs italic text-muted-foreground">Select an object</p>
-            </PanelSection>
+            <SectionHeader>Properties</SectionHeader>
+            <div className="px-3 pb-2">
+              {engine ? (
+                <PropertiesPanel
+                  engine={engine}
+                  selectedIds={selectedIds}
+                  onRefreshScene={refreshScene}
+                />
+              ) : (
+                <p className="text-xs italic text-muted-foreground/60">Select an object</p>
+              )}
+            </div>
 
-            <PanelSection title="Stitch Settings">
-              <p className="text-xs italic text-muted-foreground">No stitch parameters</p>
-            </PanelSection>
+            <div className="mx-3 border-t border-border/50" />
 
             {engine && (
-              <PanelSection title="Thread Palette">
-                <ThreadPalettePanel engine={engine} />
-              </PanelSection>
+              <>
+                <SectionHeader>Thread Palette</SectionHeader>
+                <div className="px-3 pb-3">
+                  <ThreadPalettePanel engine={engine} />
+                </div>
+              </>
             )}
           </aside>
         </div>
@@ -119,59 +323,72 @@ export function App() {
 }
 
 // ============================================================================
-// Panel Section
+// Section Header
 // ============================================================================
 
-function PanelSection({ title, children }: { title: string; children: React.ReactNode }) {
+function SectionHeader({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-2 p-3">
-      <h3 className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-        {title}
-      </h3>
+    <h3 className="px-3 pt-3 pb-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
       {children}
-      <Separator className="mt-1" />
-    </div>
+    </h3>
   );
 }
 
 // ============================================================================
-// Tool Button
+// Tool Button (floating toolbar)
 // ============================================================================
 
 function ToolButton({
   icon,
   label,
   shortcut,
+  active,
+  onClick,
 }: {
   icon: React.ReactNode;
   label: string;
   shortcut: string;
+  active?: boolean;
+  onClick?: () => void;
 }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button variant="outline" size="icon" title={label} className="h-8 w-full">
+        <Button
+          variant={active ? "default" : "ghost"}
+          size="icon"
+          title={label}
+          className={
+            active
+              ? "h-8 w-8 rounded-lg shadow-sm shadow-primary/20 ring-1 ring-primary/20"
+              : "h-8 w-8 rounded-lg text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+          }
+          onClick={onClick}
+        >
           {icon}
           <span className="sr-only">{label}</span>
         </Button>
       </TooltipTrigger>
-      <TooltipContent side="right">
-        {label} <kbd className="ml-1 rounded bg-muted px-1 text-[10px]">{shortcut}</kbd>
+      <TooltipContent side="bottom" className="text-xs">
+        {label}{" "}
+        <kbd className="ml-1.5 rounded bg-muted/80 px-1.5 py-0.5 text-[10px] font-mono">
+          {shortcut}
+        </kbd>
       </TooltipContent>
     </Tooltip>
   );
 }
 
 // ============================================================================
-// Import / Export Actions (Toolbar)
+// Import / Export Actions (top bar — icon only)
 // ============================================================================
 
 function ImportExportActions({
   engine,
-  replaceByPrefix,
+  refreshScene,
 }: {
   engine: VisionEngine;
-  replaceByPrefix: (prefix: string, objs: DesignObject[]) => void;
+  refreshScene: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -190,26 +407,42 @@ function ImportExportActions({
         if (typeof content !== "string") return;
 
         const paths = engine.importSvgDocument(content) as ParsedVectorPath[];
-        // Add each imported path as a design object on the canvas
-        const colors = ["#d2a8ff", "#f0883e", "#58a6ff", "#7ee787", "#f97583"];
-        const newObjects: DesignObject[] = paths.map((p, i) => ({
-          type: "path" as const,
-          id: `svg-import-${i}`,
-          label: `Imported Path ${i + 1}`,
-          commands: p.commands,
-          closed: p.closed,
-          color: colors[i % colors.length],
-          strokeWidth: 2,
-        }));
-        replaceByPrefix("svg-import-", newObjects);
-        console.log(`Imported ${paths.length} path(s) from SVG`);
+
+        // Get the default layer (first root node)
+        const tree = engine.sceneGetTree();
+        const layerId = tree.length > 0 ? tree[0].id["0"] : undefined;
+
+        // Add each imported path as a scene node
+        const colors = [
+          { r: 210, g: 168, b: 255, a: 255 },
+          { r: 240, g: 136, b: 62, a: 255 },
+          { r: 88, g: 166, b: 255, a: 255 },
+          { r: 126, g: 231, b: 135, a: 255 },
+          { r: 249, g: 117, b: 131, a: 255 },
+        ];
+
+        for (let i = 0; i < paths.length; i++) {
+          const p = paths[i];
+          const color = colors[i % colors.length];
+          const kind: NodeKindData = {
+            Shape: {
+              shape: { Path: { commands: p.commands, closed: p.closed } },
+              fill: p.closed ? { ...color, a: 50 } : null,
+              stroke: color,
+              stroke_width: 0.2,
+            },
+          };
+          engine.sceneAddNode(`Imported Path ${i + 1}`, kind, layerId);
+        }
+
+        refreshScene();
       };
       reader.readAsText(file);
 
       // Reset input so the same file can be re-selected
       e.target.value = "";
     },
-    [engine, replaceByPrefix],
+    [engine, refreshScene],
   );
 
   const handleExportDst = useCallback(() => {
@@ -225,7 +458,7 @@ function ImportExportActions({
   }, [engine]);
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-0.5">
       <input
         ref={fileInputRef}
         type="file"
@@ -238,202 +471,48 @@ function ImportExportActions({
         <TooltipTrigger asChild>
           <Button
             variant="ghost"
-            size="sm"
-            className="h-7 gap-1 px-2 text-xs"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
             onClick={handleSvgImport}
             data-testid="import-svg-btn"
           >
-            <FileUp className="h-3.5 w-3.5" />
-            Import SVG
+            <FileUp className="!size-3.5" />
+            <span className="sr-only">Import SVG</span>
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Import SVG file</TooltipContent>
+        <TooltipContent>Import SVG</TooltipContent>
       </Tooltip>
+      <Separator orientation="vertical" className="!mx-0.5 !h-3.5 !bg-border/30" />
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 gap-1 px-2 text-xs"
+            className="h-7 gap-1 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
             onClick={handleExportDst}
             data-testid="export-dst-btn"
           >
-            <Download className="h-3.5 w-3.5" />
+            <Download className="!size-3" />
             DST
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Export as DST (Tajima)</TooltipContent>
+        <TooltipContent>Export DST (Tajima)</TooltipContent>
       </Tooltip>
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 gap-1 px-2 text-xs"
+            className="h-7 gap-1 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
             onClick={handleExportPes}
             data-testid="export-pes-btn"
           >
-            <Download className="h-3.5 w-3.5" />
+            <Download className="!size-3" />
             PES
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Export as PES (Brother)</TooltipContent>
+        <TooltipContent>Export PES (Brother)</TooltipContent>
       </Tooltip>
-    </div>
-  );
-}
-
-// ============================================================================
-// Stitch Demo
-// ============================================================================
-
-function StitchDemo({
-  engine,
-  upsertObject,
-}: {
-  engine: VisionEngine;
-  upsertObject: (obj: DesignObject) => void;
-}) {
-  const [stitchCount, setStitchCount] = useState<number | null>(null);
-  const [satinCount, setSatinCount] = useState<number | null>(null);
-
-  const runRunningDemo = useCallback(() => {
-    const path: Point[] = [
-      { x: 0, y: 0 },
-      { x: 50, y: 0 },
-      { x: 50, y: 30 },
-      { x: 0, y: 30 },
-    ];
-    const stitches = engine.generateRunningStitches(path, 3.0);
-    setStitchCount(stitches.length);
-
-    // Add to canvas as a visible stitch object
-    upsertObject({
-      type: "stitches",
-      id: "running-demo",
-      label: "Running Stitch Demo",
-      points: stitches,
-      color: "#58a6ff",
-      showDots: true,
-    });
-  }, [engine, upsertObject]);
-
-  const runSatinDemo = useCallback(() => {
-    // Position satin demo above the running stitch demo
-    const rail1: Point[] = [
-      { x: 0, y: -15 },
-      { x: 30, y: -15 },
-    ];
-    const rail2: Point[] = [
-      { x: 0, y: -10 },
-      { x: 30, y: -10 },
-    ];
-    const result = engine.generateSatinStitches(rail1, rail2, 0.4, 0.2, {
-      center_walk: true,
-      edge_walk: false,
-      zigzag: false,
-      zigzag_spacing: 2.0,
-      stitch_length: 2.5,
-    });
-    setSatinCount(result.stitches.length);
-
-    // Extract stitch positions and add to canvas
-    const satinPoints = result.stitches.map((s) => s.position);
-    upsertObject({
-      type: "stitches",
-      id: "satin-demo",
-      label: "Satin Stitch Demo",
-      points: satinPoints,
-      color: "#f97583",
-      showDots: false,
-    });
-  }, [engine, upsertObject]);
-
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex gap-1">
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={runRunningDemo}
-          data-testid="stitch-demo-btn"
-          className="flex-1 text-xs"
-        >
-          Running
-        </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={runSatinDemo}
-          data-testid="satin-demo-btn"
-          className="flex-1 text-xs"
-        >
-          Satin
-        </Button>
-      </div>
-      {stitchCount !== null && (
-        <p className="text-xs text-muted-foreground" data-testid="stitch-count">
-          Running: {stitchCount} pts
-        </p>
-      )}
-      {satinCount !== null && (
-        <p className="text-xs text-muted-foreground" data-testid="satin-count">
-          Satin: {satinCount} pts
-        </p>
-      )}
-    </div>
-  );
-}
-
-// ============================================================================
-// SVG Import Demo
-// ============================================================================
-
-function SvgImportDemo({
-  engine,
-  upsertObject,
-}: {
-  engine: VisionEngine;
-  upsertObject: (obj: DesignObject) => void;
-}) {
-  const [pathCount, setPathCount] = useState<number | null>(null);
-
-  const handleImport = useCallback(() => {
-    // Import a simple SVG path — a square 10mm x 10mm
-    const result = engine.importSvgPath("M 0 0 L 10 0 L 10 10 L 0 10 Z");
-    const parsed = result as ParsedVectorPath | null;
-    if (parsed && typeof parsed === "object" && "commands" in parsed) {
-      setPathCount(1);
-
-      // Add the parsed path to the canvas
-      upsertObject({
-        type: "path",
-        id: "svg-demo",
-        label: "SVG Path Demo",
-        commands: parsed.commands,
-        closed: parsed.closed,
-        color: "#7ee787",
-        strokeWidth: 2,
-      });
-    }
-  }, [engine, upsertObject]);
-
-  return (
-    <div className="flex flex-col gap-2">
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={handleImport}
-        data-testid="svg-import-demo-btn"
-        className="text-xs"
-      >
-        Parse SVG Path
-      </Button>
-      {pathCount !== null && (
-        <p className="text-xs text-muted-foreground" data-testid="svg-path-count">
-          Parsed {pathCount} path(s)
-        </p>
-      )}
     </div>
   );
 }
@@ -449,22 +528,26 @@ function ThreadPalettePanel({ engine }: { engine: VisionEngine }) {
   const loadPalette = useCallback(
     (brand: ThreadBrand) => {
       const colors = engine.getThreadPalette(brand);
-      setPalette(colors.slice(0, 24)); // Show first 24 colors
+      setPalette(colors.slice(0, 24));
       setActiveBrand(brand);
     },
     [engine],
   );
 
   return (
-    <div className="flex flex-col gap-2" data-testid="thread-palette">
+    <div className="flex flex-col gap-2.5" data-testid="thread-palette">
       <div className="flex gap-1">
         {(["madeira", "isacord", "sulky"] as const).map((brand) => (
           <Button
             key={brand}
-            variant={activeBrand === brand ? "default" : "outline"}
+            variant={activeBrand === brand ? "default" : "ghost"}
             size="sm"
             onClick={() => loadPalette(brand)}
-            className="flex-1 text-[10px] capitalize"
+            className={
+              activeBrand === brand
+                ? "h-7 flex-1 text-[10px] capitalize"
+                : "h-7 flex-1 text-[10px] capitalize text-muted-foreground hover:text-foreground"
+            }
             data-testid={`thread-brand-${brand}`}
           >
             {brand}
@@ -472,13 +555,13 @@ function ThreadPalettePanel({ engine }: { engine: VisionEngine }) {
         ))}
       </div>
       {palette.length > 0 && (
-        <div className="grid grid-cols-6 gap-0.5" data-testid="thread-swatches">
+        <div className="grid grid-cols-6 gap-1" data-testid="thread-swatches">
           {palette.map((thread, i) => (
             <Tooltip key={`${thread.code}-${i}`}>
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  className="aspect-square rounded-sm border border-border transition-transform hover:scale-110"
+                  className="aspect-square rounded-md border border-border/40 transition-all hover:scale-110 hover:ring-1 hover:ring-primary/30"
                   style={{
                     backgroundColor: `rgb(${thread.r}, ${thread.g}, ${thread.b})`,
                   }}
@@ -495,8 +578,8 @@ function ThreadPalettePanel({ engine }: { engine: VisionEngine }) {
         </div>
       )}
       {activeBrand && (
-        <p className="text-[10px] text-muted-foreground">
-          <Palette className="mr-1 inline-block h-3 w-3" />
+        <p className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60">
+          <Palette className="h-3 w-3" />
           {palette.length} colors shown
         </p>
       )}
