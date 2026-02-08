@@ -1,0 +1,57 @@
+language: 'rust'
+layer: 'library'
+stack: 'systems'
+
+tags:
+  - 'wasm'
+  - 'rust'
+
+env:
+  CARGO_TERM_COLOR: 'always'
+
+fileGroups:
+  sources:
+    - 'engine/src/**/*'
+    - 'renderer/src/**/*'
+    - 'engine/Cargo.toml'
+    - 'renderer/Cargo.toml'
+    - 'Cargo.toml'
+  tests:
+    - 'engine/tests/**/*'
+    - 'renderer/tests/**/*'
+
+tasks:
+  check:
+    command: 'cargo check --workspace'
+    inputs:
+      - '@globs(sources)'
+
+  build:
+    command: 'cargo build --workspace'
+    inputs:
+      - '@globs(sources)'
+
+  test:
+    command: 'cargo test --workspace'
+    inputs:
+      - '@globs(sources)'
+      - '@globs(tests)'
+
+  format:
+    command: 'cargo fmt --all --check'
+    inputs:
+      - '@globs(sources)'
+      - '@globs(tests)'
+
+  lint:
+    command: 'cargo clippy --workspace'
+    inputs:
+      - '@globs(sources)'
+      - '@globs(tests)'
+
+  wasm-build:
+    command: 'wasm-pack build engine --target web --out-dir ../../packages/wasm-bridge/pkg'
+    inputs:
+      - '@globs(sources)'
+    outputs:
+      - '../packages/wasm-bridge/pkg/'

@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "outDir": "./dist",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@vision/wasm-bridge": ["../../packages/wasm-bridge/src/index.ts"]
+    }
+  },
+  "include": ["src", "../../packages/wasm-bridge/src/**/*.ts", "../../packages/wasm-bridge/pkg/**/*.d.ts"]
+}

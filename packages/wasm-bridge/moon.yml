@@ -1,0 +1,24 @@
+language: 'typescript'
+layer: 'library'
+
+toolchains:
+  default: 'bun'
+
+dependsOn:
+  - id: 'engine'
+    scope: 'build'
+
+tags:
+  - 'wasm'
+
+tasks:
+  build:
+    command: 'bunx tsc -b'
+    inputs:
+      - '@globs(sources)'
+      - '@globs(configs)'
+      - '/tsconfig.base.json'
+    outputs:
+      - 'dist/'
+    deps:
+      - 'engine:wasm-build'
