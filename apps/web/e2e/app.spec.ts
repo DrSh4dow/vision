@@ -65,7 +65,7 @@ test.describe("WASM Engine Integration", () => {
     await expect(status).toHaveText("Engine v0.1.0");
   });
 
-  test("stitch demo generates stitches when clicked", async ({ page }) => {
+  test("running stitch demo generates stitches when clicked", async ({ page }) => {
     const demoBtn = page.getByTestId("stitch-demo-btn");
     await expect(demoBtn).toBeVisible();
 
@@ -73,11 +73,11 @@ test.describe("WASM Engine Integration", () => {
 
     const stitchCount = page.getByTestId("stitch-count");
     await expect(stitchCount).toBeVisible({ timeout: 5_000 });
-    // Should have generated stitch points (format: "N stitch points")
-    await expect(stitchCount).toContainText(/\d+ stitch points/);
+    // Should have generated stitch points
+    await expect(stitchCount).toContainText(/Running: \d+ pts/);
   });
 
-  test("stitch demo produces a reasonable number of points", async ({ page }) => {
+  test("running stitch demo produces reasonable number of points", async ({ page }) => {
     const demoBtn = page.getByTestId("stitch-demo-btn");
     await demoBtn.click();
 
@@ -85,16 +85,125 @@ test.describe("WASM Engine Integration", () => {
     await expect(stitchCount).toBeVisible({ timeout: 5_000 });
 
     const text = await stitchCount.textContent();
-    const match = text?.match(/(\d+) stitch points/);
+    const match = text?.match(/Running: (\d+) pts/);
     expect(match).toBeTruthy();
     if (!match) return;
 
     const count = parseInt(match[1], 10);
     // Path: (0,0)->(50,0)->(50,30)->(0,30) with stitch_length=3
-    // Total path length ≈ 50 + 30 + 50 = 130mm, at 3mm stitches ≈ ~45 points
-    // Should be more than 10 and less than 100
+    // Total path ≈ 130mm at 3mm stitches ≈ ~45 points
     expect(count).toBeGreaterThan(10);
     expect(count).toBeLessThan(100);
+  });
+
+  test("satin stitch demo generates stitches when clicked", async ({ page }) => {
+    const satinBtn = page.getByTestId("satin-demo-btn");
+    await expect(satinBtn).toBeVisible();
+
+    await satinBtn.click();
+
+    const satinCount = page.getByTestId("satin-count");
+    await expect(satinCount).toBeVisible({ timeout: 5_000 });
+    await expect(satinCount).toContainText(/Satin: \d+ pts/);
+
+    // Satin should produce more stitches than a basic running stitch
+    const text = await satinCount.textContent();
+    const match = text?.match(/Satin: (\d+) pts/);
+    expect(match).toBeTruthy();
+    if (!match) return;
+    const count = parseInt(match[1], 10);
+    expect(count).toBeGreaterThan(20);
+  });
+
+  test("SVG path import demo parses successfully", async ({ page }) => {
+    const svgBtn = page.getByTestId("svg-import-demo-btn");
+    await expect(svgBtn).toBeVisible();
+
+    await svgBtn.click();
+
+    const pathCount = page.getByTestId("svg-path-count");
+    await expect(pathCount).toBeVisible({ timeout: 5_000 });
+    await expect(pathCount).toContainText("Parsed 1 path(s)");
+  });
+});
+
+test.describe("Thread Palette", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/");
+    const status = page.getByTestId("engine-status");
+    await expect(status).toContainText(/Engine v/, { timeout: 15_000 });
+  });
+
+  test("thread palette panel loads Madeira colors", async ({ page }) => {
+    const madeiraBtn = page.getByTestId("thread-brand-madeira");
+    await expect(madeiraBtn).toBeVisible();
+
+    await madeiraBtn.click();
+
+    const swatches = page.getByTestId("thread-swatches");
+    await expect(swatches).toBeVisible({ timeout: 5_000 });
+
+    // Should show color swatches
+    const firstSwatch = page.getByTestId("thread-swatch-0");
+    await expect(firstSwatch).toBeVisible();
+  });
+
+  test("thread palette shows all three brand buttons", async ({ page }) => {
+    const madeira = page.getByTestId("thread-brand-madeira");
+    const isacord = page.getByTestId("thread-brand-isacord");
+    const sulky = page.getByTestId("thread-brand-sulky");
+
+    await expect(madeira).toBeVisible();
+    await expect(isacord).toBeVisible();
+    await expect(sulky).toBeVisible();
+  });
+
+  test("switching brands updates the palette", async ({ page }) => {
+    const madeiraBtn = page.getByTestId("thread-brand-madeira");
+    const isacordBtn = page.getByTestId("thread-brand-isacord");
+
+    await madeiraBtn.click();
+    const swatches = page.getByTestId("thread-swatches");
+    await expect(swatches).toBeVisible({ timeout: 5_000 });
+
+    await isacordBtn.click();
+    // Palette should still be visible with updated colors
+    await expect(swatches).toBeVisible();
+  });
+});
+
+test.describe("Import/Export Actions", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/");
+    const status = page.getByTestId("engine-status");
+    await expect(status).toContainText(/Engine v/, { timeout: 15_000 });
+  });
+
+  test("import SVG button is visible", async ({ page }) => {
+    const importBtn = page.getByTestId("import-svg-btn");
+    await expect(importBtn).toBeVisible();
+  });
+
+  test("export DST button is visible and clickable", async ({ page }) => {
+    const dstBtn = page.getByTestId("export-dst-btn");
+    await expect(dstBtn).toBeVisible();
+
+    // Click should trigger a download (we verify no errors)
+    const downloadPromise = page.waitForEvent("download", { timeout: 5_000 });
+    await dstBtn.click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe("design.dst");
+  });
+
+  test("export PES button is visible and clickable", async ({ page }) => {
+    const pesBtn = page.getByTestId("export-pes-btn");
+    await expect(pesBtn).toBeVisible();
+
+    // Click should trigger a download
+    const downloadPromise = page.waitForEvent("download", { timeout: 5_000 });
+    await pesBtn.click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe("design.pes");
   });
 });
 
@@ -116,24 +225,7 @@ test.describe("Canvas Interaction", () => {
     expect(screenshot.byteLength).toBeGreaterThan(0);
 
     // The canvas should have some non-zero pixel data (grid lines, axes, HUD)
-    // We verify by checking the screenshot is not tiny (compressed all-black
-    // PNGs are very small)
     expect(screenshot.byteLength).toBeGreaterThan(500);
-  });
-
-  test("zoom HUD shows 100% initially", async ({ page }) => {
-    // Wait for render loop to draw HUD
-    await page.waitForTimeout(500);
-
-    // The HUD is drawn on the canvas via Canvas2D so we can't read it
-    // directly with DOM queries. Instead, verify the canvas is rendering
-    // by checking it has been drawn to (non-zero size screenshot).
-    const canvas = page.getByTestId("design-canvas");
-    const box = await canvas.boundingBox();
-    expect(box).toBeTruthy();
-    if (!box) return;
-    expect(box.width).toBeGreaterThan(0);
-    expect(box.height).toBeGreaterThan(0);
   });
 
   test("no console errors on load", async ({ page }) => {

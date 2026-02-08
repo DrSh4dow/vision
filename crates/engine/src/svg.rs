@@ -1,8 +1,8 @@
 //! SVG path import — parse SVG `d` attribute strings and SVG documents
 //! into internal `VectorPath` representation.
 
-use crate::path::{PathCommand, VectorPath};
 use crate::Point;
+use crate::path::{PathCommand, VectorPath};
 
 /// Parse an SVG path `d` attribute string into a `VectorPath`.
 ///
@@ -10,35 +10,18 @@ use crate::Point;
 /// Q/q, T/t, A/a, Z/z. Arc segments are approximated with cubic beziers.
 pub fn parse_svg_path(d: &str) -> Result<VectorPath, String> {
     let mut commands: Vec<PathCommand> = Vec::new();
-    let mut current_x = 0.0_f64;
-    let mut current_y = 0.0_f64;
-    let mut subpath_start_x = 0.0_f64;
-    let mut subpath_start_y = 0.0_f64;
-    // For smooth curves (S/s, T/t)
-    let mut last_control_x = 0.0_f64;
-    let mut last_control_y = 0.0_f64;
-    let mut last_cmd_was_cubic = false;
-    let mut last_cmd_was_quad = false;
 
+    // SimplifyingPathParser converts all commands to absolute coordinates
+    // and simplifies to: MoveTo, LineTo, CurveTo, Quadratic, ClosePath
     for segment in svgtypes::SimplifyingPathParser::from(d) {
         let segment = segment.map_err(|e| format!("SVG path parse error: {e}"))?;
 
         match segment {
             svgtypes::SimplePathSegment::MoveTo { x, y } => {
-                current_x = x;
-                current_y = y;
-                subpath_start_x = x;
-                subpath_start_y = y;
                 commands.push(PathCommand::MoveTo(Point::new(x, y)));
-                last_cmd_was_cubic = false;
-                last_cmd_was_quad = false;
             }
             svgtypes::SimplePathSegment::LineTo { x, y } => {
-                current_x = x;
-                current_y = y;
                 commands.push(PathCommand::LineTo(Point::new(x, y)));
-                last_cmd_was_cubic = false;
-                last_cmd_was_quad = false;
             }
             svgtypes::SimplePathSegment::CurveTo {
                 x1,
@@ -53,40 +36,18 @@ pub fn parse_svg_path(d: &str) -> Result<VectorPath, String> {
                     c2: Point::new(x2, y2),
                     end: Point::new(x, y),
                 });
-                last_control_x = x2;
-                last_control_y = y2;
-                current_x = x;
-                current_y = y;
-                last_cmd_was_cubic = true;
-                last_cmd_was_quad = false;
             }
             svgtypes::SimplePathSegment::Quadratic { x1, y1, x, y } => {
                 commands.push(PathCommand::QuadTo {
                     ctrl: Point::new(x1, y1),
                     end: Point::new(x, y),
                 });
-                last_control_x = x1;
-                last_control_y = y1;
-                current_x = x;
-                current_y = y;
-                last_cmd_was_cubic = false;
-                last_cmd_was_quad = true;
             }
             svgtypes::SimplePathSegment::ClosePath => {
                 commands.push(PathCommand::Close);
-                current_x = subpath_start_x;
-                current_y = subpath_start_y;
-                last_cmd_was_cubic = false;
-                last_cmd_was_quad = false;
             }
         }
     }
-
-    // Suppress unused variable warnings — these are needed for future S/T command support
-    let _ = last_control_x;
-    let _ = last_control_y;
-    let _ = last_cmd_was_cubic;
-    let _ = last_cmd_was_quad;
 
     Ok(VectorPath::from_commands(commands))
 }

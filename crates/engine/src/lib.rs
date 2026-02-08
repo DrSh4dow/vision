@@ -88,7 +88,7 @@ pub struct Stitch {
 }
 
 // =============================================================================
-// Stitch Generation
+// Stitch Generation (WASM bindings)
 // =============================================================================
 
 /// Generate running stitches along a path.
@@ -101,55 +101,140 @@ pub struct Stitch {
 /// Flat array of stitch coordinates [x0, y0, x1, y1, ...]
 #[wasm_bindgen]
 pub fn generate_running_stitches(path: &[f64], stitch_length: f64) -> Vec<f64> {
-    let point_count = path.len() / 2;
-    if point_count < 2 {
-        return vec![];
-    }
+    stitch::running::generate_running_stitches_flat(path, stitch_length)
+}
 
-    let mut stitches: Vec<f64> = Vec::new();
+/// Generate satin stitches between two guide rails.
+///
+/// # Arguments
+/// * `rail1` - Flat array of coordinates [x0, y0, x1, y1, ...] for first rail
+/// * `rail2` - Flat array of coordinates [x0, y0, x1, y1, ...] for second rail
+/// * `density` - Stitch spacing along rails in mm (typically 0.3-0.5)
+/// * `pull_compensation` - Extra width per side in mm (typically 0.1-0.3)
+/// * `underlay_json` - JSON string for underlay config
+///
+/// # Returns
+/// JSON string of stitch results with coordinates and stitch types
+#[wasm_bindgen]
+pub fn generate_satin_stitches(
+    rail1: &[f64],
+    rail2: &[f64],
+    density: f64,
+    pull_compensation: f64,
+    underlay_json: &str,
+) -> String {
+    let config: stitch::satin::UnderlayConfig = match serde_json::from_str(underlay_json) {
+        Ok(c) => c,
+        Err(e) => return format!("{{\"error\":\"{e}\"}}"),
+    };
 
-    // Add the first point
-    stitches.push(path[0]);
-    stitches.push(path[1]);
+    let stitches = stitch::satin::generate_satin_stitches_flat(
+        rail1,
+        rail2,
+        density,
+        pull_compensation,
+        &config,
+    );
 
-    let mut remaining = 0.0_f64;
+    serde_json::to_string(&stitches).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))
+}
 
-    for i in 0..(point_count - 1) {
-        let x0 = path[i * 2];
-        let y0 = path[i * 2 + 1];
-        let x1 = path[(i + 1) * 2];
-        let y1 = path[(i + 1) * 2 + 1];
+// =============================================================================
+// SVG Import (WASM bindings)
+// =============================================================================
 
-        let dx = x1 - x0;
-        let dy = y1 - y0;
-        let segment_length = (dx * dx + dy * dy).sqrt();
-
-        if segment_length == 0.0 {
-            continue;
+/// Import SVG path data from an SVG `d` attribute string.
+///
+/// Returns a JSON string containing the parsed path commands.
+#[wasm_bindgen]
+pub fn import_svg_path(d: &str) -> String {
+    match svg::parse_svg_path(d) {
+        Ok(path) => {
+            serde_json::to_string(&path).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))
         }
-
-        let nx = dx / segment_length;
-        let ny = dy / segment_length;
-
-        let mut distance = stitch_length - remaining;
-
-        while distance <= segment_length {
-            let sx = x0 + nx * distance;
-            let sy = y0 + ny * distance;
-            stitches.push(sx);
-            stitches.push(sy);
-            distance += stitch_length;
-        }
-
-        remaining = segment_length - (distance - stitch_length);
+        Err(e) => format!("{{\"error\":\"{e}\"}}"),
     }
+}
 
-    // Add the last point
-    let last_idx = (point_count - 1) * 2;
-    stitches.push(path[last_idx]);
-    stitches.push(path[last_idx + 1]);
+/// Import all paths from an SVG document string.
+///
+/// Returns a JSON string containing an array of parsed path commands.
+#[wasm_bindgen]
+pub fn import_svg_document(svg_content: &str) -> String {
+    match svg::parse_svg_document(svg_content) {
+        Ok(paths) => {
+            serde_json::to_string(&paths).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))
+        }
+        Err(e) => format!("{{\"error\":\"{e}\"}}"),
+    }
+}
 
-    stitches
+// =============================================================================
+// Thread Palette (WASM bindings)
+// =============================================================================
+
+/// Get the thread palette for a given brand.
+///
+/// Returns a JSON string with the thread color entries.
+#[wasm_bindgen]
+pub fn get_thread_palette(brand: &str) -> String {
+    let brand_enum = match brand {
+        "madeira" => thread::ThreadBrand::MadeiraRayon,
+        "isacord" => thread::ThreadBrand::IsacordPolyester,
+        "sulky" => thread::ThreadBrand::SulkyRayon,
+        _ => return format!("{{\"error\":\"Unknown brand: {brand}\"}}"),
+    };
+
+    let palette = thread::list_brand(brand_enum);
+    serde_json::to_string(&palette).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))
+}
+
+/// Find the nearest thread color in a brand's palette.
+///
+/// Returns a JSON string with the matching thread entry.
+#[wasm_bindgen]
+pub fn find_nearest_thread(brand: &str, r: u8, g: u8, b: u8) -> String {
+    let brand_enum = match brand {
+        "madeira" => thread::ThreadBrand::MadeiraRayon,
+        "isacord" => thread::ThreadBrand::IsacordPolyester,
+        "sulky" => thread::ThreadBrand::SulkyRayon,
+        _ => return format!("{{\"error\":\"Unknown brand: {brand}\"}}"),
+    };
+
+    let entry = thread::find_nearest_color(brand_enum, r, g, b);
+    serde_json::to_string(&entry).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))
+}
+
+// =============================================================================
+// Export (WASM bindings)
+// =============================================================================
+
+/// Export stitch data to DST (Tajima) format.
+///
+/// # Arguments
+/// * `design_json` - JSON string containing the ExportDesign
+///
+/// # Returns
+/// Binary DST file data as a byte array
+#[wasm_bindgen]
+pub fn export_dst(design_json: &str) -> Result<Vec<u8>, JsError> {
+    let design: format::ExportDesign = serde_json::from_str(design_json)
+        .map_err(|e| JsError::new(&format!("Invalid design JSON: {e}")))?;
+    format::dst::export_dst(&design).map_err(|e| JsError::new(&e))
+}
+
+/// Export stitch data to PES (Brother) format.
+///
+/// # Arguments
+/// * `design_json` - JSON string containing the ExportDesign
+///
+/// # Returns
+/// Binary PES file data as a byte array
+#[wasm_bindgen]
+pub fn export_pes(design_json: &str) -> Result<Vec<u8>, JsError> {
+    let design: format::ExportDesign = serde_json::from_str(design_json)
+        .map_err(|e| JsError::new(&format!("Invalid design JSON: {e}")))?;
+    format::pes::export_pes(&design).map_err(|e| JsError::new(&e))
 }
 
 #[cfg(test)]
@@ -158,18 +243,13 @@ mod tests {
 
     #[test]
     fn test_running_stitches_basic() {
-        // Straight horizontal line from (0,0) to (10,0) with stitch length 3
         let path = vec![0.0, 0.0, 10.0, 0.0];
         let stitches = generate_running_stitches(&path, 3.0);
 
-        // Should have first point, stitches at 3, 6, 9, and last point (10)
-        assert!(stitches.len() >= 4); // At least 2 points (4 coords)
-
-        // First point
+        assert!(stitches.len() >= 4);
         assert_eq!(stitches[0], 0.0);
         assert_eq!(stitches[1], 0.0);
 
-        // Last point
         let len = stitches.len();
         assert_eq!(stitches[len - 2], 10.0);
         assert_eq!(stitches[len - 1], 0.0);
