@@ -33,6 +33,7 @@ import initWasm, {
   scene_remove_node,
   scene_rename_node,
   scene_reorder_child,
+  scene_route_metrics,
   scene_set_fill,
   scene_set_path_commands,
   scene_set_stroke,
@@ -50,6 +51,7 @@ import {
   ExportDesignSchema,
   PathDataSchema,
   RenderItemSchema,
+  RouteMetricsSchema,
   SatinResultSchema,
   SceneNodeInfoSchema,
   ThreadColorSchema,
@@ -63,6 +65,7 @@ import type {
   PathData,
   Point,
   RenderItem,
+  RouteMetrics,
   SatinResult,
   SceneNodeInfo,
   StitchType,
@@ -80,6 +83,7 @@ export {
   ExportDesignSchema,
   PathDataSchema,
   RenderItemSchema,
+  RouteMetricsSchema,
   SatinResultSchema,
   SceneNodeInfoSchema,
   ThreadColorSchema,
@@ -97,6 +101,7 @@ export type {
   PathData,
   Point,
   RenderItem,
+  RouteMetrics,
   SatinResult,
   SceneNodeInfo,
   ShapeKindData,
@@ -209,6 +214,11 @@ export async function initEngine(): Promise<VisionEngine> {
       sceneExportDesign: (stitchLength: number): ExportDesign => {
         const json = scene_export_design(stitchLength);
         return ExportDesignSchema.parse(JSON.parse(json));
+      },
+
+      sceneRouteMetrics: (stitchLength: number): RouteMetrics => {
+        const json = scene_route_metrics(stitchLength);
+        return RouteMetricsSchema.parse(JSON.parse(json));
       },
 
       // ====================================================================

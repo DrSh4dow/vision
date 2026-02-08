@@ -23,6 +23,32 @@ const MIN_SATIN_WIDTH_MM: f64 = 0.6;
 /// Default zigzag spacing for satin underlay.
 const DEFAULT_SATIN_ZIGZAG_SPACING_MM: f64 = 2.0;
 
+#[derive(Debug, Clone)]
+struct ShapeStitchBlock {
+    color: Color,
+    stitches: Vec<crate::Stitch>,
+    source_order: usize,
+}
+
+impl ShapeStitchBlock {
+    fn start_point(&self) -> Point {
+        self.stitches[0].position
+    }
+
+    fn end_point(&self) -> Point {
+        self.stitches[self.stitches.len() - 1].position
+    }
+}
+
+/// Export route quality metrics.
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub struct RouteMetrics {
+    pub jump_count: usize,
+    pub trim_count: usize,
+    pub color_change_count: usize,
+    pub travel_distance_mm: f64,
+}
+
 /// Convert the current scene graph into an `ExportDesign` ready for file export.
 ///
 /// Walks all visible shapes in render order, generates running stitches along
@@ -37,6 +63,14 @@ const DEFAULT_SATIN_ZIGZAG_SPACING_MM: f64 = 2.0;
 /// An `ExportDesign` with stitches, colors, and a design name, or an error
 /// if the scene contains no exportable shapes.
 pub fn scene_to_export_design(scene: &Scene, stitch_length: f64) -> Result<ExportDesign, String> {
+    scene_to_export_design_with_options(scene, stitch_length, true)
+}
+
+fn scene_to_export_design_with_options(
+    scene: &Scene,
+    stitch_length: f64,
+    optimize_route: bool,
+) -> Result<ExportDesign, String> {
     let stitch_length = if stitch_length <= 0.0 {
         DEFAULT_STITCH_LENGTH
     } else {
@@ -44,13 +78,10 @@ pub fn scene_to_export_design(scene: &Scene, stitch_length: f64) -> Result<Expor
     };
 
     let render_items = scene.render_list();
+    let mut blocks: Vec<ShapeStitchBlock> = Vec::new();
 
-    // Build the ExportDesign by stitching each shape
-    let mut stitches: Vec<ExportStitch> = Vec::new();
-    let mut colors: Vec<Color> = Vec::new();
-    let mut current_color: Option<Color> = None;
-
-    for item in &render_items {
+    // Build shape stitch blocks first; final command assembly is done after optional routing.
+    for (source_order, item) in render_items.iter().enumerate() {
         let NodeKind::Shape {
             shape,
             stroke,
@@ -151,6 +182,32 @@ pub fn scene_to_export_design(scene: &Scene, stitch_length: f64) -> Result<Expor
             continue;
         }
 
+        blocks.push(ShapeStitchBlock {
+            color,
+            stitches: shape_stitches,
+            source_order,
+        });
+    }
+
+    if blocks.is_empty() {
+        return Err("No visible shapes with stroke or fill to export".to_string());
+    }
+
+    let blocks = if optimize_route {
+        optimize_blocks_for_travel(blocks)
+    } else {
+        blocks
+    };
+
+    // Assemble final export design.
+    let mut stitches: Vec<ExportStitch> = Vec::new();
+    let mut colors: Vec<Color> = Vec::new();
+    let mut current_color: Option<Color> = None;
+
+    for block in blocks {
+        let color = block.color;
+        let shape_stitches = block.stitches;
+
         // Insert color change if the color differs from the previous shape
         if current_color.is_some() && current_color != Some(color) {
             // Trim before color change
@@ -200,10 +257,6 @@ pub fn scene_to_export_design(scene: &Scene, stitch_length: f64) -> Result<Expor
         }
     }
 
-    if stitches.is_empty() {
-        return Err("No visible shapes with stroke or fill to export".to_string());
-    }
-
     // Append end marker
     if let Some(last) = stitches.last() {
         stitches.push(ExportStitch {
@@ -223,6 +276,94 @@ pub fn scene_to_export_design(scene: &Scene, stitch_length: f64) -> Result<Expor
         stitches,
         colors,
     })
+}
+
+/// Compute route quality metrics from a fully assembled export design.
+pub fn compute_route_metrics(design: &ExportDesign) -> RouteMetrics {
+    let mut metrics = RouteMetrics {
+        jump_count: 0,
+        trim_count: 0,
+        color_change_count: 0,
+        travel_distance_mm: 0.0,
+    };
+
+    for i in 0..design.stitches.len() {
+        let s = &design.stitches[i];
+        match s.stitch_type {
+            ExportStitchType::Jump => metrics.jump_count += 1,
+            ExportStitchType::Trim => metrics.trim_count += 1,
+            ExportStitchType::ColorChange => metrics.color_change_count += 1,
+            _ => {}
+        }
+
+        if i == 0 {
+            continue;
+        }
+
+        if matches!(
+            s.stitch_type,
+            ExportStitchType::Jump | ExportStitchType::Trim | ExportStitchType::ColorChange
+        ) {
+            let prev = &design.stitches[i - 1];
+            metrics.travel_distance_mm += distance_xy(prev.x, prev.y, s.x, s.y);
+        }
+    }
+
+    metrics
+}
+
+/// Reorder shape stitch blocks to reduce travel distance while preserving color-group order.
+fn optimize_blocks_for_travel(blocks: Vec<ShapeStitchBlock>) -> Vec<ShapeStitchBlock> {
+    if blocks.len() <= 1 {
+        return blocks;
+    }
+
+    let mut color_buckets: Vec<(Color, Vec<ShapeStitchBlock>)> = Vec::new();
+    for block in blocks {
+        if let Some((_, bucket)) = color_buckets.iter_mut().find(|(c, _)| *c == block.color) {
+            bucket.push(block);
+        } else {
+            color_buckets.push((block.color, vec![block]));
+        }
+    }
+
+    let mut ordered: Vec<ShapeStitchBlock> = Vec::new();
+    let mut current_end: Option<Point> = None;
+
+    for (_, pending) in &mut color_buckets {
+        while !pending.is_empty() {
+            let next_index = select_next_block_index(pending, current_end);
+            let next = pending.remove(next_index);
+            current_end = Some(next.end_point());
+            ordered.push(next);
+        }
+    }
+
+    ordered
+}
+
+fn select_next_block_index(pending: &[ShapeStitchBlock], current_end: Option<Point>) -> usize {
+    match current_end {
+        None => pending
+            .iter()
+            .enumerate()
+            .min_by_key(|(_, block)| block.source_order)
+            .map(|(index, _)| index)
+            .unwrap_or(0),
+        Some(end) => pending
+            .iter()
+            .enumerate()
+            .min_by(|(_, a), (_, b)| {
+                let dist_a = distance(end, a.start_point());
+                let dist_b = distance(end, b.start_point());
+                dist_a
+                    .partial_cmp(&dist_b)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then_with(|| a.source_order.cmp(&b.source_order))
+            })
+            .map(|(index, _)| index)
+            .unwrap_or(0),
+    }
 }
 
 /// Generate satin stitches for a shape by offsetting a centerline into two rails.
@@ -309,6 +450,12 @@ fn vector(a: Point, b: Point) -> (f64, f64) {
 fn distance(a: Point, b: Point) -> f64 {
     let dx = a.x - b.x;
     let dy = a.y - b.y;
+    (dx * dx + dy * dy).sqrt()
+}
+
+fn distance_xy(ax: f64, ay: f64, bx: f64, by: f64) -> f64 {
+    let dx = bx - ax;
+    let dy = by - ay;
     (dx * dx + dy * dy).sqrt()
 }
 
@@ -623,5 +770,80 @@ mod tests {
         let result = apply_transform(&p, &m);
         assert!((result.x - 13.0).abs() < 1e-10);
         assert!((result.y - 24.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_compute_route_metrics_counts() {
+        let design = ExportDesign {
+            name: "metrics".to_string(),
+            stitches: vec![
+                ExportStitch {
+                    x: 0.0,
+                    y: 0.0,
+                    stitch_type: ExportStitchType::Normal,
+                },
+                ExportStitch {
+                    x: 10.0,
+                    y: 0.0,
+                    stitch_type: ExportStitchType::Jump,
+                },
+                ExportStitch {
+                    x: 10.0,
+                    y: 0.0,
+                    stitch_type: ExportStitchType::Trim,
+                },
+                ExportStitch {
+                    x: 20.0,
+                    y: 0.0,
+                    stitch_type: ExportStitchType::ColorChange,
+                },
+                ExportStitch {
+                    x: 20.0,
+                    y: 0.0,
+                    stitch_type: ExportStitchType::End,
+                },
+            ],
+            colors: vec![Color::new(0, 0, 0, 255)],
+        };
+
+        let metrics = compute_route_metrics(&design);
+        assert_eq!(metrics.jump_count, 1);
+        assert_eq!(metrics.trim_count, 1);
+        assert_eq!(metrics.color_change_count, 1);
+        assert!((metrics.travel_distance_mm - 20.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_route_optimization_reduces_travel_distance() {
+        let mut scene = Scene::new();
+
+        let make_rect = || NodeKind::Shape {
+            shape: ShapeData::Rect(RectShape::new(8.0, 8.0, 0.0)),
+            fill: None,
+            stroke: Some(Color::new(0, 0, 0, 255)),
+            stroke_width: 0.5,
+            stitch: crate::StitchParams::default(),
+        };
+
+        let a = scene.add_node("A", make_rect(), None).unwrap();
+        let b = scene.add_node("B", make_rect(), None).unwrap();
+        let c = scene.add_node("C", make_rect(), None).unwrap();
+
+        scene.get_node_mut(a).unwrap().transform.x = 0.0;
+        scene.get_node_mut(b).unwrap().transform.x = 100.0;
+        scene.get_node_mut(c).unwrap().transform.x = 12.0;
+
+        let unoptimized = scene_to_export_design_with_options(&scene, 2.0, false).unwrap();
+        let optimized = scene_to_export_design_with_options(&scene, 2.0, true).unwrap();
+
+        let metrics_unoptimized = compute_route_metrics(&unoptimized);
+        let metrics_optimized = compute_route_metrics(&optimized);
+
+        assert!(
+            metrics_optimized.travel_distance_mm < metrics_unoptimized.travel_distance_mm,
+            "optimized travel distance {} should be lower than unoptimized {}",
+            metrics_optimized.travel_distance_mm,
+            metrics_unoptimized.travel_distance_mm
+        );
     }
 }

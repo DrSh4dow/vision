@@ -81,6 +81,13 @@ export const ExportDesignSchema = z.object({
   colors: z.array(ColorSchema),
 });
 
+export const RouteMetricsSchema = z.object({
+  jump_count: z.number(),
+  trim_count: z.number(),
+  color_change_count: z.number(),
+  travel_distance_mm: z.number(),
+});
+
 // ============================================================================
 // Scene Graph Schemas
 // ============================================================================

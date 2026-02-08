@@ -13,6 +13,7 @@ import type {
   PathData,
   Point,
   RenderItem,
+  RouteMetrics,
   SatinResult,
   SceneNodeInfo,
   ThreadBrand,
@@ -70,6 +71,9 @@ export interface VisionEngine {
    * @param stitchLength - Target stitch length in mm (0 = default 2.5mm).
    */
   sceneExportDesign(stitchLength: number): ExportDesign;
+
+  /** Compute route quality metrics for the current scene export. */
+  sceneRouteMetrics(stitchLength: number): RouteMetrics;
 
   // ==========================================================================
   // Scene Graph API

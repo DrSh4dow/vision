@@ -155,8 +155,8 @@ pub fn export_pes(design_json: &str) -> Result<Vec<u8>, JsError> {
 
 /// Convert the current scene graph to an `ExportDesign` JSON string.
 ///
-/// Walks visible shapes, generates running stitches along outlines, and
-/// assembles the result with jump/trim/color-change commands.
+/// Walks visible shapes, generates configured stitch types, applies routing
+/// optimization, and assembles jump/trim/color-change commands.
 ///
 /// # Arguments
 /// * `stitch_length` - Target stitch length in mm (0 uses the default 2.5mm).
@@ -165,6 +165,17 @@ pub fn scene_export_design(stitch_length: f64) -> Result<String, JsError> {
     let design = with_scene(|s| crate::export_pipeline::scene_to_export_design(s, stitch_length))
         .map_err(|e| JsError::new(&e))?;
     serde_json::to_string(&design).map_err(|e| JsError::new(&format!("Serialization error: {e}")))
+}
+
+/// Compute route quality metrics for the current scene's export order.
+///
+/// Returns JSON with jump/trim/color-change counts and travel distance.
+#[wasm_bindgen]
+pub fn scene_route_metrics(stitch_length: f64) -> Result<String, JsError> {
+    let design = with_scene(|s| crate::export_pipeline::scene_to_export_design(s, stitch_length))
+        .map_err(|e| JsError::new(&e))?;
+    let metrics = crate::export_pipeline::compute_route_metrics(&design);
+    serde_json::to_string(&metrics).map_err(|e| JsError::new(&format!("Serialization error: {e}")))
 }
 
 // =============================================================================

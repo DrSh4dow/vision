@@ -86,6 +86,14 @@ export interface ExportDesign {
   colors: Color[];
 }
 
+/** Route quality metrics for an exported design. */
+export interface RouteMetrics {
+  jump_count: number;
+  trim_count: number;
+  color_change_count: number;
+  travel_distance_mm: number;
+}
+
 // ============================================================================
 // Scene Graph Types
 // ============================================================================

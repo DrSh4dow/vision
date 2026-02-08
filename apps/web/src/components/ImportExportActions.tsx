@@ -71,6 +71,8 @@ export function ImportExportActions({ engine, refreshScene }: ImportExportAction
 
   const handleExportDst = useCallback(() => {
     try {
+      const metrics = engine.sceneRouteMetrics(DEFAULT_STITCH_LENGTH);
+      console.info("DST route metrics", metrics);
       const design = engine.sceneExportDesign(DEFAULT_STITCH_LENGTH);
       const data = engine.exportDst(design);
       downloadFile(data, "design.dst", "application/octet-stream");
@@ -81,6 +83,8 @@ export function ImportExportActions({ engine, refreshScene }: ImportExportAction
 
   const handleExportPes = useCallback(() => {
     try {
+      const metrics = engine.sceneRouteMetrics(DEFAULT_STITCH_LENGTH);
+      console.info("PES route metrics", metrics);
       const design = engine.sceneExportDesign(DEFAULT_STITCH_LENGTH);
       const data = engine.exportPes(design);
       downloadFile(data, "design.pes", "application/octet-stream");
