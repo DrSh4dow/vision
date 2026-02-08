@@ -21,6 +21,7 @@ import initWasm, {
   scene_add_node_with_transform,
   scene_create,
   scene_export_design,
+  scene_export_design_with_options,
   scene_get_node,
   scene_get_path_commands,
   scene_get_render_list,
@@ -34,6 +35,7 @@ import initWasm, {
   scene_rename_node,
   scene_reorder_child,
   scene_route_metrics,
+  scene_route_metrics_with_options,
   scene_set_fill,
   scene_set_path_commands,
   scene_set_stroke,
@@ -52,6 +54,7 @@ import {
   PathDataSchema,
   RenderItemSchema,
   RouteMetricsSchema,
+  RoutingOptionsSchema,
   SatinResultSchema,
   SceneNodeInfoSchema,
   ThreadColorSchema,
@@ -66,6 +69,7 @@ import type {
   Point,
   RenderItem,
   RouteMetrics,
+  RoutingOptions,
   SatinResult,
   SceneNodeInfo,
   StitchType,
@@ -84,6 +88,7 @@ export {
   PathDataSchema,
   RenderItemSchema,
   RouteMetricsSchema,
+  RoutingOptionsSchema,
   SatinResultSchema,
   SceneNodeInfoSchema,
   ThreadColorSchema,
@@ -93,15 +98,19 @@ export {
 export type {
   BoundingBox,
   Color,
+  CompensationMode,
   ExportDesign,
   ExportStitch,
   ExportStitchType,
+  MotifPattern,
   NodeKindData,
   PathCommand,
   PathData,
   Point,
   RenderItem,
   RouteMetrics,
+  RoutingOptions,
+  RoutingPolicy,
   SatinResult,
   SceneNodeInfo,
   ShapeKindData,
@@ -114,6 +123,7 @@ export type {
   TreeNode,
   TreeNodeKind,
   UnderlayConfig,
+  UnderlayMode,
 } from "./types";
 
 // ============================================================================
@@ -125,6 +135,9 @@ export const STITCH_TYPE_MAP: Record<number, StitchType> = {
   [WasmStitchType.Running]: "running",
   [WasmStitchType.Satin]: "satin",
   [WasmStitchType.Tatami]: "tatami",
+  [WasmStitchType.Spiral]: "spiral",
+  [WasmStitchType.Contour]: "contour",
+  [WasmStitchType.Motif]: "motif",
 };
 
 // ============================================================================
@@ -218,6 +231,24 @@ export async function initEngine(): Promise<VisionEngine> {
 
       sceneRouteMetrics: (stitchLength: number): RouteMetrics => {
         const json = scene_route_metrics(stitchLength);
+        return RouteMetricsSchema.parse(JSON.parse(json));
+      },
+
+      sceneExportDesignWithOptions: (
+        stitchLength: number,
+        options: RoutingOptions,
+      ): ExportDesign => {
+        const routing = RoutingOptionsSchema.parse(options);
+        const json = scene_export_design_with_options(stitchLength, JSON.stringify(routing));
+        return ExportDesignSchema.parse(JSON.parse(json));
+      },
+
+      sceneRouteMetricsWithOptions: (
+        stitchLength: number,
+        options: RoutingOptions,
+      ): RouteMetrics => {
+        const routing = RoutingOptionsSchema.parse(options);
+        const json = scene_route_metrics_with_options(stitchLength, JSON.stringify(routing));
         return RouteMetricsSchema.parse(JSON.parse(json));
       },
 

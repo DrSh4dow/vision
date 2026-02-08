@@ -42,14 +42,35 @@ export const ThreadColorSchema = z.object({
 // Stitch Schemas
 // ============================================================================
 
-const StitchTypeSchema = z.enum(["running", "satin", "tatami"]);
+const StitchTypeSchema = z.enum(["running", "satin", "tatami", "spiral", "contour", "motif"]);
+const MotifPatternSchema = z.enum(["diamond", "wave", "triangle"]);
+const UnderlayModeSchema = z.enum([
+  "none",
+  "center_walk",
+  "edge_walk",
+  "zigzag",
+  "center_edge",
+  "center_zigzag",
+  "edge_zigzag",
+  "full",
+]);
+const CompensationModeSchema = z.enum(["off", "auto", "directional"]);
 
 const StitchParamsSchema = z.object({
   type: StitchTypeSchema,
   density: z.number(),
   angle: z.number(),
-  underlay_enabled: z.boolean(),
-  pull_compensation: z.number(),
+  underlay_mode: UnderlayModeSchema.default("none"),
+  underlay_spacing_mm: z.number().default(2),
+  underlay_enabled: z.boolean().default(false),
+  pull_compensation: z.number().default(0),
+  compensation_mode: CompensationModeSchema.default("auto"),
+  compensation_x_mm: z.number().default(0),
+  compensation_y_mm: z.number().default(0),
+  fill_phase: z.number().default(0),
+  contour_step_mm: z.number().default(1.2),
+  motif_pattern: MotifPatternSchema.default("diamond"),
+  motif_scale: z.number().default(1),
 });
 
 const StitchSchema = z.object({
@@ -86,6 +107,17 @@ export const RouteMetricsSchema = z.object({
   trim_count: z.number(),
   color_change_count: z.number(),
   travel_distance_mm: z.number(),
+});
+
+const RoutingPolicySchema = z.enum(["balanced", "min_travel", "min_trims"]);
+
+export const RoutingOptionsSchema = z.object({
+  policy: RoutingPolicySchema.default("balanced"),
+  max_jump_mm: z.number().default(25),
+  trim_threshold_mm: z.number().default(12),
+  preserve_color_order: z.boolean().default(true),
+  preserve_layer_order: z.boolean().default(false),
+  allow_reverse: z.boolean().default(true),
 });
 
 // ============================================================================

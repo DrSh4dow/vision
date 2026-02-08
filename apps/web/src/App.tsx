@@ -1,17 +1,18 @@
-import type { NodeKindData, RenderItem } from "@vision/wasm-bridge";
+import type { ExportDesign, NodeKindData, RenderItem, RoutingOptions } from "@vision/wasm-bridge";
 import { Circle, MousePointer2, PenTool, Square } from "lucide-react";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ImportExportActions } from "@/components/ImportExportActions";
 import { LayersPanel } from "@/components/LayersPanel";
 import { PropertiesPanel } from "@/components/PropertiesPanel";
 import { ThreadPalettePanel } from "@/components/ThreadPalettePanel";
 import { ToolButton } from "@/components/ToolButton";
+import { Button } from "@/components/ui/button";
 import { SectionHeader } from "@/components/ui/section-header";
 import { Separator } from "@/components/ui/separator";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ELLIPSE_FILL, ELLIPSE_STROKE, RECT_FILL, RECT_STROKE } from "@/constants/colors";
-import { DEFAULT_STITCH_PARAMS } from "@/constants/embroidery";
+import { DEFAULT_STITCH_LENGTH, DEFAULT_STITCH_PARAMS } from "@/constants/embroidery";
 import type { CanvasClickEvent } from "@/hooks/useCanvas";
 import { useCanvas } from "@/hooks/useCanvas";
 import { useEngine } from "@/hooks/useEngine";
@@ -20,9 +21,84 @@ import { useSelection } from "@/hooks/useSelection";
 import { useTools } from "@/hooks/useTools";
 import type { CanvasData, DesignPoint } from "@/types/design";
 
+const PREVIEW_ROUTING_OPTIONS: RoutingOptions = {
+  policy: "balanced",
+  max_jump_mm: 25,
+  trim_threshold_mm: 12,
+  preserve_color_order: true,
+  preserve_layer_order: false,
+  allow_reverse: true,
+};
+
+function colorToCss(color: { r: number; g: number; b: number }): string {
+  return `rgb(${color.r}, ${color.g}, ${color.b})`;
+}
+
+function buildStitchOverlays(
+  design: ExportDesign,
+  playhead?: number,
+): CanvasData["stitchOverlays"] {
+  if (design.stitches.length === 0 || design.colors.length === 0) {
+    return [];
+  }
+
+  const overlays: CanvasData["stitchOverlays"] = [];
+  let colorIndex = 0;
+  let current = {
+    id: `stitch-${colorIndex}`,
+    label: `Thread ${colorIndex + 1}`,
+    points: [] as DesignPoint[],
+    commands: [] as ExportDesign["stitches"][number]["stitch_type"][],
+    color: colorToCss(design.colors[colorIndex]),
+    showDots: false,
+    simulateThread: true,
+    threadWidthMm: 0.35,
+    playhead,
+  };
+
+  for (const stitch of design.stitches) {
+    if (stitch.stitch_type === "End") {
+      continue;
+    }
+
+    const p = { x: stitch.x, y: stitch.y };
+    current.points.push(p);
+    current.commands.push(stitch.stitch_type);
+
+    if (stitch.stitch_type === "ColorChange") {
+      if (current.points.length > 1) {
+        overlays.push(current);
+      }
+      colorIndex += 1;
+      const nextColor = design.colors[Math.min(colorIndex, design.colors.length - 1)];
+      current = {
+        id: `stitch-${colorIndex}`,
+        label: `Thread ${colorIndex + 1}`,
+        points: [p],
+        commands: ["Jump"],
+        color: colorToCss(nextColor),
+        showDots: false,
+        simulateThread: true,
+        threadWidthMm: 0.35,
+        playhead,
+      };
+    }
+  }
+
+  if (current.points.length > 1) {
+    overlays.push(current);
+  }
+
+  return overlays;
+}
+
 export function App() {
   const { engine, loading, error, version } = useEngine();
   const { activeTool, setActiveTool, cursorStyle } = useTools();
+  const [showThreadPreview, setShowThreadPreview] = useState(true);
+  const [playbackEnabled, setPlaybackEnabled] = useState(false);
+  const [playbackTick, setPlaybackTick] = useState(0);
+  const [routingOptions, setRoutingOptions] = useState<RoutingOptions>(PREVIEW_ROUTING_OPTIONS);
 
   // Canvas data: scene render items + stitch overlays
   const canvasDataRef = useRef<CanvasData>({
@@ -35,11 +111,26 @@ export function App() {
   const refreshScene = useCallback(() => {
     if (!engine) return;
     const items: RenderItem[] = engine.sceneGetRenderList();
+    let stitchOverlays = canvasDataRef.current.stitchOverlays;
+    if (showThreadPreview) {
+      try {
+        const design = engine.sceneExportDesignWithOptions(DEFAULT_STITCH_LENGTH, routingOptions);
+        const maxStep = Math.max(0, design.stitches.length - 1);
+        const playhead = playbackEnabled ? playbackTick % Math.max(1, maxStep) : maxStep;
+        stitchOverlays = buildStitchOverlays(design, playhead);
+      } catch (_err) {
+        stitchOverlays = [];
+      }
+    } else {
+      stitchOverlays = [];
+    }
+
     canvasDataRef.current = {
       ...canvasDataRef.current,
       renderItems: items,
+      stitchOverlays,
     };
-  }, [engine]);
+  }, [engine, playbackEnabled, playbackTick, routingOptions, showThreadPreview]);
 
   const { selectedIds, selectNode, deselectAll } = useSelection(engine, refreshScene);
   const { penState, addPoint, finishPath, cancelPath } = usePenTool(
@@ -65,6 +156,18 @@ export function App() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [activeTool, finishPath, cancelPath, setActiveTool]);
+
+  useEffect(() => {
+    if (!playbackEnabled) return;
+    const id = window.setInterval(() => {
+      setPlaybackTick((prev) => prev + 1);
+    }, 32);
+    return () => window.clearInterval(id);
+  }, [playbackEnabled]);
+
+  useEffect(() => {
+    refreshScene();
+  }, [refreshScene]);
 
   // Sync selected IDs into canvas data ref
   useEffect(() => {
@@ -208,7 +311,31 @@ export function App() {
             {engine && (
               <>
                 <Separator orientation="vertical" className="h-4 bg-border/40" />
-                <ImportExportActions engine={engine} refreshScene={refreshScene} />
+                <ImportExportActions
+                  engine={engine}
+                  refreshScene={refreshScene}
+                  routingOptions={routingOptions}
+                  onRoutingOptionsChange={setRoutingOptions}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-[10px] text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowThreadPreview((prev) => !prev)}
+                  data-testid="toggle-thread-preview"
+                >
+                  {showThreadPreview ? "Thread On" : "Thread Off"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-[10px] text-muted-foreground hover:text-foreground"
+                  onClick={() => setPlaybackEnabled((prev) => !prev)}
+                  disabled={!showThreadPreview}
+                  data-testid="toggle-thread-playback"
+                >
+                  {playbackEnabled ? "Stop" : "Play"}
+                </Button>
               </>
             )}
           </div>

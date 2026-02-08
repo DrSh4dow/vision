@@ -167,6 +167,26 @@ pub fn scene_export_design(stitch_length: f64) -> Result<String, JsError> {
     serde_json::to_string(&design).map_err(|e| JsError::new(&format!("Serialization error: {e}")))
 }
 
+/// Convert the current scene graph to an `ExportDesign` JSON string with explicit routing options.
+#[wasm_bindgen]
+pub fn scene_export_design_with_options(
+    stitch_length: f64,
+    routing_options_json: &str,
+) -> Result<String, JsError> {
+    let routing = if routing_options_json.trim().is_empty() {
+        crate::export_pipeline::RoutingOptions::default()
+    } else {
+        serde_json::from_str::<crate::export_pipeline::RoutingOptions>(routing_options_json)
+            .map_err(|e| JsError::new(&format!("Invalid routing options: {e}")))?
+    };
+
+    let design = with_scene(|s| {
+        crate::export_pipeline::scene_to_export_design_with_routing(s, stitch_length, routing)
+    })
+    .map_err(|e| JsError::new(&e))?;
+    serde_json::to_string(&design).map_err(|e| JsError::new(&format!("Serialization error: {e}")))
+}
+
 /// Compute route quality metrics for the current scene's export order.
 ///
 /// Returns JSON with jump/trim/color-change counts and travel distance.
@@ -174,6 +194,27 @@ pub fn scene_export_design(stitch_length: f64) -> Result<String, JsError> {
 pub fn scene_route_metrics(stitch_length: f64) -> Result<String, JsError> {
     let design = with_scene(|s| crate::export_pipeline::scene_to_export_design(s, stitch_length))
         .map_err(|e| JsError::new(&e))?;
+    let metrics = crate::export_pipeline::compute_route_metrics(&design);
+    serde_json::to_string(&metrics).map_err(|e| JsError::new(&format!("Serialization error: {e}")))
+}
+
+/// Compute route quality metrics for the current scene with explicit routing options.
+#[wasm_bindgen]
+pub fn scene_route_metrics_with_options(
+    stitch_length: f64,
+    routing_options_json: &str,
+) -> Result<String, JsError> {
+    let routing = if routing_options_json.trim().is_empty() {
+        crate::export_pipeline::RoutingOptions::default()
+    } else {
+        serde_json::from_str::<crate::export_pipeline::RoutingOptions>(routing_options_json)
+            .map_err(|e| JsError::new(&format!("Invalid routing options: {e}")))?
+    };
+
+    let design = with_scene(|s| {
+        crate::export_pipeline::scene_to_export_design_with_routing(s, stitch_length, routing)
+    })
+    .map_err(|e| JsError::new(&e))?;
     let metrics = crate::export_pipeline::compute_route_metrics(&design);
     serde_json::to_string(&metrics).map_err(|e| JsError::new(&format!("Serialization error: {e}")))
 }

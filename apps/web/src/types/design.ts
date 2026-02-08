@@ -5,7 +5,7 @@
  * Coordinates are in design space (millimeters).
  */
 
-import type { RenderItem } from "@vision/wasm-bridge";
+import type { ExportStitchType, RenderItem } from "@vision/wasm-bridge";
 
 /** A 2D point in design space (mm). */
 export interface DesignPoint {
@@ -34,6 +34,10 @@ export interface StitchOverlay {
   points: DesignPoint[];
   color: string;
   showDots: boolean;
+  commands?: ExportStitchType[];
+  simulateThread?: boolean;
+  threadWidthMm?: number;
+  playhead?: number;
 }
 
 /** Canvas render data: scene render items + stitch overlays. */

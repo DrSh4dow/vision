@@ -1,4 +1,4 @@
-import type { NodeKindData, VisionEngine } from "@vision/wasm-bridge";
+import type { NodeKindData, RoutingOptions, VisionEngine } from "@vision/wasm-bridge";
 import { Download, FileUp } from "lucide-react";
 import { useCallback, useRef } from "react";
 
@@ -13,9 +13,16 @@ import type { ParsedVectorPath } from "@/types/design";
 interface ImportExportActionsProps {
   engine: VisionEngine;
   refreshScene: () => void;
+  routingOptions: RoutingOptions;
+  onRoutingOptionsChange: (next: RoutingOptions) => void;
 }
 
-export function ImportExportActions({ engine, refreshScene }: ImportExportActionsProps) {
+export function ImportExportActions({
+  engine,
+  refreshScene,
+  routingOptions,
+  onRoutingOptionsChange,
+}: ImportExportActionsProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSvgImport = useCallback(() => {
@@ -71,27 +78,27 @@ export function ImportExportActions({ engine, refreshScene }: ImportExportAction
 
   const handleExportDst = useCallback(() => {
     try {
-      const metrics = engine.sceneRouteMetrics(DEFAULT_STITCH_LENGTH);
+      const metrics = engine.sceneRouteMetricsWithOptions(DEFAULT_STITCH_LENGTH, routingOptions);
       console.info("DST route metrics", metrics);
-      const design = engine.sceneExportDesign(DEFAULT_STITCH_LENGTH);
+      const design = engine.sceneExportDesignWithOptions(DEFAULT_STITCH_LENGTH, routingOptions);
       const data = engine.exportDst(design);
       downloadFile(data, "design.dst", "application/octet-stream");
     } catch (err) {
       console.warn("DST export failed:", err);
     }
-  }, [engine]);
+  }, [engine, routingOptions]);
 
   const handleExportPes = useCallback(() => {
     try {
-      const metrics = engine.sceneRouteMetrics(DEFAULT_STITCH_LENGTH);
+      const metrics = engine.sceneRouteMetricsWithOptions(DEFAULT_STITCH_LENGTH, routingOptions);
       console.info("PES route metrics", metrics);
-      const design = engine.sceneExportDesign(DEFAULT_STITCH_LENGTH);
+      const design = engine.sceneExportDesignWithOptions(DEFAULT_STITCH_LENGTH, routingOptions);
       const data = engine.exportPes(design);
       downloadFile(data, "design.pes", "application/octet-stream");
     } catch (err) {
       console.warn("PES export failed:", err);
     }
-  }, [engine]);
+  }, [engine, routingOptions]);
 
   return (
     <div className="flex items-center gap-0.5">
@@ -120,6 +127,36 @@ export function ImportExportActions({ engine, refreshScene }: ImportExportAction
         <TooltipContent>Import SVG</TooltipContent>
       </Tooltip>
       <Separator orientation="vertical" className="mx-0.5 h-3.5 bg-border/30" />
+      <select
+        className="h-7 rounded border border-border/40 bg-card px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+        value={routingOptions.policy}
+        onChange={(e) =>
+          onRoutingOptionsChange({
+            ...routingOptions,
+            policy: e.target.value as RoutingOptions["policy"],
+          })
+        }
+        data-testid="routing-policy-select"
+        aria-label="Routing policy"
+      >
+        <option value="balanced">Balanced</option>
+        <option value="min_travel">Min Travel</option>
+        <option value="min_trims">Min Trims</option>
+      </select>
+      <label className="inline-flex h-7 items-center gap-1 rounded border border-border/40 bg-card px-1.5 text-[10px] text-muted-foreground">
+        <input
+          type="checkbox"
+          checked={routingOptions.allow_reverse}
+          onChange={(e) =>
+            onRoutingOptionsChange({
+              ...routingOptions,
+              allow_reverse: e.target.checked,
+            })
+          }
+          data-testid="routing-allow-reverse"
+        />
+        Reverse
+      </label>
       <Tooltip>
         <TooltipTrigger asChild>
           <Button

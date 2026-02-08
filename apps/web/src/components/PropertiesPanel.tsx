@@ -263,6 +263,9 @@ function StitchFields({
   const shapeKind = typeof kind === "string" || !("Shape" in kind) ? null : kind.Shape;
   const stitch = shapeKind?.stitch ?? DEFAULT_STITCH_PARAMS;
   const isSatin = stitch.type === "satin";
+  const isContour = stitch.type === "contour";
+  const isSpiral = stitch.type === "spiral";
+  const isMotif = stitch.type === "motif";
 
   const updateStitch = useCallback(
     (next: StitchParams) => {
@@ -305,6 +308,9 @@ function StitchFields({
           <option value="running">Running</option>
           <option value="satin">Satin</option>
           <option value="tatami">Tatami</option>
+          <option value="contour">Contour</option>
+          <option value="spiral">Spiral</option>
+          <option value="motif">Motif</option>
         </select>
       </div>
 
@@ -327,31 +333,156 @@ function StitchFields({
       </div>
 
       {isSatin && (
-        <div className="grid grid-cols-2 gap-2">
-          <LabeledNumberField
-            id="prop-pull-comp"
-            label="Pull Comp"
-            value={stitch.pull_compensation}
-            step={0.05}
-            min={0}
-            onChange={(value) => updateStitch({ ...stitch, pull_compensation: value })}
-          />
-          <div className="flex flex-col gap-1">
-            <PropLabel htmlFor="prop-underlay-enabled">Underlay</PropLabel>
-            <label
-              htmlFor="prop-underlay-enabled"
-              className="flex h-7 items-center gap-2 rounded-md border border-border/40 bg-surface px-2 text-xs"
-            >
-              <input
-                id="prop-underlay-enabled"
-                type="checkbox"
-                checked={stitch.underlay_enabled}
-                onChange={(e) => updateStitch({ ...stitch, underlay_enabled: e.target.checked })}
-                data-testid="prop-underlay-enabled"
-              />
-              <span>Center walk</span>
-            </label>
+        <div className="flex flex-col gap-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col gap-1">
+              <PropLabel htmlFor="prop-underlay-mode">Underlay</PropLabel>
+              <select
+                id="prop-underlay-mode"
+                className="h-7 rounded-md border border-border/40 bg-surface px-2 text-xs text-foreground"
+                value={stitch.underlay_mode}
+                onChange={(e) =>
+                  updateStitch({
+                    ...stitch,
+                    underlay_mode: e.target.value as StitchParams["underlay_mode"],
+                    underlay_enabled: e.target.value !== "none",
+                  })
+                }
+                data-testid="prop-underlay-mode"
+              >
+                <option value="none">None</option>
+                <option value="center_walk">Center Walk</option>
+                <option value="edge_walk">Edge Walk</option>
+                <option value="zigzag">Zigzag</option>
+                <option value="center_edge">Center + Edge</option>
+                <option value="center_zigzag">Center + Zigzag</option>
+                <option value="edge_zigzag">Edge + Zigzag</option>
+                <option value="full">Full</option>
+              </select>
+            </div>
+            <LabeledNumberField
+              id="prop-pull-comp"
+              label="Pull Comp"
+              value={stitch.pull_compensation}
+              step={0.05}
+              min={0}
+              onChange={(value) => updateStitch({ ...stitch, pull_compensation: value })}
+            />
           </div>
+
+          {(stitch.underlay_mode === "zigzag" ||
+            stitch.underlay_mode === "center_zigzag" ||
+            stitch.underlay_mode === "edge_zigzag" ||
+            stitch.underlay_mode === "full") && (
+            <div className="grid grid-cols-2 gap-2">
+              <LabeledNumberField
+                id="prop-underlay-spacing"
+                label="Underlay Step"
+                value={stitch.underlay_spacing_mm}
+                step={0.1}
+                min={0.5}
+                onChange={(value) => updateStitch({ ...stitch, underlay_spacing_mm: value })}
+              />
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col gap-1">
+              <PropLabel htmlFor="prop-comp-mode">Comp Mode</PropLabel>
+              <select
+                id="prop-comp-mode"
+                className="h-7 rounded-md border border-border/40 bg-surface px-2 text-xs text-foreground"
+                value={stitch.compensation_mode}
+                onChange={(e) =>
+                  updateStitch({
+                    ...stitch,
+                    compensation_mode: e.target.value as StitchParams["compensation_mode"],
+                  })
+                }
+                data-testid="prop-comp-mode"
+              >
+                <option value="off">Off</option>
+                <option value="auto">Auto</option>
+                <option value="directional">Directional</option>
+              </select>
+            </div>
+          </div>
+
+          {stitch.compensation_mode === "directional" && (
+            <div className="grid grid-cols-2 gap-2">
+              <LabeledNumberField
+                id="prop-comp-x"
+                label="Comp X"
+                value={stitch.compensation_x_mm}
+                step={0.05}
+                min={0}
+                onChange={(value) => updateStitch({ ...stitch, compensation_x_mm: value })}
+              />
+              <LabeledNumberField
+                id="prop-comp-y"
+                label="Comp Y"
+                value={stitch.compensation_y_mm}
+                step={0.05}
+                min={0}
+                onChange={(value) => updateStitch({ ...stitch, compensation_y_mm: value })}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {(isContour || isSpiral || isMotif) && (
+        <div className="grid grid-cols-2 gap-2">
+          {(isSpiral || isMotif) && (
+            <LabeledNumberField
+              id="prop-fill-phase"
+              label="Fill Phase"
+              value={stitch.fill_phase}
+              step={0.1}
+              onChange={(value) => updateStitch({ ...stitch, fill_phase: value })}
+            />
+          )}
+          {isContour && (
+            <LabeledNumberField
+              id="prop-contour-step"
+              label="Contour Step"
+              value={stitch.contour_step_mm}
+              step={0.1}
+              min={0.1}
+              onChange={(value) => updateStitch({ ...stitch, contour_step_mm: value })}
+            />
+          )}
+          {isMotif && (
+            <div className="flex flex-col gap-1">
+              <PropLabel htmlFor="prop-motif-pattern">Motif</PropLabel>
+              <select
+                id="prop-motif-pattern"
+                className="h-7 rounded-md border border-border/40 bg-surface px-2 text-xs text-foreground"
+                value={stitch.motif_pattern}
+                onChange={(e) =>
+                  updateStitch({
+                    ...stitch,
+                    motif_pattern: e.target.value as StitchParams["motif_pattern"],
+                  })
+                }
+                data-testid="prop-motif-pattern"
+              >
+                <option value="diamond">Diamond</option>
+                <option value="wave">Wave</option>
+                <option value="triangle">Triangle</option>
+              </select>
+            </div>
+          )}
+          {isMotif && (
+            <LabeledNumberField
+              id="prop-motif-scale"
+              label="Motif Scale"
+              value={stitch.motif_scale}
+              step={0.1}
+              min={0.2}
+              onChange={(value) => updateStitch({ ...stitch, motif_scale: value })}
+            />
+          )}
         </div>
       )}
     </div>

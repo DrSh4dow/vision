@@ -48,6 +48,44 @@ pub enum StitchType {
     Running,
     Satin,
     Tatami,
+    Spiral,
+    Contour,
+    Motif,
+}
+
+/// Motif pattern variant for motif fill stitches.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MotifPattern {
+    #[default]
+    Diamond,
+    Wave,
+    Triangle,
+}
+
+/// Underlay pattern mode for satin stitches.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UnderlayMode {
+    #[default]
+    None,
+    CenterWalk,
+    EdgeWalk,
+    Zigzag,
+    CenterEdge,
+    CenterZigzag,
+    EdgeZigzag,
+    Full,
+}
+
+/// Pull compensation mode for satin stitches.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CompensationMode {
+    Off,
+    #[default]
+    Auto,
+    Directional,
 }
 
 /// Stitch parameters for an embroidery object.
@@ -57,8 +95,28 @@ pub struct StitchParams {
     pub stitch_type: StitchType,
     pub density: f64,
     pub angle: f64,
+    #[serde(default)]
+    pub underlay_mode: UnderlayMode,
+    #[serde(default = "default_underlay_spacing_mm")]
+    pub underlay_spacing_mm: f64,
+    #[serde(default)]
     pub underlay_enabled: bool,
+    #[serde(default)]
     pub pull_compensation: f64,
+    #[serde(default)]
+    pub compensation_mode: CompensationMode,
+    #[serde(default)]
+    pub compensation_x_mm: f64,
+    #[serde(default)]
+    pub compensation_y_mm: f64,
+    #[serde(default)]
+    pub fill_phase: f64,
+    #[serde(default = "default_contour_step_mm")]
+    pub contour_step_mm: f64,
+    #[serde(default)]
+    pub motif_pattern: MotifPattern,
+    #[serde(default = "default_motif_scale")]
+    pub motif_scale: f64,
 }
 
 impl Default for StitchParams {
@@ -67,10 +125,31 @@ impl Default for StitchParams {
             stitch_type: StitchType::Running,
             density: crate::constants::DEFAULT_STITCH_DENSITY,
             angle: 0.0,
+            underlay_mode: UnderlayMode::None,
+            underlay_spacing_mm: default_underlay_spacing_mm(),
             underlay_enabled: false,
             pull_compensation: 0.0,
+            compensation_mode: CompensationMode::Auto,
+            compensation_x_mm: 0.0,
+            compensation_y_mm: 0.0,
+            fill_phase: 0.0,
+            contour_step_mm: default_contour_step_mm(),
+            motif_pattern: MotifPattern::default(),
+            motif_scale: default_motif_scale(),
         }
     }
+}
+
+fn default_contour_step_mm() -> f64 {
+    1.2
+}
+
+fn default_underlay_spacing_mm() -> f64 {
+    2.0
+}
+
+fn default_motif_scale() -> f64 {
+    1.0
 }
 
 /// A single stitch point with metadata.

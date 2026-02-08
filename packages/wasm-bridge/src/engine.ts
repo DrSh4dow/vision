@@ -14,6 +14,7 @@ import type {
   Point,
   RenderItem,
   RouteMetrics,
+  RoutingOptions,
   SatinResult,
   SceneNodeInfo,
   ThreadBrand,
@@ -74,6 +75,12 @@ export interface VisionEngine {
 
   /** Compute route quality metrics for the current scene export. */
   sceneRouteMetrics(stitchLength: number): RouteMetrics;
+
+  /** Generate scene export design with explicit routing options. */
+  sceneExportDesignWithOptions(stitchLength: number, options: RoutingOptions): ExportDesign;
+
+  /** Compute route metrics with explicit routing options. */
+  sceneRouteMetricsWithOptions(stitchLength: number, options: RoutingOptions): RouteMetrics;
 
   // ==========================================================================
   // Scene Graph API

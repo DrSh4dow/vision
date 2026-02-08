@@ -14,8 +14,17 @@ export const DEFAULT_STITCH_PARAMS: StitchParams = {
   type: "running",
   density: DEFAULT_STITCH_DENSITY,
   angle: DEFAULT_STITCH_ANGLE,
+  underlay_mode: "none",
+  underlay_spacing_mm: 2,
   underlay_enabled: false,
   pull_compensation: 0,
+  compensation_mode: "auto",
+  compensation_x_mm: 0,
+  compensation_y_mm: 0,
+  fill_phase: 0,
+  contour_step_mm: 1.2,
+  motif_pattern: "diamond",
+  motif_scale: 1,
 };
 
 /** Available thread brand options. */

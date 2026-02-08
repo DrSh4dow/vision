@@ -19,7 +19,9 @@ mod types;
 mod wasm;
 
 // Re-export core types at crate root for ergonomic access.
-pub use types::{Color, Point, Stitch, StitchParams, StitchType};
+pub use types::{
+    Color, CompensationMode, MotifPattern, Point, Stitch, StitchParams, StitchType, UnderlayMode,
+};
 
 #[cfg(test)]
 mod tests {

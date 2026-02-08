@@ -36,15 +36,39 @@ export interface ThreadColor {
 export type ThreadBrand = "madeira" | "isacord" | "sulky";
 
 /** Stitch type enumeration (mirrors Rust StitchType). */
-export type StitchType = "running" | "satin" | "tatami";
+export type StitchType = "running" | "satin" | "tatami" | "spiral" | "contour" | "motif";
+
+/** Motif pattern variant for motif fill stitches. */
+export type MotifPattern = "diamond" | "wave" | "triangle";
+/** Satin underlay mode variant. */
+export type UnderlayMode =
+  | "none"
+  | "center_walk"
+  | "edge_walk"
+  | "zigzag"
+  | "center_edge"
+  | "center_zigzag"
+  | "edge_zigzag"
+  | "full";
+/** Pull compensation mode for satin stitches. */
+export type CompensationMode = "off" | "auto" | "directional";
 
 /** Stitch parameters for an embroidery object. */
 export interface StitchParams {
   type: StitchType;
   density: number;
   angle: number;
+  underlay_mode: UnderlayMode;
+  underlay_spacing_mm: number;
   underlay_enabled: boolean;
   pull_compensation: number;
+  compensation_mode: CompensationMode;
+  compensation_x_mm: number;
+  compensation_y_mm: number;
+  fill_phase: number;
+  contour_step_mm: number;
+  motif_pattern: MotifPattern;
+  motif_scale: number;
 }
 
 /** A single stitch with metadata. */
@@ -92,6 +116,19 @@ export interface RouteMetrics {
   trim_count: number;
   color_change_count: number;
   travel_distance_mm: number;
+}
+
+/** Routing optimization policy. */
+export type RoutingPolicy = "balanced" | "min_travel" | "min_trims";
+
+/** Routing options used when exporting scene stitches. */
+export interface RoutingOptions {
+  policy: RoutingPolicy;
+  max_jump_mm: number;
+  trim_threshold_mm: number;
+  preserve_color_order: boolean;
+  preserve_layer_order: boolean;
+  allow_reverse: boolean;
 }
 
 // ============================================================================

@@ -199,8 +199,18 @@ test.describe("Import/Export Actions", () => {
     await expect(stitchType).toBeVisible();
     await stitchType.selectOption("satin");
 
-    await expect(page.getByTestId("prop-underlay-enabled")).toBeVisible();
+    await expect(page.getByTestId("prop-underlay-mode")).toBeVisible();
+    await expect(page.getByTestId("prop-comp-mode")).toBeVisible();
     await expect(page.locator("#prop-pull-comp")).toBeVisible();
+
+    await page.getByTestId("prop-comp-mode").selectOption("directional");
+    await expect(page.locator("#prop-comp-x")).toBeVisible();
+    await expect(page.locator("#prop-comp-y")).toBeVisible();
+  });
+
+  test("routing reverse toggle is available", async ({ page }) => {
+    await expect(page.getByTestId("routing-policy-select")).toBeVisible();
+    await expect(page.getByTestId("routing-allow-reverse")).toBeVisible();
   });
 });
 
