@@ -242,3 +242,58 @@ test.describe("Canvas Interaction", () => {
     expect(errors).toEqual([]);
   });
 });
+
+test.describe("Canvas Rendering", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/");
+    const status = page.getByTestId("engine-status");
+    await expect(status).toContainText(/Engine v/, { timeout: 15_000 });
+  });
+
+  test("running stitch demo renders on canvas", async ({ page }) => {
+    // Click the running stitch demo button
+    await page.getByTestId("stitch-demo-btn").click();
+    await expect(page.getByTestId("stitch-count")).toBeVisible({ timeout: 5_000 });
+
+    // Wait for render loop to draw the stitches
+    await page.waitForTimeout(300);
+
+    // Take a full-page screenshot to verify visual output
+    await page.screenshot({ path: "e2e/screenshots/running-stitch-demo.png", fullPage: false });
+  });
+
+  test("satin stitch demo renders on canvas", async ({ page }) => {
+    await page.getByTestId("satin-demo-btn").click();
+    await expect(page.getByTestId("satin-count")).toBeVisible({ timeout: 5_000 });
+
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: "e2e/screenshots/satin-stitch-demo.png", fullPage: false });
+  });
+
+  test("SVG path demo renders on canvas", async ({ page }) => {
+    await page.getByTestId("svg-import-demo-btn").click();
+    await expect(page.getByTestId("svg-path-count")).toBeVisible({ timeout: 5_000 });
+
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: "e2e/screenshots/svg-path-demo.png", fullPage: false });
+  });
+
+  test("all demos render together on canvas", async ({ page }) => {
+    // Click all three demo buttons
+    await page.getByTestId("stitch-demo-btn").click();
+    await expect(page.getByTestId("stitch-count")).toBeVisible({ timeout: 5_000 });
+
+    await page.getByTestId("satin-demo-btn").click();
+    await expect(page.getByTestId("satin-count")).toBeVisible({ timeout: 5_000 });
+
+    await page.getByTestId("svg-import-demo-btn").click();
+    await expect(page.getByTestId("svg-path-count")).toBeVisible({ timeout: 5_000 });
+
+    // Also load thread palette for a complete UI screenshot
+    await page.getByTestId("thread-brand-madeira").click();
+    await expect(page.getByTestId("thread-swatches")).toBeVisible({ timeout: 5_000 });
+
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: "e2e/screenshots/all-demos-combined.png", fullPage: false });
+  });
+});

@@ -1,6 +1,7 @@
 # AGENTS.md — Vision
 
 Collaborative embroidery design tool (Figma-like). Monorepo: **moonrepo** + **Bun** + **Rust/WASM** + **React 19**.
+Assume senior-level knowledge. No explanations for standard practices. Terse, scannable, constraint-first.
 
 ## Architecture
 
@@ -39,6 +40,7 @@ bunx playwright test e2e/app.spec.ts          # 18 tests (from apps/web)
 ## Code Quality — Zero Tolerance
 
 **Every PR must pass ALL of these before merge:**
+
 1. `cargo fmt --all --check` — clean
 2. `cargo clippy --workspace` — zero warnings
 3. `cargo test --workspace` — all green
@@ -106,3 +108,8 @@ crates/engine/      — Scene graph, paths, shapes, stitch algorithms, format I/
 crates/renderer/    — Camera, mesh, vertex (native), GPU renderer (wasm32 only)
 biome.json          — Root Biome config (lint + format for all TS)
 ```
+
+## Plan Mode
+
+- Plans must be extremely concise. Sacrifice grammar for brevity.
+- End each plan with unresolved questions, if any.

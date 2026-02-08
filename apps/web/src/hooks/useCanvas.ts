@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import type { DesignObject, DesignPoint, PathCommand } from "@/types/design";
 
 /** Camera state for 2D canvas pan/zoom. */
 interface Camera {
@@ -11,18 +12,27 @@ interface Camera {
 interface UseCanvasOptions {
   /** Whether the engine is ready (triggers initial render). */
   ready: boolean;
+  /** Mutable ref to the current design objects to render. */
+  objects: React.RefObject<DesignObject[]>;
 }
 
+/** Scale factor: 1 mm in design space = this many canvas units (pixels at zoom 1). */
+const MM_TO_PX = 10;
+
 /**
- * Hook to manage a 2D canvas with pan/zoom and grid rendering.
+ * Hook to manage a 2D canvas with pan/zoom, grid rendering, and design object display.
  *
  * Returns a ref to attach to a `<canvas>` element. Handles:
  * - DPI-aware sizing via ResizeObserver
  * - Infinite grid rendering with zoom-adaptive spacing
- * - Pan (middle-click or Space+drag) and zoom (mouse wheel)
+ * - Pan (middle-click or Alt+drag) and zoom (mouse wheel)
  * - Origin axes highlighting
+ * - Rendering design objects (stitches, paths)
  */
-export function useCanvas({ ready }: UseCanvasOptions): React.RefObject<HTMLCanvasElement | null> {
+export function useCanvas({
+  ready,
+  objects,
+}: UseCanvasOptions): React.RefObject<HTMLCanvasElement | null> {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cameraRef = useRef<Camera>({ x: 0, y: 0, zoom: 1 });
   const rafRef = useRef<number>(0);
@@ -65,6 +75,16 @@ export function useCanvas({ ready }: UseCanvasOptions): React.RefObject<HTMLCanv
     // Draw origin axes
     drawAxes(ctx, cam, width, height);
 
+    // Draw design objects
+    const objs = objects.current;
+    for (const obj of objs) {
+      if (obj.type === "stitches") {
+        drawStitchObject(ctx, cam, obj.points, obj.color, obj.showDots);
+      } else if (obj.type === "path") {
+        drawPathObject(ctx, cam, obj.commands, obj.color, obj.strokeWidth, obj.closed);
+      }
+    }
+
     ctx.restore();
 
     // Draw HUD (zoom level, camera position)
@@ -76,7 +96,13 @@ export function useCanvas({ ready }: UseCanvasOptions): React.RefObject<HTMLCanv
       8,
       height - 8,
     );
-  }, []);
+
+    // Object count indicator
+    if (objs.length > 0) {
+      ctx.textAlign = "right";
+      ctx.fillText(`${objs.length} object${objs.length !== 1 ? "s" : ""}`, width - 8, height - 8);
+    }
+  }, [objects]);
 
   // Render loop
   useEffect(() => {
@@ -254,5 +280,146 @@ function drawAxes(ctx: CanvasRenderingContext2D, cam: Camera, viewW: number, vie
     ctx.moveTo(0, top);
     ctx.lineTo(0, bottom);
     ctx.stroke();
+  }
+}
+
+// ============================================================================
+// Design object rendering
+// ============================================================================
+
+/** Convert a design-space point (mm) to canvas world coordinates. */
+function toCanvas(p: DesignPoint): { x: number; y: number } {
+  return { x: p.x * MM_TO_PX, y: p.y * MM_TO_PX };
+}
+
+/** Draw stitch points as connected lines with optional dot markers. */
+function drawStitchObject(
+  ctx: CanvasRenderingContext2D,
+  cam: Camera,
+  points: DesignPoint[],
+  color: string,
+  showDots: boolean,
+): void {
+  if (points.length === 0) return;
+
+  // Draw connecting lines
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5 / cam.zoom;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.beginPath();
+
+  const first = toCanvas(points[0]);
+  ctx.moveTo(first.x, first.y);
+
+  for (let i = 1; i < points.length; i++) {
+    const p = toCanvas(points[i]);
+    ctx.lineTo(p.x, p.y);
+  }
+  ctx.stroke();
+
+  // Draw dots at each stitch point
+  if (showDots) {
+    const dotRadius = 2.0 / cam.zoom;
+    ctx.fillStyle = color;
+    for (const pt of points) {
+      const p = toCanvas(pt);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, dotRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Draw start/end markers
+  const startP = toCanvas(points[0]);
+  const endP = toCanvas(points[points.length - 1]);
+  const markerRadius = 3.5 / cam.zoom;
+
+  // Start marker — green circle
+  ctx.fillStyle = "#7ee787";
+  ctx.beginPath();
+  ctx.arc(startP.x, startP.y, markerRadius, 0, Math.PI * 2);
+  ctx.fill();
+
+  // End marker — red circle
+  ctx.fillStyle = "#f85149";
+  ctx.beginPath();
+  ctx.arc(endP.x, endP.y, markerRadius, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/** Get the point from a path command (for extracting coordinates). */
+function getCommandPoint(cmd: PathCommand): DesignPoint | null {
+  if (cmd === "Close") return null;
+  if ("MoveTo" in cmd) return cmd.MoveTo;
+  if ("LineTo" in cmd) return cmd.LineTo;
+  if ("CubicTo" in cmd) return cmd.CubicTo.end;
+  if ("QuadTo" in cmd) return cmd.QuadTo.end;
+  return null;
+}
+
+/** Draw a vector path object using Canvas2D path commands. */
+function drawPathObject(
+  ctx: CanvasRenderingContext2D,
+  cam: Camera,
+  commands: PathCommand[],
+  color: string,
+  strokeWidth: number,
+  closed: boolean,
+): void {
+  if (commands.length === 0) return;
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = (strokeWidth || 2) / cam.zoom;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+
+  // Semi-transparent fill for closed paths
+  if (closed) {
+    ctx.fillStyle = `${color}20`;
+  }
+
+  ctx.beginPath();
+
+  for (const cmd of commands) {
+    if (cmd === "Close") {
+      ctx.closePath();
+      continue;
+    }
+
+    if ("MoveTo" in cmd) {
+      const p = toCanvas(cmd.MoveTo);
+      ctx.moveTo(p.x, p.y);
+    } else if ("LineTo" in cmd) {
+      const p = toCanvas(cmd.LineTo);
+      ctx.lineTo(p.x, p.y);
+    } else if ("CubicTo" in cmd) {
+      const c1 = toCanvas(cmd.CubicTo.c1);
+      const c2 = toCanvas(cmd.CubicTo.c2);
+      const end = toCanvas(cmd.CubicTo.end);
+      ctx.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, end.x, end.y);
+    } else if ("QuadTo" in cmd) {
+      const ctrl = toCanvas(cmd.QuadTo.ctrl);
+      const end = toCanvas(cmd.QuadTo.end);
+      ctx.quadraticCurveTo(ctrl.x, ctrl.y, end.x, end.y);
+    }
+  }
+
+  if (closed) {
+    ctx.fill();
+  }
+  ctx.stroke();
+
+  // Draw control point markers at each vertex
+  const vertexRadius = 2.5 / cam.zoom;
+  ctx.fillStyle = color;
+  for (const cmd of commands) {
+    const pt = getCommandPoint(cmd);
+    if (pt) {
+      const p = toCanvas(pt);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, vertexRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 }

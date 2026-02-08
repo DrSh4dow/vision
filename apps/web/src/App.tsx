@@ -13,10 +13,22 @@ import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCanvas } from "@/hooks/useCanvas";
 import { useEngine } from "@/hooks/useEngine";
+import type { DesignObject, ParsedVectorPath } from "@/types/design";
 
 export function App() {
   const { engine, loading, error, version } = useEngine();
-  const canvasRef = useCanvas({ ready: !loading && !error });
+  const objectsRef = useRef<DesignObject[]>([]);
+  const canvasRef = useCanvas({ ready: !loading && !error, objects: objectsRef });
+
+  /** Replace or add a design object by id. */
+  const upsertObject = useCallback((obj: DesignObject) => {
+    objectsRef.current = [...objectsRef.current.filter((o) => o.id !== obj.id), obj];
+  }, []);
+
+  /** Replace all objects matching an id prefix. */
+  const replaceByPrefix = useCallback((prefix: string, objs: DesignObject[]) => {
+    objectsRef.current = [...objectsRef.current.filter((o) => !o.id.startsWith(prefix)), ...objs];
+  }, []);
 
   const statusText = error
     ? `Error: ${error}`
@@ -36,7 +48,7 @@ export function App() {
             >
               Vision
             </span>
-            {engine && <ImportExportActions engine={engine} />}
+            {engine && <ImportExportActions engine={engine} replaceByPrefix={replaceByPrefix} />}
           </div>
           <span className="text-xs text-muted-foreground" data-testid="engine-status">
             {statusText}
@@ -65,13 +77,13 @@ export function App() {
 
             {engine && (
               <PanelSection title="Stitch Demo">
-                <StitchDemo engine={engine} />
+                <StitchDemo engine={engine} upsertObject={upsertObject} />
               </PanelSection>
             )}
 
             {engine && (
               <PanelSection title="SVG Import">
-                <SvgImportDemo engine={engine} />
+                <SvgImportDemo engine={engine} upsertObject={upsertObject} />
               </PanelSection>
             )}
           </aside>
@@ -154,7 +166,13 @@ function ToolButton({
 // Import / Export Actions (Toolbar)
 // ============================================================================
 
-function ImportExportActions({ engine }: { engine: VisionEngine }) {
+function ImportExportActions({
+  engine,
+  replaceByPrefix,
+}: {
+  engine: VisionEngine;
+  replaceByPrefix: (prefix: string, objs: DesignObject[]) => void;
+}) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSvgImport = useCallback(() => {
@@ -171,8 +189,19 @@ function ImportExportActions({ engine }: { engine: VisionEngine }) {
         const content = ev.target?.result;
         if (typeof content !== "string") return;
 
-        const paths = engine.importSvgDocument(content);
-        // For now just log — will be wired to scene graph later
+        const paths = engine.importSvgDocument(content) as ParsedVectorPath[];
+        // Add each imported path as a design object on the canvas
+        const colors = ["#d2a8ff", "#f0883e", "#58a6ff", "#7ee787", "#f97583"];
+        const newObjects: DesignObject[] = paths.map((p, i) => ({
+          type: "path" as const,
+          id: `svg-import-${i}`,
+          label: `Imported Path ${i + 1}`,
+          commands: p.commands,
+          closed: p.closed,
+          color: colors[i % colors.length],
+          strokeWidth: 2,
+        }));
+        replaceByPrefix("svg-import-", newObjects);
         console.log(`Imported ${paths.length} path(s) from SVG`);
       };
       reader.readAsText(file);
@@ -180,7 +209,7 @@ function ImportExportActions({ engine }: { engine: VisionEngine }) {
       // Reset input so the same file can be re-selected
       e.target.value = "";
     },
-    [engine],
+    [engine, replaceByPrefix],
   );
 
   const handleExportDst = useCallback(() => {
@@ -258,7 +287,13 @@ function ImportExportActions({ engine }: { engine: VisionEngine }) {
 // Stitch Demo
 // ============================================================================
 
-function StitchDemo({ engine }: { engine: VisionEngine }) {
+function StitchDemo({
+  engine,
+  upsertObject,
+}: {
+  engine: VisionEngine;
+  upsertObject: (obj: DesignObject) => void;
+}) {
   const [stitchCount, setStitchCount] = useState<number | null>(null);
   const [satinCount, setSatinCount] = useState<number | null>(null);
 
@@ -271,16 +306,27 @@ function StitchDemo({ engine }: { engine: VisionEngine }) {
     ];
     const stitches = engine.generateRunningStitches(path, 3.0);
     setStitchCount(stitches.length);
-  }, [engine]);
+
+    // Add to canvas as a visible stitch object
+    upsertObject({
+      type: "stitches",
+      id: "running-demo",
+      label: "Running Stitch Demo",
+      points: stitches,
+      color: "#58a6ff",
+      showDots: true,
+    });
+  }, [engine, upsertObject]);
 
   const runSatinDemo = useCallback(() => {
+    // Position satin demo above the running stitch demo
     const rail1: Point[] = [
-      { x: 0, y: 0 },
-      { x: 30, y: 0 },
+      { x: 0, y: -15 },
+      { x: 30, y: -15 },
     ];
     const rail2: Point[] = [
-      { x: 0, y: 5 },
-      { x: 30, y: 5 },
+      { x: 0, y: -10 },
+      { x: 30, y: -10 },
     ];
     const result = engine.generateSatinStitches(rail1, rail2, 0.4, 0.2, {
       center_walk: true,
@@ -290,7 +336,18 @@ function StitchDemo({ engine }: { engine: VisionEngine }) {
       stitch_length: 2.5,
     });
     setSatinCount(result.stitches.length);
-  }, [engine]);
+
+    // Extract stitch positions and add to canvas
+    const satinPoints = result.stitches.map((s) => s.position);
+    upsertObject({
+      type: "stitches",
+      id: "satin-demo",
+      label: "Satin Stitch Demo",
+      points: satinPoints,
+      color: "#f97583",
+      showDots: false,
+    });
+  }, [engine, upsertObject]);
 
   return (
     <div className="flex flex-col gap-2">
@@ -332,16 +389,34 @@ function StitchDemo({ engine }: { engine: VisionEngine }) {
 // SVG Import Demo
 // ============================================================================
 
-function SvgImportDemo({ engine }: { engine: VisionEngine }) {
+function SvgImportDemo({
+  engine,
+  upsertObject,
+}: {
+  engine: VisionEngine;
+  upsertObject: (obj: DesignObject) => void;
+}) {
   const [pathCount, setPathCount] = useState<number | null>(null);
 
   const handleImport = useCallback(() => {
-    // Import a simple SVG path
+    // Import a simple SVG path — a square 10mm x 10mm
     const result = engine.importSvgPath("M 0 0 L 10 0 L 10 10 L 0 10 Z");
-    if (result && typeof result === "object") {
+    const parsed = result as ParsedVectorPath | null;
+    if (parsed && typeof parsed === "object" && "commands" in parsed) {
       setPathCount(1);
+
+      // Add the parsed path to the canvas
+      upsertObject({
+        type: "path",
+        id: "svg-demo",
+        label: "SVG Path Demo",
+        commands: parsed.commands,
+        closed: parsed.closed,
+        color: "#7ee787",
+        strokeWidth: 2,
+      });
     }
-  }, [engine]);
+  }, [engine, upsertObject]);
 
   return (
     <div className="flex flex-col gap-2">

@@ -32,6 +32,7 @@ Thumbs.db
 # Test artifacts
 test-results/
 playwright-report/
+e2e/screenshots/
 
 # Lockfile
 bun.lock
