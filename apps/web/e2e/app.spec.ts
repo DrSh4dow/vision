@@ -140,8 +140,10 @@ test.describe("Import/Export Actions", () => {
     await page.mouse.move(cx + 40, cy + 40, { steps: 5 });
     await page.mouse.up();
 
-    // Wait for the new shape node to appear in the layers tree
-    await expect(page.locator("[data-testid^='layer-node-']")).toHaveCount(2, { timeout: 3_000 });
+    // Wait for the new shape row to appear in the sequencer
+    await expect(page.locator("[data-testid^='sequencer-row-']")).toHaveCount(1, {
+      timeout: 3_000,
+    });
 
     const dstBtn = page.getByTestId("export-dst-btn");
     await expect(dstBtn).toBeVisible();
@@ -169,8 +171,10 @@ test.describe("Import/Export Actions", () => {
     await page.mouse.move(cx + 40, cy + 40, { steps: 5 });
     await page.mouse.up();
 
-    // Wait for the new shape node to appear in the layers tree
-    await expect(page.locator("[data-testid^='layer-node-']")).toHaveCount(2, { timeout: 3_000 });
+    // Wait for the new shape row to appear in the sequencer
+    await expect(page.locator("[data-testid^='sequencer-row-']")).toHaveCount(1, {
+      timeout: 3_000,
+    });
 
     const pesBtn = page.getByTestId("export-pes-btn");
     await expect(pesBtn).toBeVisible();
@@ -208,9 +212,50 @@ test.describe("Import/Export Actions", () => {
     await expect(page.locator("#prop-comp-y")).toBeVisible();
   });
 
+  test("fill controls are available for tatami objects", async ({ page }) => {
+    const canvas = page.getByTestId("design-canvas");
+    await expect(canvas).toBeVisible();
+
+    await page.getByTestId("tool-rect").click();
+    const box = await canvas.boundingBox();
+    if (!box) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    await page.mouse.move(cx - 40, cy - 40);
+    await page.mouse.down();
+    await page.mouse.move(cx + 40, cy + 40, { steps: 5 });
+    await page.mouse.up();
+
+    const stitchType = page.getByTestId("prop-stitch-type");
+    await expect(stitchType).toBeVisible();
+    await stitchType.selectOption("tatami");
+
+    await expect(page.locator("#prop-min-segment")).toBeVisible();
+    await expect(page.locator("#prop-fill-overlap")).toBeVisible();
+    await expect(page.getByTestId("prop-fill-start-mode")).toBeVisible();
+    await expect(page.getByTestId("prop-edge-walk-fill")).toBeVisible();
+  });
+
   test("routing reverse toggle is available", async ({ page }) => {
     await expect(page.getByTestId("routing-policy-select")).toBeVisible();
     await expect(page.getByTestId("routing-allow-reverse")).toBeVisible();
+  });
+
+  test("advanced routing controls and metrics panel are available", async ({ page }) => {
+    await page.getByTestId("routing-advanced-toggle").click();
+    await expect(page.getByTestId("routing-advanced-panel")).toBeVisible();
+    await expect(page.getByTestId("routing-sequence-mode")).toBeVisible();
+    await expect(page.getByTestId("routing-entry-exit")).toBeVisible();
+    await expect(page.getByTestId("routing-tie-mode")).toBeVisible();
+    await expect(page.getByTestId("routing-max-jump")).toBeVisible();
+    await expect(page.getByTestId("routing-trim-threshold")).toBeVisible();
+    await expect(page.getByTestId("routing-min-run-before-trim")).toBeVisible();
+    await expect(page.getByTestId("routing-allow-underpath")).toBeVisible();
+    await expect(page.getByTestId("routing-allow-color-merge")).toBeHidden();
+    await page.getByTestId("routing-sequence-mode").selectOption("optimizer");
+    await expect(page.getByTestId("routing-allow-color-merge")).toBeVisible();
+    await expect(page.getByTestId("routing-metrics-panel")).toBeVisible();
+    await expect(page.getByTestId("routing-metrics-inline")).toBeVisible();
   });
 });
 
@@ -263,21 +308,31 @@ test.describe("Canvas Interaction", () => {
     expect(errors).toEqual([]);
   });
 
-  test("clicking a layer node does not crash (BigInt regression)", async ({ page }) => {
+  test("clicking a sequencer row does not crash (BigInt regression)", async ({ page }) => {
     const errors: string[] = [];
     page.on("pageerror", (err) => errors.push(err.message));
 
-    // The default "Layer 1" should be visible in the layers panel
-    const layersTree = page.getByTestId("layers-tree");
-    await expect(layersTree).toBeVisible({ timeout: 5_000 });
+    const canvas = page.getByTestId("design-canvas");
+    await page.getByTestId("tool-rect").click();
+    const box = await canvas.boundingBox();
+    if (!box) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    await page.mouse.move(cx - 30, cy - 30);
+    await page.mouse.down();
+    await page.mouse.move(cx + 30, cy + 30, { steps: 5 });
+    await page.mouse.up();
 
-    // Click on the first layer node
-    const layerNode = page.locator("[data-testid^='layer-node-']").first();
-    await expect(layerNode).toBeVisible();
-    await layerNode.click();
+    const sequencerTree = page.getByTestId("sequencer-tree");
+    await expect(sequencerTree).toBeVisible({ timeout: 5_000 });
 
-    // Verify selection state is applied (aria-selected becomes true)
-    await expect(layerNode).toHaveAttribute("aria-selected", "true");
+    // Click on the first sequencer row
+    const sequencerRow = page.locator("[data-testid^='sequencer-row-']").first();
+    await expect(sequencerRow).toBeVisible();
+    await sequencerRow.click();
+
+    // Verify selection state is applied
+    await expect(sequencerRow).toHaveClass(/bg-accent\/70/);
 
     // No errors should have been thrown (previously crashed with "can't convert undefined to BigInt")
     expect(errors).toEqual([]);
@@ -312,10 +367,10 @@ test.describe("Canvas Interaction", () => {
 
   test("undo/redo works", async ({ page }) => {
     const canvas = page.getByTestId("design-canvas");
-    const layerNodes = page.locator("[data-testid^='layer-node-']");
+    const sequencerRows = page.locator("[data-testid^='sequencer-row-']");
 
-    // Initially should have 1 node (Layer 1)
-    await expect(layerNodes).toHaveCount(1, { timeout: 5_000 });
+    // Initially should have no stitch rows
+    await expect(sequencerRows).toHaveCount(0, { timeout: 5_000 });
 
     // Create a rectangle shape
     await page.keyboard.press("r");
@@ -328,43 +383,35 @@ test.describe("Canvas Interaction", () => {
     await page.mouse.move(cx + 30, cy + 30, { steps: 5 });
     await page.mouse.up();
 
-    // Wait for the new shape node to appear (Layer 1 + Rectangle = 2)
-    await expect(layerNodes).toHaveCount(2, { timeout: 3_000 });
+    // Wait for the new shape row to appear
+    await expect(sequencerRows).toHaveCount(1, { timeout: 3_000 });
 
     // Ensure the page has focus for keyboard shortcuts
     await canvas.click({ position: { x: cx, y: cy } });
 
     // Undo — should remove the rectangle
     await page.keyboard.press("Control+z");
-    await expect(layerNodes).toHaveCount(1, { timeout: 5_000 });
+    await expect(sequencerRows).toHaveCount(0, { timeout: 5_000 });
 
     // Redo — should restore the rectangle
     await page.keyboard.press("Control+Shift+z");
-    await expect(layerNodes).toHaveCount(2, { timeout: 5_000 });
+    await expect(sequencerRows).toHaveCount(1, { timeout: 5_000 });
   });
 
-  test("layer visibility toggle", async ({ page }) => {
-    // Wait for the layer tree to be visible
-    const layersTree = page.getByTestId("layers-tree");
-    await expect(layersTree).toBeVisible({ timeout: 5_000 });
+  test("sequencer shows stitch objects after shape creation", async ({ page }) => {
+    const canvas = page.getByTestId("design-canvas");
+    await page.getByTestId("tool-rect").click();
+    const box = await canvas.boundingBox();
+    if (!box) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    await page.mouse.move(cx - 30, cy - 30);
+    await page.mouse.down();
+    await page.mouse.move(cx + 30, cy + 30, { steps: 5 });
+    await page.mouse.up();
 
-    // Find the first layer node
-    const layerNode = page.locator("[data-testid^='layer-node-']").first();
-    await expect(layerNode).toBeVisible();
-
-    // Find the visibility toggle button for this layer
-    const visibilityBtn = page.locator("[data-testid^='layer-visibility-']").first();
-
-    // Force-click visibility (button is opacity-0 until hover)
-    await visibilityBtn.click({ force: true });
-
-    // After toggling, the layer node should have opacity-40 class (hidden state)
-    await expect(layerNode).toHaveClass(/opacity-40/);
-
-    // Toggle back
-    await visibilityBtn.click({ force: true });
-
-    // Should no longer have opacity-40
-    await expect(layerNode).not.toHaveClass(/opacity-40/);
+    await expect(page.locator("[data-testid^='sequencer-row-']")).toHaveCount(1, {
+      timeout: 5_000,
+    });
   });
 });

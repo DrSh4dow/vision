@@ -263,9 +263,11 @@ function StitchFields({
   const shapeKind = typeof kind === "string" || !("Shape" in kind) ? null : kind.Shape;
   const stitch = shapeKind?.stitch ?? DEFAULT_STITCH_PARAMS;
   const isSatin = stitch.type === "satin";
+  const isTatami = stitch.type === "tatami";
   const isContour = stitch.type === "contour";
   const isSpiral = stitch.type === "spiral";
   const isMotif = stitch.type === "motif";
+  const isFillType = isTatami || isContour || isSpiral || isMotif;
 
   const updateStitch = useCallback(
     (next: StitchParams) => {
@@ -431,58 +433,112 @@ function StitchFields({
         </div>
       )}
 
-      {(isContour || isSpiral || isMotif) && (
-        <div className="grid grid-cols-2 gap-2">
-          {(isSpiral || isMotif) && (
+      {isFillType && (
+        <div className="flex flex-col gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <LabeledNumberField
-              id="prop-fill-phase"
-              label="Fill Phase"
-              value={stitch.fill_phase}
+              id="prop-min-segment"
+              label="Min Segment"
+              value={stitch.min_segment_mm}
               step={0.1}
-              onChange={(value) => updateStitch({ ...stitch, fill_phase: value })}
+              min={0}
+              onChange={(value) => updateStitch({ ...stitch, min_segment_mm: value })}
             />
-          )}
-          {isContour && (
             <LabeledNumberField
-              id="prop-contour-step"
-              label="Contour Step"
-              value={stitch.contour_step_mm}
+              id="prop-fill-overlap"
+              label="Overlap"
+              value={stitch.overlap_mm}
               step={0.1}
-              min={0.1}
-              onChange={(value) => updateStitch({ ...stitch, contour_step_mm: value })}
+              min={0}
+              onChange={(value) => updateStitch({ ...stitch, overlap_mm: value })}
             />
-          )}
-          {isMotif && (
             <div className="flex flex-col gap-1">
-              <PropLabel htmlFor="prop-motif-pattern">Motif</PropLabel>
+              <PropLabel htmlFor="prop-fill-start-mode">Fill Start</PropLabel>
               <select
-                id="prop-motif-pattern"
+                id="prop-fill-start-mode"
                 className="h-7 rounded-md border border-border/40 bg-surface px-2 text-xs text-foreground"
-                value={stitch.motif_pattern}
+                value={stitch.fill_start_mode}
                 onChange={(e) =>
                   updateStitch({
                     ...stitch,
-                    motif_pattern: e.target.value as StitchParams["motif_pattern"],
+                    fill_start_mode: e.target.value as StitchParams["fill_start_mode"],
                   })
                 }
-                data-testid="prop-motif-pattern"
+                data-testid="prop-fill-start-mode"
               >
-                <option value="diamond">Diamond</option>
-                <option value="wave">Wave</option>
-                <option value="triangle">Triangle</option>
+                <option value="auto">Auto</option>
+                <option value="center">Center</option>
+                <option value="edge">Edge</option>
               </select>
             </div>
-          )}
-          {isMotif && (
-            <LabeledNumberField
-              id="prop-motif-scale"
-              label="Motif Scale"
-              value={stitch.motif_scale}
-              step={0.1}
-              min={0.2}
-              onChange={(value) => updateStitch({ ...stitch, motif_scale: value })}
-            />
-          )}
+            <label className="inline-flex h-7 items-center gap-2 self-end rounded-md border border-border/40 bg-surface px-2 text-xs text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={stitch.edge_walk_on_fill}
+                onChange={(e) =>
+                  updateStitch({
+                    ...stitch,
+                    edge_walk_on_fill: e.target.checked,
+                  })
+                }
+                data-testid="prop-edge-walk-fill"
+              />
+              Edge Walk
+            </label>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            {(isSpiral || isMotif) && (
+              <LabeledNumberField
+                id="prop-fill-phase"
+                label="Fill Phase"
+                value={stitch.fill_phase}
+                step={0.1}
+                onChange={(value) => updateStitch({ ...stitch, fill_phase: value })}
+              />
+            )}
+            {isContour && (
+              <LabeledNumberField
+                id="prop-contour-step"
+                label="Contour Step"
+                value={stitch.contour_step_mm}
+                step={0.1}
+                min={0.1}
+                onChange={(value) => updateStitch({ ...stitch, contour_step_mm: value })}
+              />
+            )}
+            {isMotif && (
+              <div className="flex flex-col gap-1">
+                <PropLabel htmlFor="prop-motif-pattern">Motif</PropLabel>
+                <select
+                  id="prop-motif-pattern"
+                  className="h-7 rounded-md border border-border/40 bg-surface px-2 text-xs text-foreground"
+                  value={stitch.motif_pattern}
+                  onChange={(e) =>
+                    updateStitch({
+                      ...stitch,
+                      motif_pattern: e.target.value as StitchParams["motif_pattern"],
+                    })
+                  }
+                  data-testid="prop-motif-pattern"
+                >
+                  <option value="diamond">Diamond</option>
+                  <option value="wave">Wave</option>
+                  <option value="triangle">Triangle</option>
+                </select>
+              </div>
+            )}
+            {isMotif && (
+              <LabeledNumberField
+                id="prop-motif-scale"
+                label="Motif Scale"
+                value={stitch.motif_scale}
+                step={0.1}
+                min={0.2}
+                onChange={(value) => updateStitch({ ...stitch, motif_scale: value })}
+              />
+            )}
+          </div>
         </div>
       )}
     </div>

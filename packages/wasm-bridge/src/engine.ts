@@ -118,7 +118,7 @@ export interface VisionEngine {
   /** Reorder a node within its parent's children. */
   sceneReorderChild(nodeId: number, newIndex: number): void;
 
-  /** Get the full scene tree (for layers panel). */
+  /** Get the full scene tree (for sequencer/panel UI). */
   sceneGetTree(): TreeNode[];
 
   /** Get the render list (visible shapes with world transforms). */

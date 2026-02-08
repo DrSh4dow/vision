@@ -88,6 +88,16 @@ pub enum CompensationMode {
     Directional,
 }
 
+/// Fill stitching start strategy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FillStartMode {
+    #[default]
+    Auto,
+    Center,
+    Edge,
+}
+
 /// Stitch parameters for an embroidery object.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct StitchParams {
@@ -111,6 +121,14 @@ pub struct StitchParams {
     pub compensation_y_mm: f64,
     #[serde(default)]
     pub fill_phase: f64,
+    #[serde(default = "default_min_segment_mm")]
+    pub min_segment_mm: f64,
+    #[serde(default)]
+    pub overlap_mm: f64,
+    #[serde(default)]
+    pub edge_walk_on_fill: bool,
+    #[serde(default)]
+    pub fill_start_mode: FillStartMode,
     #[serde(default = "default_contour_step_mm")]
     pub contour_step_mm: f64,
     #[serde(default)]
@@ -133,6 +151,10 @@ impl Default for StitchParams {
             compensation_x_mm: 0.0,
             compensation_y_mm: 0.0,
             fill_phase: 0.0,
+            min_segment_mm: default_min_segment_mm(),
+            overlap_mm: 0.0,
+            edge_walk_on_fill: false,
+            fill_start_mode: FillStartMode::Auto,
             contour_step_mm: default_contour_step_mm(),
             motif_pattern: MotifPattern::default(),
             motif_scale: default_motif_scale(),
@@ -142,6 +164,10 @@ impl Default for StitchParams {
 
 fn default_contour_step_mm() -> f64 {
     1.2
+}
+
+fn default_min_segment_mm() -> f64 {
+    0.4
 }
 
 fn default_underlay_spacing_mm() -> f64 {

@@ -1,6 +1,6 @@
-import type { NodeKindData, RoutingOptions, VisionEngine } from "@vision/wasm-bridge";
-import { Download, FileUp } from "lucide-react";
-import { useCallback, useRef } from "react";
+import type { NodeKindData, RouteMetrics, RoutingOptions, VisionEngine } from "@vision/wasm-bridge";
+import { Download, FileUp, SlidersHorizontal } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -17,6 +17,15 @@ interface ImportExportActionsProps {
   onRoutingOptionsChange: (next: RoutingOptions) => void;
 }
 
+const EMPTY_ROUTE_METRICS: RouteMetrics = {
+  jump_count: 0,
+  trim_count: 0,
+  color_change_count: 0,
+  travel_distance_mm: 0,
+  longest_travel_mm: 0,
+  route_score: 0,
+};
+
 export function ImportExportActions({
   engine,
   refreshScene,
@@ -24,6 +33,28 @@ export function ImportExportActions({
   onRoutingOptionsChange,
 }: ImportExportActionsProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showRoutingPanel, setShowRoutingPanel] = useState(false);
+  const [routeMetrics, setRouteMetrics] = useState<RouteMetrics>(EMPTY_ROUTE_METRICS);
+  const isStrictSequencer = routingOptions.sequence_mode === "strict_sequencer";
+
+  const setRoutingOption = useCallback(
+    (key: keyof RoutingOptions, value: RoutingOptions[keyof RoutingOptions]) => {
+      onRoutingOptionsChange({
+        ...routingOptions,
+        [key]: value,
+      });
+    },
+    [onRoutingOptionsChange, routingOptions],
+  );
+
+  useEffect(() => {
+    try {
+      const metrics = engine.sceneRouteMetricsWithOptions(DEFAULT_STITCH_LENGTH, routingOptions);
+      setRouteMetrics(metrics);
+    } catch (_err) {
+      setRouteMetrics(EMPTY_ROUTE_METRICS);
+    }
+  }, [engine, routingOptions]);
 
   const handleSvgImport = useCallback(() => {
     fileInputRef.current?.click();
@@ -101,7 +132,7 @@ export function ImportExportActions({
   }, [engine, routingOptions]);
 
   return (
-    <div className="flex items-center gap-0.5">
+    <div className="relative flex items-center gap-0.5">
       <input
         ref={fileInputRef}
         type="file"
@@ -130,12 +161,7 @@ export function ImportExportActions({
       <select
         className="h-7 rounded border border-border/40 bg-card px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
         value={routingOptions.policy}
-        onChange={(e) =>
-          onRoutingOptionsChange({
-            ...routingOptions,
-            policy: e.target.value as RoutingOptions["policy"],
-          })
-        }
+        onChange={(e) => setRoutingOption("policy", e.target.value as RoutingOptions["policy"])}
         data-testid="routing-policy-select"
         aria-label="Routing policy"
       >
@@ -147,16 +173,28 @@ export function ImportExportActions({
         <input
           type="checkbox"
           checked={routingOptions.allow_reverse}
-          onChange={(e) =>
-            onRoutingOptionsChange({
-              ...routingOptions,
-              allow_reverse: e.target.checked,
-            })
-          }
+          onChange={(e) => setRoutingOption("allow_reverse", e.target.checked)}
           data-testid="routing-allow-reverse"
         />
         Reverse
       </label>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+        onClick={() => setShowRoutingPanel((prev) => !prev)}
+        data-testid="routing-advanced-toggle"
+      >
+        <SlidersHorizontal className="!size-3.5" />
+        <span className="sr-only">Advanced Routing</span>
+      </Button>
+      <span
+        className="px-1 text-[10px] text-muted-foreground/90"
+        data-testid="routing-metrics-inline"
+      >
+        T:{routeMetrics.travel_distance_mm.toFixed(1)} J:{routeMetrics.jump_count} R:
+        {routeMetrics.route_score.toFixed(1)}
+      </span>
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
@@ -189,6 +227,179 @@ export function ImportExportActions({
         </TooltipTrigger>
         <TooltipContent>Export PES (Brother)</TooltipContent>
       </Tooltip>
+
+      {showRoutingPanel && (
+        <div
+          className="absolute top-8 left-0 z-40 w-[360px] rounded-md border border-border/50 bg-popover p-3 shadow-2xl"
+          data-testid="routing-advanced-panel"
+        >
+          <div className="mb-2 grid grid-cols-2 gap-2">
+            <label className="col-span-2 flex flex-col gap-1 text-[10px] text-muted-foreground">
+              Sequence Mode
+              <select
+                className="h-7 rounded border border-border/40 bg-card px-2 text-xs text-foreground"
+                value={routingOptions.sequence_mode}
+                onChange={(e) =>
+                  setRoutingOption(
+                    "sequence_mode",
+                    e.target.value as RoutingOptions["sequence_mode"],
+                  )
+                }
+                data-testid="routing-sequence-mode"
+              >
+                <option value="strict_sequencer">Strict Sequencer</option>
+                <option value="optimizer">Optimizer</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-[10px] text-muted-foreground">
+              Entry/Exit
+              <select
+                className="h-7 rounded border border-border/40 bg-card px-2 text-xs text-foreground"
+                value={routingOptions.entry_exit_mode}
+                onChange={(e) =>
+                  setRoutingOption(
+                    "entry_exit_mode",
+                    e.target.value as RoutingOptions["entry_exit_mode"],
+                  )
+                }
+                data-testid="routing-entry-exit"
+              >
+                <option value="auto">Auto</option>
+                <option value="preserve_shape_start">Preserve Start</option>
+                <option value="user_anchor">User Anchor</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-[10px] text-muted-foreground">
+              Tie Mode
+              <select
+                className="h-7 rounded border border-border/40 bg-card px-2 text-xs text-foreground"
+                value={routingOptions.tie_mode}
+                onChange={(e) =>
+                  setRoutingOption("tie_mode", e.target.value as RoutingOptions["tie_mode"])
+                }
+                data-testid="routing-tie-mode"
+              >
+                <option value="off">Off</option>
+                <option value="shape_start_end">Shape Start/End</option>
+                <option value="color_change">Color Change</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="mb-2 grid grid-cols-2 gap-2">
+            <label className="flex flex-col gap-1 text-[10px] text-muted-foreground">
+              Max Jump (mm)
+              <input
+                type="number"
+                step="0.5"
+                min="0"
+                className="h-7 rounded border border-border/40 bg-card px-2 text-xs text-foreground"
+                value={routingOptions.max_jump_mm}
+                onChange={(e) =>
+                  setRoutingOption("max_jump_mm", Number.parseFloat(e.target.value) || 0)
+                }
+                data-testid="routing-max-jump"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-[10px] text-muted-foreground">
+              Trim Threshold (mm)
+              <input
+                type="number"
+                step="0.5"
+                min="0"
+                className="h-7 rounded border border-border/40 bg-card px-2 text-xs text-foreground"
+                value={routingOptions.trim_threshold_mm}
+                onChange={(e) =>
+                  setRoutingOption("trim_threshold_mm", Number.parseFloat(e.target.value) || 0)
+                }
+                data-testid="routing-trim-threshold"
+              />
+            </label>
+            <label className="col-span-2 flex flex-col gap-1 text-[10px] text-muted-foreground">
+              Min Run Before Trim (mm)
+              <input
+                type="number"
+                step="0.25"
+                min="0"
+                className="h-7 rounded border border-border/40 bg-card px-2 text-xs text-foreground"
+                value={routingOptions.min_stitch_run_before_trim_mm}
+                onChange={(e) =>
+                  setRoutingOption(
+                    "min_stitch_run_before_trim_mm",
+                    Number.parseFloat(e.target.value) || 0,
+                  )
+                }
+                data-testid="routing-min-run-before-trim"
+              />
+            </label>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-[10px] text-muted-foreground">
+            {!isStrictSequencer && (
+              <>
+                <label className="inline-flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={routingOptions.preserve_color_order}
+                    onChange={(e) => setRoutingOption("preserve_color_order", e.target.checked)}
+                    data-testid="routing-preserve-color"
+                  />
+                  Preserve Color
+                </label>
+                <label className="inline-flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={routingOptions.preserve_layer_order}
+                    onChange={(e) => setRoutingOption("preserve_layer_order", e.target.checked)}
+                    data-testid="routing-preserve-layer"
+                  />
+                  Preserve Layer
+                </label>
+              </>
+            )}
+            <label className="inline-flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                checked={routingOptions.allow_underpath}
+                onChange={(e) => setRoutingOption("allow_underpath", e.target.checked)}
+                data-testid="routing-allow-underpath"
+              />
+              Allow Underpath
+            </label>
+            {!isStrictSequencer && (
+              <label className="inline-flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={routingOptions.allow_color_merge}
+                  onChange={(e) => setRoutingOption("allow_color_merge", e.target.checked)}
+                  data-testid="routing-allow-color-merge"
+                />
+                Allow Color Merge
+              </label>
+            )}
+          </div>
+
+          {isStrictSequencer && (
+            <p className="mt-2 rounded border border-border/40 bg-card/80 px-2 py-1.5 text-[10px] text-muted-foreground">
+              Strict Sequencer keeps object order exactly as listed in the Sequencer panel. Routing
+              still optimizes transitions between consecutive objects.
+            </p>
+          )}
+
+          <div
+            className="mt-3 rounded border border-border/40 bg-card/80 px-2 py-1.5 text-[10px] text-muted-foreground"
+            data-testid="routing-metrics-panel"
+          >
+            <p>Travel: {routeMetrics.travel_distance_mm.toFixed(2)} mm</p>
+            <p>Longest move: {routeMetrics.longest_travel_mm.toFixed(2)} mm</p>
+            <p>
+              Jumps: {routeMetrics.jump_count} | Trims: {routeMetrics.trim_count} | Colors:{" "}
+              {routeMetrics.color_change_count}
+            </p>
+            <p>Route score: {routeMetrics.route_score.toFixed(2)}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

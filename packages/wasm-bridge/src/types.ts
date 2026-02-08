@@ -52,6 +52,8 @@ export type UnderlayMode =
   | "full";
 /** Pull compensation mode for satin stitches. */
 export type CompensationMode = "off" | "auto" | "directional";
+/** Fill start strategy for fill stitches. */
+export type FillStartMode = "auto" | "center" | "edge";
 
 /** Stitch parameters for an embroidery object. */
 export interface StitchParams {
@@ -66,6 +68,10 @@ export interface StitchParams {
   compensation_x_mm: number;
   compensation_y_mm: number;
   fill_phase: number;
+  min_segment_mm: number;
+  overlap_mm: number;
+  edge_walk_on_fill: boolean;
+  fill_start_mode: FillStartMode;
   contour_step_mm: number;
   motif_pattern: MotifPattern;
   motif_scale: number;
@@ -116,10 +122,18 @@ export interface RouteMetrics {
   trim_count: number;
   color_change_count: number;
   travel_distance_mm: number;
+  longest_travel_mm: number;
+  route_score: number;
 }
 
 /** Routing optimization policy. */
 export type RoutingPolicy = "balanced" | "min_travel" | "min_trims";
+/** Entry/exit mode for stitch blocks. */
+export type RoutingEntryExitMode = "auto" | "preserve_shape_start" | "user_anchor";
+/** Tie stitch insertion mode. */
+export type RoutingTieMode = "off" | "shape_start_end" | "color_change";
+/** Sequencing mode for stitch block ordering. */
+export type RoutingSequenceMode = "strict_sequencer" | "optimizer";
 
 /** Routing options used when exporting scene stitches. */
 export interface RoutingOptions {
@@ -129,6 +143,12 @@ export interface RoutingOptions {
   preserve_color_order: boolean;
   preserve_layer_order: boolean;
   allow_reverse: boolean;
+  allow_color_merge: boolean;
+  allow_underpath: boolean;
+  entry_exit_mode: RoutingEntryExitMode;
+  tie_mode: RoutingTieMode;
+  min_stitch_run_before_trim_mm: number;
+  sequence_mode: RoutingSequenceMode;
 }
 
 // ============================================================================

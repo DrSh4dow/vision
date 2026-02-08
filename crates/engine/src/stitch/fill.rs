@@ -25,14 +25,7 @@ pub fn generate_tatami_fill(
         stitch_length
     };
 
-    let mut closed_rings: Vec<Vec<Point>> = Vec::new();
-    for ring in rings {
-        if ring.len() < 3 || !is_ring_closed(ring) {
-            continue;
-        }
-        closed_rings.push(ring.clone());
-    }
-
+    let closed_rings = normalize_closed_rings(rings);
     if closed_rings.is_empty() {
         return vec![];
     }
@@ -163,7 +156,8 @@ pub fn generate_contour_fill(
 
     let mut all_stitches: Vec<Stitch> = Vec::new();
 
-    for ring in &closed_rings {
+    let outer_ring = &closed_rings[0];
+    for ring in std::iter::once(outer_ring) {
         let center = centroid(ring);
         let max_radius = ring
             .iter()
@@ -199,7 +193,7 @@ pub fn generate_contour_fill(
             }
 
             let mut contour_stitches =
-                super::running::generate_running_stitches(&contour_loop, stitch_length);
+                generate_clipped_running_stitches(&contour_loop, &closed_rings, stitch_length);
             if contour_stitches.is_empty() {
                 continue;
             }
@@ -395,7 +389,7 @@ fn normalize_density(density: f64) -> f64 {
 }
 
 fn normalize_closed_rings(rings: &[Vec<Point>]) -> Vec<Vec<Point>> {
-    let mut normalized = Vec::new();
+    let mut normalized: Vec<(Vec<Point>, f64)> = Vec::new();
     for ring in rings {
         if ring.len() < 3 {
             continue;
@@ -405,9 +399,48 @@ fn normalize_closed_rings(rings: &[Vec<Point>]) -> Vec<Vec<Point>> {
         if distance(r[0], r[r.len() - 1]) > 1e-6 {
             r.push(r[0]);
         }
-        normalized.push(r);
+        if r.len() < 4 {
+            continue;
+        }
+        let area = signed_area(&r);
+        if area.abs() <= 1e-6 {
+            continue;
+        }
+        normalized.push((r, area));
     }
-    normalized
+
+    if normalized.is_empty() {
+        return vec![];
+    }
+
+    let outer_index = normalized
+        .iter()
+        .enumerate()
+        .max_by(|(_, a), (_, b)| {
+            a.1.abs()
+                .partial_cmp(&b.1.abs())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .map(|(idx, _)| idx)
+        .unwrap_or(0);
+
+    let mut ordered: Vec<Vec<Point>> = Vec::with_capacity(normalized.len());
+    let (mut outer, outer_area) = normalized.swap_remove(outer_index);
+    if outer_area < 0.0 {
+        outer.reverse();
+    }
+    ordered.push(outer);
+
+    normalized.sort_by(|a, b| {
+        b.1.abs()
+            .partial_cmp(&a.1.abs())
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    for (ring, _) in normalized {
+        ordered.push(ring);
+    }
+
+    ordered
 }
 
 fn centroid(points: &[Point]) -> Point {
@@ -462,15 +495,6 @@ fn point_in_ring(p: Point, ring: &[Point]) -> bool {
     inside
 }
 
-fn is_ring_closed(ring: &[Point]) -> bool {
-    if ring.len() < 2 {
-        return false;
-    }
-    let first = ring[0];
-    let last = ring[ring.len() - 1];
-    distance(first, last) < f64::EPSILON
-}
-
 fn bounding_y(rings: &[Vec<Point>]) -> (f64, f64) {
     let mut min_y = f64::INFINITY;
     let mut max_y = f64::NEG_INFINITY;
@@ -517,6 +541,61 @@ fn collect_intersections(rings: &[Vec<Point>], y: f64) -> Vec<f64> {
         }
     }
     intersections
+}
+
+fn generate_clipped_running_stitches(
+    points: &[Point],
+    rings: &[Vec<Point>],
+    stitch_length: f64,
+) -> Vec<Stitch> {
+    if points.len() < 2 {
+        return vec![];
+    }
+
+    let mut stitched: Vec<Stitch> = Vec::new();
+    let mut segment: Vec<Point> = Vec::new();
+
+    let flush_segment = |segment: &mut Vec<Point>, stitched: &mut Vec<Stitch>| {
+        if segment.len() < 2 {
+            segment.clear();
+            return;
+        }
+
+        let mut closed_segment = std::mem::take(segment);
+        if distance(closed_segment[0], closed_segment[closed_segment.len() - 1]) > 1e-6 {
+            closed_segment.push(closed_segment[0]);
+        }
+
+        let mut part = super::running::generate_running_stitches(&closed_segment, stitch_length);
+        if let Some(first) = part.first_mut() {
+            first.is_jump = !stitched.is_empty();
+        }
+        stitched.extend(part);
+    };
+
+    for point in points {
+        if point_in_rings(*point, rings) {
+            segment.push(*point);
+        } else {
+            flush_segment(&mut segment, &mut stitched);
+        }
+    }
+    flush_segment(&mut segment, &mut stitched);
+
+    stitched
+}
+
+fn signed_area(ring: &[Point]) -> f64 {
+    if ring.len() < 3 {
+        return 0.0;
+    }
+    let mut area = 0.0;
+    for i in 0..(ring.len() - 1) {
+        let p0 = ring[i];
+        let p1 = ring[i + 1];
+        area += p0.x * p1.y - p1.x * p0.y;
+    }
+    area * 0.5
 }
 
 fn rotate(p: Point, cos: f64, sin: f64) -> Point {
@@ -598,5 +677,30 @@ mod tests {
         let stitches =
             generate_motif_fill(&[ring], 0.6, 15.0, 2.0, 0.0, MotifPattern::Diamond, 1.0);
         assert!(!stitches.is_empty());
+    }
+
+    #[test]
+    fn test_normalize_closed_rings_promotes_largest_outer() {
+        let small = vec![
+            Point::new(0.0, 0.0),
+            Point::new(2.0, 0.0),
+            Point::new(2.0, 2.0),
+            Point::new(0.0, 2.0),
+            Point::new(0.0, 0.0),
+        ];
+        let large = vec![
+            Point::new(-10.0, -10.0),
+            Point::new(10.0, -10.0),
+            Point::new(10.0, 10.0),
+            Point::new(-10.0, 10.0),
+            Point::new(-10.0, -10.0),
+        ];
+
+        let normalized = normalize_closed_rings(&[small, large]);
+        assert_eq!(normalized.len(), 2);
+
+        let a0 = signed_area(&normalized[0]).abs();
+        let a1 = signed_area(&normalized[1]).abs();
+        assert!(a0 > a1, "largest ring should be treated as outer boundary");
     }
 }

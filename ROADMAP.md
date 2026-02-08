@@ -1,224 +1,306 @@
-# Browser-Based Embroidery Design Software
-## Architecture & Technical Roadmap
+# Vision Roadmap
+## Browser-Native Embroidery Platform with Hatch-Level Feature Parity
 
----
+## 1) Product Goal
 
-## Vision
+Build a full browser-native embroidery design and digitizing platform that reaches practical feature parity with Hatch Digitizer for core production workflows, while delivering a modern UX, fast iteration, and collaboration-ready architecture.
 
-A Figma-like collaborative embroidery design tool running entirely in the browser — free tier supported by premium features. Users can design, digitize, simulate, and export production-ready embroidery files without installing anything.
+## 2) Parity Definition (What "Feature Parity with Hatch" Means)
 
----
+Parity is achieved when a professional digitizer can complete end-to-end production jobs in Vision without switching to Hatch for core tasks:
 
-## Core Technical Challenges
+1. Vector drawing/editing and object transforms
+2. Full object digitizing controls (running, satin, tatami, advanced fills, compensation, underlay)
+3. Reliable auto-routing/travel/jump/trim behavior
+4. Accurate stitch sequence controls and machine commands
+5. Realistic stitch simulation and stitch playback diagnostics
+6. Multi-format production export/import for mainstream machine ecosystems
+7. Lettering/monogram workflows used in common commercial jobs
+8. Print/export production sheets and job metadata
 
-The reason desktop apps like Hatch and Embrilliance still dominate is that embroidery digitizing involves **computationally heavy vector-to-stitch pathfinding**, real-time **stitch simulation rendering**, and support for **dozens of proprietary file formats**. Solving these in the browser is the entire moat.
+## 3) Constraints and Principles
 
----
+1. Browser-native compute first: digitizing and simulation run client-side in Rust/WASM.
+2. JS/TS web app imports engine APIs only from `@vision/wasm-bridge`.
+3. No backend dependency for stitch generation, simulation, or file conversion.
+4. Engineering quality gates are blocking, not advisory.
+5. Reference Ink/Stitch algorithms, but implement clean-room Rust versions.
 
-## Phase 1 — Canvas & Design Primitives
+## 4) Reuse Strategy from Ink/Stitch (Knowledge Reuse, Not Code Copy)
 
-**Goal:** A usable vector editor with embroidery-aware primitives.
+Use Ink/Stitch as algorithm and behavior reference for mature embroidery logic:
 
-### Tech Stack
-- **Rendering Engine:** Custom WebGL2/WebGPU renderer (not a wrapper around Fabric.js or Konva — you'll outgrow them immediately). Study Figma's approach: a custom 2D renderer on top of WebGL with their own scene graph. Use **wgpu** compiled to WebGPU/WebGL via wasm for future-proofing.
-- **Core Engine:** **Rust → WebAssembly**. This is non-negotiable for the geometry and stitch generation performance you need. The entire engine (scene graph, stitch solver, file I/O) lives in Rust/WASM.
-- **UI Shell:** **React or SolidJS** for panels, toolbars, layers, properties. The canvas itself is NOT React — it's your custom WebGL surface. React only owns the chrome.
-- **State Management:** CRDT-based document model from the start (even before multiplayer). Use **Automerge** or **Yjs** as your document backbone. This gives you undo/redo, offline, and future collaboration for free.
+1. Auto-fill graph construction + Eulerian traversal concepts
+2. Stitch-plan assembly semantics (tie-in/tie-off, jump/trim/color-change handling)
+3. Fill and satin validation heuristics (small shapes, invalid geometry, warnings)
+4. Realistic stitch rendering patterns and command-aware visualization
+5. Parameter taxonomy and defaults for practical digitizing controls
 
-### Key Deliverables
-- Infinite canvas with pan/zoom/rotate (GPU-accelerated)
-- Vector primitives: paths, bezier curves, shapes, text-to-outline
-- Node editing (pen tool equivalent)
-- Layers, groups, boolean operations (union, subtract, intersect)
-- SVG/PNG import with auto-trace to vector (potrace algorithm, compiled to WASM)
-- Color palette system mapped to thread brands (Madeira, Isacord, Sulky — these are just databases)
+Mandatory legal boundary:
 
-### Architecture Note
-```
-┌─────────────────────────────────────┐
-│           React UI Shell            │
-│  (panels, tools, properties, layers)│
-├─────────────────────────────────────┤
-│         Bridge Layer (JS ↔ WASM)    │
-│     (thin typed API, SharedArrayBuffer) │
-├─────────────────────────────────────┤
-│        Rust/WASM Core Engine        │
-│  ┌───────────┬──────────┬─────────┐ │
-│  │Scene Graph│Stitch Gen│ File I/O│ │
-│  └───────────┴──────────┴─────────┘ │
-├─────────────────────────────────────┤
-│     WebGL2 / WebGPU Renderer        │
-│   (custom 2D renderer, instanced    │
-│    drawing for stitch preview)      │
-└─────────────────────────────────────┘
-```
+1. Do not copy GPL source into Vision.
+2. Implement independent Rust algorithms from documented behavior/tests.
+3. Keep behavior notes and test vectors as references, not copied implementation.
 
----
+## 5) Target Architecture (Final State)
 
-## Phase 2 — Digitizing Engine (The Hard Part)
+1. `apps/web`: React shell, tools, property panels, timeline, simulation controls
+2. `packages/wasm-bridge`: strict type-safe bridge, schema validation, stable API surface
+3. `crates/engine`: scene graph, geometry, digitizing, stitch plan, format IO, routing metrics
+4. Renderer split:
+   1. Immediate 2D Canvas/WebGL preview path for editing responsiveness
+   2. High-fidelity WebGL/WebGPU thread simulation path for TrueView-like output
 
-**Goal:** Convert vector designs into production-quality stitch data.
+## 6) Phased Delivery Plan
 
-This is where 90% of the IP lives. Embroidery digitizing is essentially a **constrained pathfinding and fill optimization problem**.
+## Phase 0 — Baseline Hardening (Immediate)
+Goal: make current progress stable before deeper parity work.
 
-### Stitch Types to Implement (in order)
-1. **Running stitch** — simplest, path following with configurable length
-2. **Satin/column stitch** — two-rail sweep with density control, underlay generation
-3. **Fill stitches** — the beast:
-   - Tatami fill (row-based with stagger)
-   - Spiral fill
-   - Contour fill
-   - Motif fill (pattern-based)
-4. **Underlay generation** — automatic stabilization stitches beneath fills and satins
-5. **Pull compensation** — automatically widen shapes to counteract fabric pull (critical for quality)
-6. **Auto-routing / travel stitches** — minimize jump stitches and thread trims between sections
+Deliverables:
 
-### Key Algorithms
-- **Computational geometry:** Polygon offsetting (Clipper2 library — has a Rust port), Voronoi diagrams for even spacing, sweep line algorithms for fill generation
-- **Pathfinding:** Modified TSP / Eulerian path solvers for optimal stitch ordering
-- **Pull compensation:** Directional morphological dilation based on stitch angle and density
+1. Freeze/verify stitch schema defaults across Rust + bridge + UI
+2. Expand deterministic test corpus for running/satin/tatami/contour/spiral/motif
+3. Add regression fixtures for jump/trim/color-change behavior
+4. Add benchmark harness for stitch generation latency and memory
 
-### Recommended Approach
-- Study **Ink/Stitch** source code deeply (Python + C extensions, GPL licensed). You already know Ink/Stitch — its digitizing algorithms are solid but unoptimized. Rewrite the core algorithms in Rust with proper computational geometry primitives.
-- The **libembroidery** project (C library) has useful file format implementations.
-- Build a **stitch parameter panel** per object: users select stitch type, density, angle, underlay, compensation — the engine regenerates stitches in real-time.
+Exit criteria:
 
-### Performance Target
-Regenerating stitches for a 50k-stitch design should take <100ms in WASM. This is achievable in Rust with proper spatial indexing (R-tree for object queries, sweep line for fill generation).
+1. Full required checks pass consistently
+2. Engine test suite includes golden-reference stitch snapshots
+3. Baseline metrics captured for 10k/50k/100k stitch jobs
 
----
+## Phase 1 — Core Digitizing Parity (Production-Critical 80%)
+Goal: match reliable quality for the most common commercial workflows.
 
-## Phase 3 — Realistic Stitch Simulation
+Scope:
 
-**Goal:** Show a photorealistic preview of the embroidered result.
+1. Running stitch: path smoothing, min/max segment handling, bean/manual variants
+2. Satin columns:
+   1. robust two-rail behavior
+   2. center/edge/zigzag underlay modes
+   3. pull compensation controls
+   4. width/density/angle behavior consistency
+3. Tatami fill:
+   1. better row scheduling and stagger behavior
+   2. gap-fill rows
+   3. start/end strategy
+   4. edge-walk support and overlap controls
 
-This is the "wow factor" feature that will differentiate from desktop software.
+Exit criteria:
 
-### Approach
-- **GPU instanced rendering:** Each stitch is a textured quad (or short cylinder for 3D). A 100k-stitch design = 100k instances — trivial for modern GPUs via WebGPU instanced draw calls.
-- **Thread shading model:** Custom fragment shader that simulates thread luster — a anisotropic specular model (like hair/fur shading — Ward or Kajiya-Kay model adapted for thread).
-- **Fabric simulation:** Background texture with displacement based on stitch density (optional: compute shader for real-time fabric deformation).
-- **Stitch order animation:** Playback the stitching sequence to visualize machine pathing — useful for debugging jump stitches and ordering issues.
+1. Core objects produce stable stitchouts on representative designs
+2. Jump/trim count and travel distance are within agreed benchmark thresholds
+3. E2E tests cover object creation -> parameter edit -> export -> preview
 
-### Reference
-Look at **Wilcom's TrueView** technology as the gold standard. Also study hair/fur rendering papers — embroidery thread rendering is mathematically similar.
+## Phase 2 — Stitch Plan and Routing Parity
+Goal: make sequence quality comparable to mature desktop digitizers.
 
----
+Scope:
 
-## Phase 4 — File Format Support
+1. First-class stitch-plan pipeline in engine:
+   1. color blocks
+   2. object boundaries
+   3. command-aware transitions
+2. Tie policies:
+   1. off
+   2. shape start/end
+   3. color-change only
+3. Travel optimization improvements:
+   1. route scoring tuned by policy
+   2. reversible block routing
+   3. color/layer preservation policies
+4. Jump collapse and trim insertion logic aligned with machine-safe behavior
 
-**Goal:** Read and write every major embroidery format.
+Exit criteria:
 
-### Formats (priority order)
-| Format | Extension | Notes |
-|--------|-----------|-------|
-| DST | .dst | Tajima — most universal, simple format |
-| PES | .pes | Brother — you know this from your PE910L |
-| JEF | .jef | Janome |
-| EXP | .exp | Melco |
-| VP3 | .vp3 | Husqvarna/Viking |
-| HUS | .hus | Husqvarna |
-| XXX | .xxx | Singer |
-| PEC | .pec | Brother (embedded in PES) |
-| SVG | .svg | Import/export vector layer |
-| Native | .json/.bin | Your own format (CRDT-friendly) |
+1. Route metrics dashboard reflects true command sequence outcomes
+2. Routing policies are deterministic and test-covered
+3. Reduced unnecessary trims/jumps on standard benchmark designs
 
-### Implementation
-- All format parsers/writers in **Rust/WASM**. Use **libembroidery** as reference (MIT licensed C library with most format specs reverse-engineered).
-- Build a unified internal stitch representation that all formats serialize to/from.
-- Client-side only — no server roundtrip for file conversion.
+## Phase 3 — Advanced Fill Parity
+Goal: close major fill-quality gap with Hatch-class tools.
 
----
+Scope:
 
-## Phase 5 — Collaboration & Cloud
+1. Contour fill:
+   1. inner->outer
+   2. single spiral
+   3. double spiral strategies
+   4. join style controls
+2. Spiral fill quality tuning:
+   1. center stability
+   2. hole handling
+   3. density consistency
+3. Motif fill:
+   1. pattern library expansion
+   2. repeat alignment
+   3. scaling and phase control
+4. Guided/meander-style fill path (if enabled in Vision scope)
+5. Fill-specific compensation and underlay interplay
 
-**Goal:** Figma-like multiplayer editing and cloud storage.
+Exit criteria:
 
-### Tech Stack
-- **Real-time sync:** Yjs or Automerge CRDT (already in your document model from Phase 1) + WebSocket relay server
-- **Backend:** Rust (Axum) or TypeScript (Bun/Hono) — your call based on team
-- **Storage:** S3-compatible object store for design files, PostgreSQL for metadata
-- **Auth:** Standard OAuth2 / passkeys
-- **Presence:** Cursor positions, selections, viewport awareness (lightweight WebSocket messages)
+1. Advanced fills pass geometry stress fixtures (holes, islands, self-touching outlines)
+2. Parameter panel supports practical controls expected by power users
+3. Quality review set shows no critical artifacts in standard test pack
 
-### Architecture
-- **Relay server model** (like Figma): clients send CRDT updates to a relay that broadcasts to other clients and persists to storage. No OT needed — CRDTs handle conflict resolution.
-- **Lazy loading:** Large designs load progressively — viewport-based tile loading for the canvas, stitch data loaded on demand per object.
+## Phase 4 — Geometry Robustness and Validation
+Goal: prevent silent bad stitch plans and give actionable guidance.
 
----
+Scope:
 
-## Phase 6 — Advanced Features & Polish
+1. Geometry repair pipeline:
+   1. ring normalization
+   2. invalid polygon repair
+   3. tiny-shape fallback policy
+2. Validation warnings/errors:
+   1. invalid shape
+   2. disjoint fill components
+   3. missing guide markers
+   4. unsupported parameter combinations
+3. UI diagnostics panel for per-object embroidery warnings
 
-- **Auto-digitize:** ML-based raster image → vector → stitch pipeline (use a fine-tuned segmentation model like SAM2 for region detection, then apply stitch parameters per region)
-- **Lettering engine:** Built-in embroidery font system with proper kerning, satin column generation per glyph
-- **Template library:** Pre-digitized designs, monogram frames, borders
-- **Machine profiles:** Configure hoop sizes, max stitch lengths, supported features per machine model
-- **Design marketplace:** Community sharing, premium designs (monetization path)
-- **PDF/print worksheets:** Color sequence sheets, placement guides
+Exit criteria:
 
----
+1. Invalid geometry does not crash export pipeline
+2. Validation messages are deterministic and actionable
+3. Known bad SVG fixtures are handled gracefully
 
-## Monetization Model
+## Phase 5 — Simulation Parity (2.5D then 3D)
+Goal: modern, trustworthy visual preview for design QA and client proofing.
 
-| Tier | Features |
-|------|----------|
-| **Free** | Full design & digitize, local file export (DST, PES), 3 cloud saves |
-| **Pro** | All formats, cloud storage, collaboration, stitch simulation, auto-digitize |
-| **Team** | Shared libraries, brand management, API access |
+Scope:
 
----
+1. Phase 5A (2.5D):
+   1. command-aware thread rendering
+   2. better thread thickness and sheen
+   3. clean playback/timeline controls
+2. Phase 5B (3D/WebGL-WebGPU):
+   1. instanced thread geometry
+   2. anisotropic highlight model
+   3. density-aware fabric response
+3. Fast/quality render modes for edit vs proof output
 
-## Build vs. Buy Decision Matrix
+Exit criteria:
 
-| Component | Recommendation |
-|-----------|---------------|
-| 2D Renderer | **Build** — no existing browser lib handles embroidery-scale instanced rendering well |
-| Vector editing | **Build on top of** computational geometry crates (geo, clipper2) |
-| Stitch generation | **Build** — this is your core IP. Reference Ink/Stitch algorithms |
-| File formats | **Build** using libembroidery as reference |
-| CRDT | **Buy** — use Yjs or Automerge |
-| Auth/payments | **Buy** — Clerk/Auth.js + Stripe |
-| Image tracing | **Adapt** — potrace compiled to WASM |
-| Auto-digitize ML | **Build** — fine-tune existing vision models |
+1. Simulation visually distinguishes stitch type, angle, and layering
+2. Playback diagnostics expose routing and trim issues clearly
+3. High-quality preview stays interactive for large stitch counts
 
----
+## Phase 6 — File Format Parity
+Goal: reliable production interoperability.
 
-## Staffing Suggestions
+Scope:
 
-Given you'd be the technical architect:
+1. Export priority: DST, PES, JEF, EXP, VP3, HUS, XXX, PEC
+2. Import priority: DST, PES, JEF first, then remaining formats
+3. Unified internal stitch representation with loss mapping notes per format
+4. Machine constraints and hoop/profile compatibility checks
 
-- **1-2 Rust/WASM engineers** — core engine, stitch algorithms, file formats
-- **1 WebGL/WebGPU specialist** — renderer, stitch simulation shaders
-- **1 senior frontend engineer** — React UI, design tool UX (someone with Figma/design-tool experience is gold)
-- **1 computational geometry person** (can overlap with Rust eng) — fill algorithms, pull compensation, pathfinding
-- **You** — architecture, system design, critical path decisions, ML pipeline
+Exit criteria:
 
-Minimum viable team: **3 engineers + you** to reach a usable MVP.
+1. Round-trip tests for each supported format family
+2. Real-machine validation pack for representative files
+3. Production worksheet export includes thread order, trims, stops, dimensions
 
----
+## Phase 7 — Lettering and Productivity Parity
+Goal: cover high-frequency commercial workflows beyond base digitizing.
 
-## Key Risks & Mitigations
+Scope:
 
-**Risk: Stitch quality parity with Hatch/Wilcom**
-→ Mitigation: Focus on satin and tatami fill quality first. These cover 80% of designs. Pull compensation is the secret sauce — invest heavily here.
+1. Embroidery lettering engine:
+   1. satin columns per glyph
+   2. kerning/tracking controls
+   3. baseline/path text
+2. Monogram templates and quick presets
+3. Object and layer command tools:
+   1. trim/jump insertion
+   2. reorder tools
+   3. sequence editor/timeline
 
-**Risk: WebGPU adoption**
-→ Mitigation: Build renderer with WebGL2 fallback. WebGPU is the future but WebGL2 covers 97%+ of browsers today.
+Exit criteria:
 
-**Risk: WASM memory limits**
-→ Mitigation: Stream large designs, use SharedArrayBuffer for renderer ↔ engine communication. Modern browsers support 4GB+ WASM memory.
+1. Common name/monogram jobs can be completed fully in Vision
+2. Lettering quality acceptable for standard garment/thread scenarios
+3. Sequence editing works without destructive data loss
 
-**Risk: File format edge cases**
-→ Mitigation: Build a comprehensive test suite with real-world files from every machine brand. The embroidery community is passionate — leverage beta testers early.
+## Phase 8 — Collaboration and Cloud (Post-Parity)
+Goal: exceed desktop software with browser-native collaboration.
 
----
+Scope:
 
-## Suggested First 3 Months Focus
+1. CRDT document sync
+2. Presence and multi-user editing
+3. Version history and branch/merge for design variants
+4. Team libraries and shared thread/preset catalogs
 
-1. Rust/WASM scaffold with basic canvas rendering (WebGL2)
-2. Vector primitives + pen tool + SVG import
-3. Running stitch + satin stitch generation on vector paths
-4. DST + PES export
-5. Deploy as static site (Cloudflare Pages or Vercel) — usable MVP
+Exit criteria:
 
-This alone would be more capable than most free online tools and would validate the architecture.
+1. Multi-user editing stable under latency and reconnection scenarios
+2. Conflict resolution is deterministic and user-understandable
+
+## 7) Hatch Parity Workstream Matrix
+
+Priority order (highest first):
+
+1. Satin/tatami quality and underlay behavior
+2. Stitch-plan command semantics and auto-routing quality
+3. Advanced fill robustness
+4. Simulation fidelity for proofing and QA
+5. Format interoperability breadth
+6. Lettering and sequence productivity tools
+
+## 8) Quality Gates (Must Stay Green)
+
+Existing required checks remain mandatory:
+
+1. `cargo fmt --all --check`
+2. `cargo clippy --workspace` with zero warnings
+3. `cargo test --workspace`
+4. `bunx biome check`
+5. `bunx tsc --noEmit --project apps/web`
+6. `bunx vite build` (from `apps/web`)
+7. `bunx playwright test e2e/app.spec.ts` (from `apps/web`)
+
+Additional parity gates:
+
+1. Golden stitch snapshot tests by stitch type and routing policy
+2. Route metrics benchmark thresholds on standard design pack
+3. Visual regression checks for simulation quality modes
+4. Cross-format import/export regression pack
+
+## 9) Performance Targets
+
+1. 50k-stitch regeneration target: <100ms median, <200ms p95 on reference hardware
+2. 100k-stitch simulation preview: interactive editing at practical framerate in fast mode
+3. Import/export operations must be non-blocking in UI and cancellable
+
+## 10) Risks and Mitigations
+
+1. Risk: quality parity stalls on advanced fills
+   1. Mitigation: prioritize graph-based auto-fill and stitch-plan semantics before feature breadth
+2. Risk: simulation fidelity impacts interactivity
+   1. Mitigation: dual render paths (fast edit vs high-quality proof)
+3. Risk: file format edge cases
+   1. Mitigation: fixture library + real-machine validation loop
+4. Risk: legal exposure from GPL reference misuse
+   1. Mitigation: clean-room implementation policy and review checklist
+
+## 11) Execution Order for Next Development Cycles
+
+1. Complete Phase 0 hardening and benchmark harness
+2. Finish Phase 1 quality tuning for satin/tatami underlay/compensation
+3. Finalize Phase 2 stitch-plan/routing semantics and metrics confidence
+4. Push Phase 3 advanced fill parity with robust geometry handling
+5. Deliver Phase 5A simulation uplift before Phase 5B 3D renderer
+6. Expand Phase 6 format coverage with continuous real-file validation
+
+## 12) Definition of Done for "Hatch-Parity Core"
+
+Vision can be considered Hatch-parity for core workflows when all are true:
+
+1. Core digitizing workflows (running, satin, tatami, advanced fills) are production-usable
+2. Routing and stitch plan behavior are reliable and tunable for commercial jobs
+3. Simulation is trusted for pathing/quality review and customer proofing
+4. Major machine formats are export/import reliable for normal shop pipelines
+5. Lettering and sequence tools support common business use cases without tool switching

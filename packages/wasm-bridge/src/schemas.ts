@@ -55,6 +55,7 @@ const UnderlayModeSchema = z.enum([
   "full",
 ]);
 const CompensationModeSchema = z.enum(["off", "auto", "directional"]);
+const FillStartModeSchema = z.enum(["auto", "center", "edge"]);
 
 const StitchParamsSchema = z.object({
   type: StitchTypeSchema,
@@ -68,6 +69,10 @@ const StitchParamsSchema = z.object({
   compensation_x_mm: z.number().default(0),
   compensation_y_mm: z.number().default(0),
   fill_phase: z.number().default(0),
+  min_segment_mm: z.number().default(0.4),
+  overlap_mm: z.number().default(0),
+  edge_walk_on_fill: z.boolean().default(false),
+  fill_start_mode: FillStartModeSchema.default("auto"),
   contour_step_mm: z.number().default(1.2),
   motif_pattern: MotifPatternSchema.default("diamond"),
   motif_scale: z.number().default(1),
@@ -107,9 +112,14 @@ export const RouteMetricsSchema = z.object({
   trim_count: z.number(),
   color_change_count: z.number(),
   travel_distance_mm: z.number(),
+  longest_travel_mm: z.number().default(0),
+  route_score: z.number().default(0),
 });
 
 const RoutingPolicySchema = z.enum(["balanced", "min_travel", "min_trims"]);
+const RoutingEntryExitModeSchema = z.enum(["auto", "preserve_shape_start", "user_anchor"]);
+const RoutingTieModeSchema = z.enum(["off", "shape_start_end", "color_change"]);
+const RoutingSequenceModeSchema = z.enum(["strict_sequencer", "optimizer"]);
 
 export const RoutingOptionsSchema = z.object({
   policy: RoutingPolicySchema.default("balanced"),
@@ -118,6 +128,12 @@ export const RoutingOptionsSchema = z.object({
   preserve_color_order: z.boolean().default(true),
   preserve_layer_order: z.boolean().default(false),
   allow_reverse: z.boolean().default(true),
+  allow_color_merge: z.boolean().default(false),
+  allow_underpath: z.boolean().default(true),
+  entry_exit_mode: RoutingEntryExitModeSchema.default("auto"),
+  tie_mode: RoutingTieModeSchema.default("shape_start_end"),
+  min_stitch_run_before_trim_mm: z.number().default(2),
+  sequence_mode: RoutingSequenceModeSchema.default("strict_sequencer"),
 });
 
 // ============================================================================

@@ -3,8 +3,8 @@ import { Circle, MousePointer2, PenTool, Square } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ImportExportActions } from "@/components/ImportExportActions";
-import { LayersPanel } from "@/components/LayersPanel";
 import { PropertiesPanel } from "@/components/PropertiesPanel";
+import { SequencerPanel } from "@/components/SequencerPanel";
 import { ThreadPalettePanel } from "@/components/ThreadPalettePanel";
 import { ToolButton } from "@/components/ToolButton";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,12 @@ const PREVIEW_ROUTING_OPTIONS: RoutingOptions = {
   preserve_color_order: true,
   preserve_layer_order: false,
   allow_reverse: true,
+  allow_color_merge: false,
+  allow_underpath: true,
+  entry_exit_mode: "auto",
+  tie_mode: "shape_start_end",
+  min_stitch_run_before_trim_mm: 2,
+  sequence_mode: "strict_sequencer",
 };
 
 function colorToCss(color: { r: number; g: number; b: number }): string {
@@ -346,23 +352,25 @@ export function App() {
 
         {/* Workspace */}
         <div className="flex flex-1 overflow-hidden">
-          {/* Left panel — Layers */}
+          {/* Left panel — Sequencer */}
           <aside
             className="panel-scroll flex w-56 shrink-0 flex-col overflow-y-auto border-r border-border/40 bg-panel"
             data-testid="panel-left"
-            aria-label="Layers"
+            aria-label="Sequencer"
           >
-            <SectionHeader>Layers</SectionHeader>
+            <SectionHeader>Sequencer</SectionHeader>
             <div className="flex-1 px-1.5 pb-3">
               {engine ? (
-                <LayersPanel
+                <SequencerPanel
                   engine={engine}
                   selectedIds={selectedIds}
                   onSelectNode={selectNode}
                   onRefreshScene={refreshScene}
                 />
               ) : (
-                <p className="px-1.5 text-xs italic text-muted-foreground/80">No layers yet</p>
+                <p className="px-1.5 text-xs italic text-muted-foreground/80">
+                  No stitch objects yet
+                </p>
               )}
             </div>
           </aside>

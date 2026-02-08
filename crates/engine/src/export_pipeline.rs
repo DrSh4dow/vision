@@ -17,7 +17,7 @@ use crate::stitch::fill::{
 };
 use crate::stitch::running::generate_running_stitches;
 use crate::stitch::satin::{UnderlayConfig, generate_satin_stitches};
-use crate::{CompensationMode, StitchParams, UnderlayMode};
+use crate::{CompensationMode, FillStartMode, StitchParams, UnderlayMode};
 
 /// Minimum number of points required to generate stitches from a path.
 const MIN_POINTS_FOR_STITCHES: usize = 2;
@@ -48,6 +48,8 @@ pub struct RouteMetrics {
     pub trim_count: usize,
     pub color_change_count: usize,
     pub travel_distance_mm: f64,
+    pub longest_travel_mm: f64,
+    pub route_score: f64,
 }
 
 /// Stitch routing policy for block ordering and travel handling.
@@ -58,6 +60,37 @@ pub enum RoutingPolicy {
     Balanced,
     MinTravel,
     MinTrims,
+}
+
+/// Entry/exit strategy for individual stitch blocks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EntryExitMode {
+    #[default]
+    Auto,
+    PreserveShapeStart,
+    UserAnchor,
+}
+
+/// Tie stitch insertion mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TieMode {
+    Off,
+    #[default]
+    ShapeStartEnd,
+    ColorChange,
+}
+
+/// Block sequencing mode for export routing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SequenceMode {
+    /// Preserve explicit scene/sequencer order and optimize only transitions.
+    StrictSequencer,
+    /// Allow global reorder optimization by routing policy.
+    #[default]
+    Optimizer,
 }
 
 /// Route optimization options used during scene export.
@@ -75,6 +108,18 @@ pub struct RoutingOptions {
     pub preserve_layer_order: bool,
     #[serde(default = "default_true")]
     pub allow_reverse: bool,
+    #[serde(default)]
+    pub allow_color_merge: bool,
+    #[serde(default = "default_true")]
+    pub allow_underpath: bool,
+    #[serde(default)]
+    pub entry_exit_mode: EntryExitMode,
+    #[serde(default)]
+    pub tie_mode: TieMode,
+    #[serde(default = "default_min_stitch_run_before_trim_mm")]
+    pub min_stitch_run_before_trim_mm: f64,
+    #[serde(default)]
+    pub sequence_mode: SequenceMode,
 }
 
 impl Default for RoutingOptions {
@@ -86,6 +131,12 @@ impl Default for RoutingOptions {
             preserve_color_order: true,
             preserve_layer_order: false,
             allow_reverse: true,
+            allow_color_merge: false,
+            allow_underpath: true,
+            entry_exit_mode: EntryExitMode::Auto,
+            tie_mode: TieMode::ShapeStartEnd,
+            min_stitch_run_before_trim_mm: default_min_stitch_run_before_trim_mm(),
+            sequence_mode: SequenceMode::Optimizer,
         }
     }
 }
@@ -100,6 +151,10 @@ fn default_trim_threshold_mm() -> f64 {
 
 fn default_true() -> bool {
     true
+}
+
+fn default_min_stitch_run_before_trim_mm() -> f64 {
+    2.0
 }
 
 /// Convert the current scene graph into an `ExportDesign` ready for file export.
@@ -197,6 +252,8 @@ pub fn scene_to_export_design_with_routing(
                     stitch.angle,
                     stitch_length,
                 );
+                let fill_stitches =
+                    apply_fill_controls(fill_stitches, &world_subpaths, stitch, stitch_length);
 
                 if !fill_stitches.is_empty() {
                     let color = match (fill, stroke) {
@@ -229,6 +286,8 @@ pub fn scene_to_export_design_with_routing(
                     stitch_length,
                     stitch.contour_step_mm,
                 );
+                let fill_stitches =
+                    apply_fill_controls(fill_stitches, &world_subpaths, stitch, stitch_length);
 
                 if !fill_stitches.is_empty() {
                     let color = match (fill, stroke) {
@@ -261,6 +320,8 @@ pub fn scene_to_export_design_with_routing(
                     stitch_length,
                     stitch.fill_phase,
                 );
+                let fill_stitches =
+                    apply_fill_controls(fill_stitches, &world_subpaths, stitch, stitch_length);
 
                 if !fill_stitches.is_empty() {
                     let color = match (fill, stroke) {
@@ -296,6 +357,8 @@ pub fn scene_to_export_design_with_routing(
                     stitch.motif_pattern,
                     stitch.motif_scale,
                 );
+                let fill_stitches =
+                    apply_fill_controls(fill_stitches, &world_subpaths, stitch, stitch_length);
 
                 if !fill_stitches.is_empty() {
                     let color = match (fill, stroke) {
@@ -351,13 +414,26 @@ pub fn scene_to_export_design_with_routing(
     let mut colors: Vec<Color> = Vec::new();
     let mut current_color: Option<Color> = None;
     let mut current_position: Option<Point> = None;
+    let mut run_since_trim_mm = 0.0;
 
     for block in blocks {
         let color = block.color;
         let shape_stitches = block.stitches;
+        let start_point = shape_stitches[0].position;
 
         // Insert color change if the color differs from the previous shape
         if current_color.is_some() && current_color != Some(color) {
+            if matches!(routing.tie_mode, TieMode::ColorChange)
+                && let Some(anchor) = current_position
+            {
+                emit_tie_sequence(
+                    &mut stitches,
+                    anchor,
+                    &mut current_position,
+                    &mut run_since_trim_mm,
+                );
+            }
+
             // Trim before color change
             if let Some(last) = stitches.last() {
                 stitches.push(ExportStitch {
@@ -365,12 +441,22 @@ pub fn scene_to_export_design_with_routing(
                     y: last.y,
                     stitch_type: ExportStitchType::Trim,
                 });
+                run_since_trim_mm = 0.0;
             }
             stitches.push(ExportStitch {
-                x: shape_stitches[0].position.x,
-                y: shape_stitches[0].position.y,
+                x: start_point.x,
+                y: start_point.y,
                 stitch_type: ExportStitchType::ColorChange,
             });
+            current_position = Some(start_point);
+            if matches!(routing.tie_mode, TieMode::ColorChange) {
+                emit_tie_sequence(
+                    &mut stitches,
+                    start_point,
+                    &mut current_position,
+                    &mut run_since_trim_mm,
+                );
+            }
         }
 
         // Track color
@@ -381,10 +467,9 @@ pub fn scene_to_export_design_with_routing(
 
         // Move to the start of this shape (if not the first shape).
         if let Some(prev) = current_position {
-            let start = shape_stitches[0].position;
-            let travel = distance(prev, start);
+            let travel = distance(prev, start_point);
             if travel > f64::EPSILON {
-                if should_insert_trim(routing, travel)
+                if should_insert_trim(routing, travel, run_since_trim_mm)
                     && stitches
                         .last()
                         .is_some_and(|s| s.stitch_type != ExportStitchType::Trim)
@@ -394,14 +479,25 @@ pub fn scene_to_export_design_with_routing(
                         y: prev.y,
                         stitch_type: ExportStitchType::Trim,
                     });
+                    run_since_trim_mm = 0.0;
                 }
 
                 stitches.push(ExportStitch {
-                    x: start.x,
-                    y: start.y,
+                    x: start_point.x,
+                    y: start_point.y,
                     stitch_type: ExportStitchType::Jump,
                 });
+                current_position = Some(start_point);
             }
+        }
+
+        if matches!(routing.tie_mode, TieMode::ShapeStartEnd) {
+            emit_tie_sequence(
+                &mut stitches,
+                start_point,
+                &mut current_position,
+                &mut run_since_trim_mm,
+            );
         }
 
         for stitch in &shape_stitches {
@@ -413,12 +509,31 @@ pub fn scene_to_export_design_with_routing(
                 ExportStitchType::Normal
             };
 
+            let prev_position = current_position;
             stitches.push(ExportStitch {
                 x: stitch.position.x,
                 y: stitch.position.y,
                 stitch_type,
             });
+            if stitch_type == ExportStitchType::Normal
+                && let Some(prev) = prev_position
+            {
+                run_since_trim_mm += distance(prev, stitch.position);
+            } else if stitch_type == ExportStitchType::Trim {
+                run_since_trim_mm = 0.0;
+            }
             current_position = Some(stitch.position);
+        }
+
+        if matches!(routing.tie_mode, TieMode::ShapeStartEnd)
+            && let Some(anchor) = current_position
+        {
+            emit_tie_sequence(
+                &mut stitches,
+                anchor,
+                &mut current_position,
+                &mut run_since_trim_mm,
+            );
         }
     }
 
@@ -450,6 +565,8 @@ pub fn compute_route_metrics(design: &ExportDesign) -> RouteMetrics {
         trim_count: 0,
         color_change_count: 0,
         travel_distance_mm: 0.0,
+        longest_travel_mm: 0.0,
+        route_score: 0.0,
     };
 
     for i in 0..design.stitches.len() {
@@ -470,15 +587,59 @@ pub fn compute_route_metrics(design: &ExportDesign) -> RouteMetrics {
             ExportStitchType::Jump | ExportStitchType::Trim | ExportStitchType::ColorChange
         ) {
             let prev = &design.stitches[i - 1];
-            metrics.travel_distance_mm += distance_xy(prev.x, prev.y, s.x, s.y);
+            let travel = distance_xy(prev.x, prev.y, s.x, s.y);
+            metrics.travel_distance_mm += travel;
+            metrics.longest_travel_mm = metrics.longest_travel_mm.max(travel);
         }
     }
+
+    metrics.route_score = metrics.travel_distance_mm
+        + metrics.trim_count as f64 * 8.0
+        + metrics.jump_count as f64 * 2.0
+        + metrics.color_change_count as f64 * 25.0;
 
     metrics
 }
 
-fn should_insert_trim(routing: RoutingOptions, travel_mm: f64) -> bool {
+fn emit_tie_sequence(
+    stitches: &mut Vec<ExportStitch>,
+    anchor: Point,
+    current_position: &mut Option<Point>,
+    run_since_trim_mm: &mut f64,
+) {
+    // Small lock stitch around the anchor point: center -> +x -> center -> -x -> center.
+    const TIE_OFFSET_MM: f64 = 0.25;
+    let points = [
+        anchor,
+        Point::new(anchor.x + TIE_OFFSET_MM, anchor.y),
+        anchor,
+        Point::new(anchor.x - TIE_OFFSET_MM, anchor.y),
+        anchor,
+    ];
+
+    for p in points {
+        if let Some(prev) = *current_position {
+            *run_since_trim_mm += distance(prev, p);
+        }
+        stitches.push(ExportStitch {
+            x: p.x,
+            y: p.y,
+            stitch_type: ExportStitchType::Normal,
+        });
+        *current_position = Some(p);
+    }
+}
+
+fn should_insert_trim(routing: RoutingOptions, travel_mm: f64, run_since_trim_mm: f64) -> bool {
     if travel_mm < routing.trim_threshold_mm {
+        return false;
+    }
+
+    if run_since_trim_mm < routing.min_stitch_run_before_trim_mm.max(0.0) {
+        return false;
+    }
+
+    if routing.allow_underpath && travel_mm <= routing.max_jump_mm {
         return false;
     }
 
@@ -495,6 +656,10 @@ fn optimize_blocks_for_travel(
 ) -> Vec<ShapeStitchBlock> {
     if blocks.len() <= 1 {
         return blocks;
+    }
+
+    if routing.sequence_mode == SequenceMode::StrictSequencer {
+        return orient_blocks_for_strict_sequencer(blocks, routing);
     }
 
     if routing.preserve_layer_order {
@@ -517,15 +682,70 @@ fn optimize_blocks_for_travel(
     let mut ordered: Vec<ShapeStitchBlock> = Vec::new();
     let mut current_end: Option<Point> = None;
 
-    for (_, pending) in &mut color_buckets {
-        let bucket = std::mem::take(pending);
+    if !routing.allow_color_merge {
+        for (_, pending) in &mut color_buckets {
+            let bucket = std::mem::take(pending);
+            let mut optimized = optimize_bucket(bucket, routing, current_end);
+            if let Some(last) = optimized.last() {
+                current_end = Some(last.end_point());
+            } else {
+                current_end =
+                    current_end.or_else(|| ordered.last().map(ShapeStitchBlock::end_point));
+            }
+            ordered.append(&mut optimized);
+        }
+        return ordered;
+    }
+
+    while !color_buckets.is_empty() {
+        let bucket_index = match current_end {
+            None => 0,
+            Some(end) => color_buckets
+                .iter()
+                .enumerate()
+                .map(|(idx, (_, bucket))| {
+                    let score = bucket
+                        .iter()
+                        .map(|b| {
+                            let (cost, _) = best_route_score(end, b, routing);
+                            cost
+                        })
+                        .fold(f64::INFINITY, f64::min);
+                    (idx, score)
+                })
+                .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+                .map(|(idx, _)| idx)
+                .unwrap_or(0),
+        };
+
+        let (_, bucket) = color_buckets.remove(bucket_index);
         let mut optimized = optimize_bucket(bucket, routing, current_end);
         if let Some(last) = optimized.last() {
             current_end = Some(last.end_point());
-        } else {
-            current_end = current_end.or_else(|| ordered.last().map(ShapeStitchBlock::end_point));
         }
         ordered.append(&mut optimized);
+    }
+
+    ordered
+}
+
+/// Preserve block order exactly, only allowing per-block direction optimization.
+fn orient_blocks_for_strict_sequencer(
+    blocks: Vec<ShapeStitchBlock>,
+    routing: RoutingOptions,
+) -> Vec<ShapeStitchBlock> {
+    let mut ordered: Vec<ShapeStitchBlock> = Vec::with_capacity(blocks.len());
+    let mut current_end: Option<Point> = None;
+
+    for mut block in blocks {
+        if let Some(end) = current_end {
+            let (_, reverse) = best_route_score(end, &block, routing);
+            if reverse {
+                block.stitches.reverse();
+            }
+        }
+        current_end = Some(block.end_point());
+        ordered.push(block);
     }
 
     ordered
@@ -585,7 +805,7 @@ fn select_next_block_index(
 
 fn best_route_score(from: Point, block: &ShapeStitchBlock, routing: RoutingOptions) -> (f64, bool) {
     let forward_cost = route_cost(from, block.start_point(), routing);
-    if !routing.allow_reverse {
+    if !routing.allow_reverse || routing.entry_exit_mode == EntryExitMode::PreserveShapeStart {
         return (forward_cost, false);
     }
 
@@ -599,7 +819,9 @@ fn best_route_score(from: Point, block: &ShapeStitchBlock, routing: RoutingOptio
 
 fn route_cost(from: Point, to: Point, routing: RoutingOptions) -> f64 {
     let travel = distance(from, to);
-    let trim = if travel >= routing.trim_threshold_mm {
+    let trim = if travel >= routing.trim_threshold_mm
+        && !(routing.allow_underpath && travel <= routing.max_jump_mm)
+    {
         1.0
     } else {
         0.0
@@ -615,6 +837,154 @@ fn route_cost(from: Point, to: Point, routing: RoutingOptions) -> f64 {
         RoutingPolicy::MinTrims => trim * 1000.0 + travel * 0.1 + jump_penalty,
         RoutingPolicy::Balanced => travel + trim * routing.trim_threshold_mm + jump_penalty * 0.5,
     }
+}
+
+fn apply_fill_controls(
+    mut stitches: Vec<crate::Stitch>,
+    rings: &[Vec<Point>],
+    stitch: &StitchParams,
+    stitch_length: f64,
+) -> Vec<crate::Stitch> {
+    if stitches.is_empty() {
+        return stitches;
+    }
+
+    match stitch.fill_start_mode {
+        FillStartMode::Auto => {}
+        FillStartMode::Center | FillStartMode::Edge => {
+            if let Some(target) = dominant_ring_centroid(rings) {
+                let selected = stitches
+                    .iter()
+                    .enumerate()
+                    .min_by(|(_, a), (_, b)| {
+                        let da = distance(a.position, target);
+                        let db = distance(b.position, target);
+                        match stitch.fill_start_mode {
+                            FillStartMode::Center => {
+                                da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
+                            }
+                            FillStartMode::Edge => {
+                                db.partial_cmp(&da).unwrap_or(std::cmp::Ordering::Equal)
+                            }
+                            FillStartMode::Auto => std::cmp::Ordering::Equal,
+                        }
+                    })
+                    .map(|(idx, _)| idx)
+                    .unwrap_or(0);
+                rotate_stitches(&mut stitches, selected);
+            }
+        }
+    }
+
+    let min_segment = stitch.min_segment_mm.max(0.0);
+    if min_segment > 0.0 {
+        let mut filtered: Vec<crate::Stitch> = Vec::with_capacity(stitches.len());
+        for current in stitches {
+            if filtered.is_empty() {
+                filtered.push(crate::Stitch {
+                    position: current.position,
+                    is_jump: false,
+                    is_trim: current.is_trim,
+                });
+                continue;
+            }
+
+            let prev = &filtered[filtered.len() - 1];
+            if current.is_jump || current.is_trim {
+                filtered.push(current);
+                continue;
+            }
+
+            if distance(prev.position, current.position) + f64::EPSILON < min_segment {
+                continue;
+            }
+            filtered.push(current);
+        }
+        stitches = filtered;
+    }
+
+    let overlap = stitch.overlap_mm.max(0.0);
+    if overlap > 0.0 && stitches.len() >= 2 {
+        let last = &stitches[stitches.len() - 1];
+        let prev = &stitches[stitches.len() - 2];
+        let dx = last.position.x - prev.position.x;
+        let dy = last.position.y - prev.position.y;
+        let len = (dx * dx + dy * dy).sqrt();
+        if len > f64::EPSILON {
+            let ux = dx / len;
+            let uy = dy / len;
+            stitches.push(crate::Stitch {
+                position: Point::new(
+                    last.position.x + ux * overlap,
+                    last.position.y + uy * overlap,
+                ),
+                is_jump: false,
+                is_trim: false,
+            });
+        }
+    }
+
+    if stitch.edge_walk_on_fill
+        && let Some(edge_ring) = dominant_ring(rings)
+    {
+        let edge = generate_running_stitches(&edge_ring, stitch_length.max(0.1));
+        if !edge.is_empty() {
+            if let Some(first) = stitches.first_mut() {
+                first.is_jump = true;
+            }
+            let mut merged = edge;
+            merged.extend(stitches);
+            stitches = merged;
+        }
+    }
+
+    stitches
+}
+
+fn rotate_stitches(stitches: &mut Vec<crate::Stitch>, index: usize) {
+    if stitches.is_empty() || index == 0 || index >= stitches.len() {
+        return;
+    }
+    let tail = stitches.split_off(index);
+    stitches.splice(0..0, tail);
+    if let Some(first) = stitches.first_mut() {
+        first.is_jump = false;
+    }
+}
+
+fn dominant_ring_centroid(rings: &[Vec<Point>]) -> Option<Point> {
+    dominant_ring(rings).map(|ring| {
+        let mut sx = 0.0;
+        let mut sy = 0.0;
+        let mut count = 0usize;
+        for p in &ring {
+            sx += p.x;
+            sy += p.y;
+            count += 1;
+        }
+        Point::new(sx / count as f64, sy / count as f64)
+    })
+}
+
+fn dominant_ring(rings: &[Vec<Point>]) -> Option<Vec<Point>> {
+    rings
+        .iter()
+        .filter(|r| r.len() >= 3)
+        .map(|r| {
+            let mut ring = r.clone();
+            if distance(ring[0], ring[ring.len() - 1]) > 1e-6 {
+                ring.push(ring[0]);
+            }
+            let mut area = 0.0;
+            for i in 0..(ring.len() - 1) {
+                let p0 = ring[i];
+                let p1 = ring[i + 1];
+                area += p0.x * p1.y - p1.x * p0.y;
+            }
+            (ring, area.abs())
+        })
+        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+        .map(|(ring, _)| ring)
 }
 
 /// Generate satin stitches for a shape by offsetting a centerline into two rails.
@@ -1016,6 +1386,179 @@ mod tests {
     }
 
     #[test]
+    fn test_export_pipeline_fill_edge_walk_adds_stitches() {
+        let mut scene_base = Scene::new();
+        let mut scene_edge = Scene::new();
+        let mut stitch = crate::StitchParams::default();
+        stitch.stitch_type = crate::StitchType::Tatami;
+        stitch.density = 1.8;
+
+        let mut stitch_edge = stitch;
+        stitch_edge.edge_walk_on_fill = true;
+
+        scene_base
+            .add_node(
+                "Tatami Base",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(18.0, 10.0, 0.0)),
+                    fill: Some(Color::new(30, 180, 30, 255)),
+                    stroke: Some(Color::new(30, 180, 30, 255)),
+                    stroke_width: 0.4,
+                    stitch,
+                },
+                None,
+            )
+            .unwrap();
+        scene_edge
+            .add_node(
+                "Tatami Edge",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(18.0, 10.0, 0.0)),
+                    fill: Some(Color::new(30, 180, 30, 255)),
+                    stroke: Some(Color::new(30, 180, 30, 255)),
+                    stroke_width: 0.4,
+                    stitch: stitch_edge,
+                },
+                None,
+            )
+            .unwrap();
+
+        let base = scene_to_export_design(&scene_base, 2.0).unwrap();
+        let with_edge = scene_to_export_design(&scene_edge, 2.0).unwrap();
+
+        let base_normals = base
+            .stitches
+            .iter()
+            .filter(|s| s.stitch_type == ExportStitchType::Normal)
+            .count();
+        let edge_normals = with_edge
+            .stitches
+            .iter()
+            .filter(|s| s.stitch_type == ExportStitchType::Normal)
+            .count();
+        assert!(edge_normals > base_normals);
+    }
+
+    #[test]
+    fn test_export_pipeline_fill_min_segment_reduces_density() {
+        let mut scene_low = Scene::new();
+        let mut scene_high = Scene::new();
+        let mut low_filter = crate::StitchParams::default();
+        low_filter.stitch_type = crate::StitchType::Motif;
+        low_filter.density = 0.45;
+        low_filter.motif_scale = 0.6;
+        low_filter.min_segment_mm = 0.05;
+
+        let mut high_filter = low_filter;
+        high_filter.min_segment_mm = 2.0;
+
+        scene_low
+            .add_node(
+                "Motif A",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(20.0, 16.0, 0.0)),
+                    fill: Some(Color::new(200, 40, 90, 255)),
+                    stroke: Some(Color::new(200, 40, 90, 255)),
+                    stroke_width: 0.4,
+                    stitch: low_filter,
+                },
+                None,
+            )
+            .unwrap();
+
+        scene_high
+            .add_node(
+                "Motif B",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(20.0, 16.0, 0.0)),
+                    fill: Some(Color::new(200, 40, 90, 255)),
+                    stroke: Some(Color::new(200, 40, 90, 255)),
+                    stroke_width: 0.4,
+                    stitch: high_filter,
+                },
+                None,
+            )
+            .unwrap();
+
+        let low_design = scene_to_export_design(&scene_low, 2.0).unwrap();
+        let high_design = scene_to_export_design(&scene_high, 2.0).unwrap();
+
+        let low_normals = low_design
+            .stitches
+            .iter()
+            .filter(|s| s.stitch_type == ExportStitchType::Normal)
+            .count();
+        let high_normals = high_design
+            .stitches
+            .iter()
+            .filter(|s| s.stitch_type == ExportStitchType::Normal)
+            .count();
+
+        assert!(high_normals < low_normals);
+    }
+
+    #[test]
+    fn test_export_pipeline_fill_start_mode_center_targets_centroid() {
+        let mut scene_center = Scene::new();
+        let mut scene_edge = Scene::new();
+        let mut center_mode = crate::StitchParams::default();
+        center_mode.stitch_type = crate::StitchType::Tatami;
+        center_mode.fill_start_mode = crate::FillStartMode::Center;
+        center_mode.density = 1.6;
+
+        let mut edge_mode = center_mode;
+        edge_mode.fill_start_mode = crate::FillStartMode::Edge;
+
+        scene_center
+            .add_node(
+                "Center",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(20.0, 10.0, 0.0)),
+                    fill: Some(Color::new(60, 120, 200, 255)),
+                    stroke: Some(Color::new(60, 120, 200, 255)),
+                    stroke_width: 0.4,
+                    stitch: center_mode,
+                },
+                None,
+            )
+            .unwrap();
+        scene_edge
+            .add_node(
+                "Edge",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(20.0, 10.0, 0.0)),
+                    fill: Some(Color::new(60, 120, 200, 255)),
+                    stroke: Some(Color::new(60, 120, 200, 255)),
+                    stroke_width: 0.4,
+                    stitch: edge_mode,
+                },
+                None,
+            )
+            .unwrap();
+
+        let center_design = scene_to_export_design(&scene_center, 2.0).unwrap();
+        let edge_design = scene_to_export_design(&scene_edge, 2.0).unwrap();
+
+        let center = Point::new(10.0, 5.0);
+        let center_first = center_design
+            .stitches
+            .iter()
+            .filter(|s| s.stitch_type == ExportStitchType::Normal)
+            .map(|s| Point::new(s.x, s.y))
+            .next()
+            .unwrap();
+        let edge_first = edge_design
+            .stitches
+            .iter()
+            .filter(|s| s.stitch_type == ExportStitchType::Normal)
+            .map(|s| Point::new(s.x, s.y))
+            .next()
+            .unwrap();
+
+        assert!(distance(center, center_first) <= distance(center, edge_first));
+    }
+
+    #[test]
     fn test_export_pipeline_world_transform_applied() {
         let mut scene = Scene::new();
         let id = scene
@@ -1229,6 +1772,53 @@ mod tests {
     }
 
     #[test]
+    fn test_route_sequence_mode_strict_preserves_explicit_order() {
+        let mut scene = Scene::new();
+        let make_rect = || NodeKind::Shape {
+            shape: ShapeData::Rect(RectShape::new(8.0, 8.0, 0.0)),
+            fill: None,
+            stroke: Some(Color::new(0, 0, 0, 255)),
+            stroke_width: 0.5,
+            stitch: crate::StitchParams::default(),
+        };
+
+        let a = scene.add_node("A", make_rect(), None).unwrap();
+        let b = scene.add_node("B", make_rect(), None).unwrap();
+        let c = scene.add_node("C", make_rect(), None).unwrap();
+        scene.get_node_mut(a).unwrap().transform.x = 0.0;
+        scene.get_node_mut(b).unwrap().transform.x = 100.0;
+        scene.get_node_mut(c).unwrap().transform.x = 10.0;
+
+        let strict = scene_to_export_design_with_routing(
+            &scene,
+            2.0,
+            RoutingOptions {
+                sequence_mode: SequenceMode::StrictSequencer,
+                allow_reverse: false,
+                ..RoutingOptions::default()
+            },
+        )
+        .unwrap();
+        let optimizer = scene_to_export_design_with_routing(
+            &scene,
+            2.0,
+            RoutingOptions {
+                sequence_mode: SequenceMode::Optimizer,
+                allow_reverse: false,
+                ..RoutingOptions::default()
+            },
+        )
+        .unwrap();
+
+        let strict_metrics = compute_route_metrics(&strict);
+        let optimizer_metrics = compute_route_metrics(&optimizer);
+        assert!(
+            strict_metrics.travel_distance_mm >= optimizer_metrics.travel_distance_mm,
+            "strict order should not globally reorder to reduce travel"
+        );
+    }
+
+    #[test]
     fn test_route_allow_reverse_reduces_travel_distance() {
         let mut scene = Scene::new();
         let mut path_a = VectorPath::new();
@@ -1282,5 +1872,179 @@ mod tests {
             with_reverse_metrics.travel_distance_mm < no_reverse_metrics.travel_distance_mm,
             "reverse-enabled routing should reduce travel for opposite-direction path blocks"
         );
+    }
+
+    #[test]
+    fn test_route_entry_exit_preserve_shape_start_disables_reverse_gain() {
+        let mut scene = Scene::new();
+        let mut path_a = VectorPath::new();
+        path_a.move_to(Point::new(0.0, 0.0));
+        path_a.line_to(Point::new(80.0, 0.0));
+
+        let mut path_b = VectorPath::new();
+        path_b.move_to(Point::new(20.0, 0.0));
+        path_b.line_to(Point::new(100.0, 0.0));
+
+        let kind_a = NodeKind::Shape {
+            shape: ShapeData::Path(path_a),
+            fill: None,
+            stroke: Some(Color::new(40, 140, 240, 255)),
+            stroke_width: 0.5,
+            stitch: crate::StitchParams::default(),
+        };
+        let kind_b = NodeKind::Shape {
+            shape: ShapeData::Path(path_b),
+            fill: None,
+            stroke: Some(Color::new(40, 140, 240, 255)),
+            stroke_width: 0.5,
+            stitch: crate::StitchParams::default(),
+        };
+
+        scene.add_node("A", kind_a, None).unwrap();
+        scene.add_node("B", kind_b, None).unwrap();
+
+        let preserve_start = scene_to_export_design_with_routing(
+            &scene,
+            2.0,
+            RoutingOptions {
+                allow_reverse: true,
+                entry_exit_mode: EntryExitMode::PreserveShapeStart,
+                ..RoutingOptions::default()
+            },
+        )
+        .unwrap();
+        let no_reverse = scene_to_export_design_with_routing(
+            &scene,
+            2.0,
+            RoutingOptions {
+                allow_reverse: false,
+                ..RoutingOptions::default()
+            },
+        )
+        .unwrap();
+
+        let preserve_metrics = compute_route_metrics(&preserve_start);
+        let no_reverse_metrics = compute_route_metrics(&no_reverse);
+        assert!(
+            (preserve_metrics.travel_distance_mm - no_reverse_metrics.travel_distance_mm).abs()
+                < 1e-6
+        );
+    }
+
+    #[test]
+    fn test_route_allow_underpath_reduces_trim_count() {
+        let mut scene = Scene::new();
+        let make_rect = || NodeKind::Shape {
+            shape: ShapeData::Rect(RectShape::new(6.0, 6.0, 0.0)),
+            fill: None,
+            stroke: Some(Color::new(0, 0, 0, 255)),
+            stroke_width: 0.4,
+            stitch: crate::StitchParams::default(),
+        };
+
+        let a = scene.add_node("A", make_rect(), None).unwrap();
+        let b = scene.add_node("B", make_rect(), None).unwrap();
+        scene.get_node_mut(a).unwrap().transform.x = 0.0;
+        scene.get_node_mut(b).unwrap().transform.x = 14.0;
+
+        let with_underpath = scene_to_export_design_with_routing(
+            &scene,
+            2.0,
+            RoutingOptions {
+                allow_underpath: true,
+                trim_threshold_mm: 10.0,
+                min_stitch_run_before_trim_mm: 0.0,
+                ..RoutingOptions::default()
+            },
+        )
+        .unwrap();
+        let without_underpath = scene_to_export_design_with_routing(
+            &scene,
+            2.0,
+            RoutingOptions {
+                allow_underpath: false,
+                trim_threshold_mm: 10.0,
+                min_stitch_run_before_trim_mm: 0.0,
+                ..RoutingOptions::default()
+            },
+        )
+        .unwrap();
+
+        let with_metrics = compute_route_metrics(&with_underpath);
+        let without_metrics = compute_route_metrics(&without_underpath);
+        assert!(with_metrics.trim_count <= without_metrics.trim_count);
+    }
+
+    #[test]
+    fn test_route_tie_mode_shape_start_end_increases_stitch_count() {
+        let mut scene = Scene::new();
+        scene
+            .add_node(
+                "Rect",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(8.0, 8.0, 0.0)),
+                    fill: None,
+                    stroke: Some(Color::new(0, 0, 0, 255)),
+                    stroke_width: 0.4,
+                    stitch: crate::StitchParams::default(),
+                },
+                None,
+            )
+            .unwrap();
+
+        let with_ties = scene_to_export_design_with_routing(
+            &scene,
+            2.0,
+            RoutingOptions {
+                tie_mode: TieMode::ShapeStartEnd,
+                ..RoutingOptions::default()
+            },
+        )
+        .unwrap();
+        let without_ties = scene_to_export_design_with_routing(
+            &scene,
+            2.0,
+            RoutingOptions {
+                tie_mode: TieMode::Off,
+                ..RoutingOptions::default()
+            },
+        )
+        .unwrap();
+
+        assert!(with_ties.stitches.len() > without_ties.stitches.len());
+    }
+
+    #[test]
+    fn test_compute_route_metrics_extended_fields() {
+        let design = ExportDesign {
+            name: "metrics".to_string(),
+            stitches: vec![
+                ExportStitch {
+                    x: 0.0,
+                    y: 0.0,
+                    stitch_type: ExportStitchType::Normal,
+                },
+                ExportStitch {
+                    x: 10.0,
+                    y: 0.0,
+                    stitch_type: ExportStitchType::Jump,
+                },
+                ExportStitch {
+                    x: 10.0,
+                    y: 0.0,
+                    stitch_type: ExportStitchType::Trim,
+                },
+                ExportStitch {
+                    x: 30.0,
+                    y: 0.0,
+                    stitch_type: ExportStitchType::ColorChange,
+                },
+            ],
+            colors: vec![Color::new(0, 0, 0, 255)],
+        };
+
+        let metrics = compute_route_metrics(&design);
+        assert!(metrics.longest_travel_mm >= 20.0);
+        assert!(metrics.route_score > metrics.travel_distance_mm);
     }
 }
