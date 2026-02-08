@@ -35,10 +35,14 @@ interface UseCanvasOptions {
   cursorStyle: string;
   /** Called when the user clicks on the canvas (select tool). */
   onCanvasClick?: (event: CanvasClickEvent) => void;
+  /** Called to hit-test a point in world-space (mm). */
+  onCanvasHitTest?: (worldX: number, worldY: number) => number | null;
   /** Called when a shape drag is completed (rect/ellipse tool). */
   onShapeDragEnd?: (startMm: DesignPoint, endMm: DesignPoint) => void;
   /** Called when pen tool clicks to add a point. */
   onPenClick?: (pointMm: DesignPoint) => void;
+  /** Called when a select-tool drag commits node movement. */
+  onSelectionDragCommit?: (nodeIds: number[], deltaMm: DesignPoint) => void;
   /** Current pen tool points (for live preview). */
   penPoints?: DesignPoint[];
 }
@@ -59,8 +63,10 @@ export function useCanvas({
   activeTool,
   cursorStyle,
   onCanvasClick,
+  onCanvasHitTest,
   onShapeDragEnd,
   onPenClick,
+  onSelectionDragCommit,
   penPoints,
 }: UseCanvasOptions): React.RefObject<HTMLCanvasElement | null> {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -72,6 +78,12 @@ export function useCanvas({
   const shapeDragStart = useRef<DesignPoint | null>(null);
   const shapeDragCurrent = useRef<DesignPoint | null>(null);
   const isShapeDragging = useRef(false);
+  // Select-tool direct move drag state
+  const isMoveDragPrimed = useRef(false);
+  const isMoveDragging = useRef(false);
+  const moveDragStart = useRef<DesignPoint | null>(null);
+  const moveDragDelta = useRef<DesignPoint>({ x: 0, y: 0 });
+  const moveDragNodeIds = useRef<number[]>([]);
 
   const render = useCallback(() => {
     const canvas = canvasRef.current;
@@ -106,15 +118,35 @@ export function useCanvas({
     drawGrid(ctx, cam, width, height);
     drawAxes(ctx, cam, width, height);
 
+    const movePreviewActive = isMoveDragging.current;
+
     // Draw scene render items
     const data = canvasData.current;
     for (const item of data.renderItems) {
+      if (movePreviewActive && moveDragNodeIds.current.includes(item.id)) {
+        const [a, b, c, d, tx, ty] = item.world_transform;
+        const previewItem = {
+          ...item,
+          world_transform: [
+            a,
+            b,
+            c,
+            d,
+            tx + moveDragDelta.current.x,
+            ty + moveDragDelta.current.y,
+          ] as [number, number, number, number, number, number],
+        };
+        drawRenderItem(ctx, cam, previewItem, data.selectedIds.has(item.id));
+        continue;
+      }
       drawRenderItem(ctx, cam, item, data.selectedIds.has(item.id));
     }
 
-    // Draw stitch overlays
-    for (const overlay of data.stitchOverlays) {
-      drawStitchOverlay(ctx, cam, overlay);
+    // Draw stitch overlays (hide during direct-move preview to avoid stale mismatch)
+    if (!movePreviewActive) {
+      for (const overlay of data.stitchOverlays) {
+        drawStitchOverlay(ctx, cam, overlay);
+      }
     }
 
     // Draw shape drag preview (rubber band)
@@ -220,11 +252,48 @@ export function useCanvas({
         const worldPt = screenToWorld(e.clientX, e.clientY);
 
         if (activeTool === "select") {
+          const hitId = onCanvasHitTest ? onCanvasHitTest(worldPt.x, worldPt.y) : null;
+
+          if (e.shiftKey) {
+            if (onCanvasClick) {
+              onCanvasClick({
+                worldX: worldPt.x,
+                worldY: worldPt.y,
+                shiftKey: e.shiftKey,
+                button: e.button,
+              });
+            }
+            return;
+          }
+
+          if (hitId !== null) {
+            const selected = canvasData.current.selectedIds;
+            if (selected.has(hitId)) {
+              moveDragNodeIds.current = Array.from(selected);
+            } else {
+              moveDragNodeIds.current = [hitId];
+              if (onCanvasClick) {
+                onCanvasClick({
+                  worldX: worldPt.x,
+                  worldY: worldPt.y,
+                  shiftKey: false,
+                  button: e.button,
+                });
+              }
+            }
+
+            isMoveDragPrimed.current = true;
+            isMoveDragging.current = false;
+            moveDragStart.current = worldPt;
+            moveDragDelta.current = { x: 0, y: 0 };
+            return;
+          }
+
           if (onCanvasClick) {
             onCanvasClick({
               worldX: worldPt.x,
               worldY: worldPt.y,
-              shiftKey: e.shiftKey,
+              shiftKey: false,
               button: e.button,
             });
           }
@@ -257,6 +326,23 @@ export function useCanvas({
         return;
       }
 
+      if (isMoveDragPrimed.current && moveDragStart.current) {
+        const currentPt = screenToWorld(e.clientX, e.clientY);
+        moveDragDelta.current = {
+          x: currentPt.x - moveDragStart.current.x,
+          y: currentPt.y - moveDragStart.current.y,
+        };
+
+        if (!isMoveDragging.current) {
+          const dist = Math.hypot(moveDragDelta.current.x, moveDragDelta.current.y);
+          if (dist > MIN_DRAG_MM) {
+            isMoveDragging.current = true;
+            el.style.cursor = "grabbing";
+          }
+        }
+        return;
+      }
+
       // Hover hit-test for select tool
       // (lightweight — only update cursor, don't re-render)
     };
@@ -284,21 +370,62 @@ export function useCanvas({
         shapeDragStart.current = null;
         shapeDragCurrent.current = null;
         el.style.cursor = cursorStyle;
+        return;
       }
+
+      if (isMoveDragPrimed.current) {
+        if (isMoveDragging.current && moveDragNodeIds.current.length > 0 && onSelectionDragCommit) {
+          const delta = moveDragDelta.current;
+          if (Math.abs(delta.x) > f64Epsilon || Math.abs(delta.y) > f64Epsilon) {
+            onSelectionDragCommit(moveDragNodeIds.current, delta);
+          }
+        }
+        isMoveDragPrimed.current = false;
+        isMoveDragging.current = false;
+        moveDragStart.current = null;
+        moveDragNodeIds.current = [];
+        moveDragDelta.current = { x: 0, y: 0 };
+        el.style.cursor = cursorStyle;
+      }
+    };
+
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key !== "Escape") return;
+      if (!isMoveDragPrimed.current) return;
+      isMoveDragPrimed.current = false;
+      isMoveDragging.current = false;
+      moveDragStart.current = null;
+      moveDragNodeIds.current = [];
+      moveDragDelta.current = { x: 0, y: 0 };
+      el.style.cursor = cursorStyle;
     };
 
     el.addEventListener("wheel", onWheel, { passive: false });
     el.addEventListener("mousedown", onMouseDown);
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
+    window.addEventListener("keydown", onKeyDown);
 
     return () => {
       el.removeEventListener("wheel", onWheel);
       el.removeEventListener("mousedown", onMouseDown);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
+      window.removeEventListener("keydown", onKeyDown);
     };
-  }, [activeTool, cursorStyle, onCanvasClick, onShapeDragEnd, onPenClick, screenToWorld]);
+  }, [
+    activeTool,
+    canvasData,
+    cursorStyle,
+    onCanvasClick,
+    onCanvasHitTest,
+    onShapeDragEnd,
+    onPenClick,
+    onSelectionDragCommit,
+    screenToWorld,
+  ]);
 
   return canvasRef;
 }
+
+const f64Epsilon = 1e-9;

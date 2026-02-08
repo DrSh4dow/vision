@@ -12,7 +12,7 @@ Parity is achieved when a professional digitizer can complete end-to-end product
 1. Vector drawing/editing and object transforms
 2. Full object digitizing controls (running, satin, tatami, advanced fills, compensation, underlay)
 3. Reliable auto-routing/travel/jump/trim behavior
-4. Accurate stitch sequence controls and machine commands
+4. Stitch-block-first sequence editing with accurate machine commands
 5. Realistic stitch simulation and stitch playback diagnostics
 6. Multi-format production export/import for mainstream machine ecosystems
 7. Lettering/monogram workflows used in common commercial jobs
@@ -25,6 +25,7 @@ Parity is achieved when a professional digitizer can complete end-to-end product
 3. No backend dependency for stitch generation, simulation, or file conversion.
 4. Engineering quality gates are blocking, not advisory.
 5. Reference Ink/Stitch algorithms, but implement clean-room Rust versions.
+6. Hybrid object model: geometry remains authoring source, stitch blocks are first-class editable entities.
 
 ## 4) Reuse Strategy from Ink/Stitch (Knowledge Reuse, Not Code Copy)
 
@@ -35,6 +36,8 @@ Use Ink/Stitch as algorithm and behavior reference for mature embroidery logic:
 3. Fill and satin validation heuristics (small shapes, invalid geometry, warnings)
 4. Realistic stitch rendering patterns and command-aware visualization
 5. Parameter taxonomy and defaults for practical digitizing controls
+6. Local reference workspace: `../inkstitch` is the default comparison baseline when uncertain about algorithm quality or expected behavior.
+7. Decision rule: when in doubt, inspect `../inkstitch` first for inspiration and benchmark Vision behavior against it before finalizing implementation details.
 
 Mandatory legal boundary:
 
@@ -47,6 +50,10 @@ Mandatory legal boundary:
 1. `apps/web`: React shell, tools, property panels, timeline, simulation controls
 2. `packages/wasm-bridge`: strict type-safe bridge, schema validation, stable API surface
 3. `crates/engine`: scene graph, geometry, digitizing, stitch plan, format IO, routing metrics
+   1. `GeometrySource`: path/shape/raster-derived boundaries and guides
+   2. `EmbroideryObject`: stitch params + compensation + underlay + anchors
+   3. `StitchBlock`: generated/edited stitch runs with explicit commands
+   4. `SequenceTrack`: ordered stitch blocks as machine execution order
 4. Renderer split:
    1. Immediate 2D Canvas/WebGL preview path for editing responsiveness
    2. High-fidelity WebGL/WebGPU thread simulation path for TrueView-like output
@@ -74,13 +81,17 @@ Goal: match reliable quality for the most common commercial workflows.
 
 Scope:
 
-1. Running stitch: path smoothing, min/max segment handling, bean/manual variants
-2. Satin columns:
+1. Direct manipulation UX:
+   1. select-and-drag shape movement on canvas
+   2. multi-select move parity with design tools (Figma/Inkscape style)
+   3. drag move commit with undo/redo safety
+2. Running stitch: path smoothing, min/max segment handling, bean/manual variants
+3. Satin columns:
    1. robust two-rail behavior
    2. center/edge/zigzag underlay modes
    3. pull compensation controls
    4. width/density/angle behavior consistency
-3. Tatami fill:
+4. Tatami fill:
    1. better row scheduling and stagger behavior
    2. gap-fill rows
    3. start/end strategy
@@ -89,33 +100,39 @@ Scope:
 Exit criteria:
 
 1. Core objects produce stable stitchouts on representative designs
-2. Jump/trim count and travel distance are within agreed benchmark thresholds
-3. E2E tests cover object creation -> parameter edit -> export -> preview
+2. Canvas direct drag-move works predictably without pan/zoom regressions
+3. Jump/trim count and travel distance are within agreed benchmark thresholds
+4. E2E tests cover object creation -> drag move -> parameter edit -> export -> preview
 
-## Phase 2 — Stitch Plan and Routing Parity
+## Phase 2 — Hybrid Stitch Plan and Routing Parity
 Goal: make sequence quality comparable to mature desktop digitizers.
 
 Scope:
 
-1. First-class stitch-plan pipeline in engine:
+1. First-class hybrid model in engine:
+   1. persist `EmbroideryObject` and `StitchBlock` separately from render shapes
+   2. keep deterministic sync between geometry edits and stitch block regeneration
+   3. allow explicit stitch-block resequence independent of visual layer order
+2. First-class stitch-plan pipeline:
    1. color blocks
    2. object boundaries
    3. command-aware transitions
-2. Tie policies:
+3. Tie policies:
    1. off
    2. shape start/end
    3. color-change only
-3. Travel optimization improvements:
+4. Travel optimization improvements:
    1. route scoring tuned by policy
    2. reversible block routing
    3. color/layer preservation policies
-4. Jump collapse and trim insertion logic aligned with machine-safe behavior
+5. Jump collapse and trim insertion logic aligned with machine-safe behavior
 
 Exit criteria:
 
 1. Route metrics dashboard reflects true command sequence outcomes
-2. Routing policies are deterministic and test-covered
-3. Reduced unnecessary trims/jumps on standard benchmark designs
+2. Stitch-block edits survive undo/redo and export without data loss
+3. Routing policies are deterministic and test-covered
+4. Reduced unnecessary trims/jumps on standard benchmark designs
 
 ## Phase 3 — Advanced Fill Parity
 Goal: close major fill-quality gap with Hatch-class tools.
@@ -243,12 +260,13 @@ Exit criteria:
 
 Priority order (highest first):
 
-1. Satin/tatami quality and underlay behavior
-2. Stitch-plan command semantics and auto-routing quality
-3. Advanced fill robustness
-4. Simulation fidelity for proofing and QA
-5. Format interoperability breadth
-6. Lettering and sequence productivity tools
+1. Hybrid object model with first-class stitch blocks and sequencer behavior
+2. Satin/tatami quality and underlay behavior
+3. Stitch-plan command semantics and auto-routing quality
+4. Advanced fill robustness
+5. Simulation fidelity for proofing and QA
+6. Format interoperability breadth
+7. Lettering and sequence productivity tools
 
 ## 8) Quality Gates (Must Stay Green)
 
@@ -289,11 +307,13 @@ Additional parity gates:
 ## 11) Execution Order for Next Development Cycles
 
 1. Complete Phase 0 hardening and benchmark harness
-2. Finish Phase 1 quality tuning for satin/tatami underlay/compensation
-3. Finalize Phase 2 stitch-plan/routing semantics and metrics confidence
-4. Push Phase 3 advanced fill parity with robust geometry handling
-5. Deliver Phase 5A simulation uplift before Phase 5B 3D renderer
-6. Expand Phase 6 format coverage with continuous real-file validation
+2. Deliver direct manipulation UX parity (select+drag move on canvas)
+3. Implement Phase 2 hybrid model foundation (`EmbroideryObject` + `StitchBlock` + `SequenceTrack`)
+4. Finish Phase 1 quality tuning for satin/tatami underlay/compensation
+5. Finalize Phase 2 stitch-plan/routing semantics and metrics confidence
+6. Push Phase 3 advanced fill parity with robust geometry handling
+7. Deliver Phase 5A simulation uplift before Phase 5B 3D renderer
+8. Expand Phase 6 format coverage with continuous real-file validation
 
 ## 12) Definition of Done for "Hatch-Parity Core"
 
@@ -304,3 +324,8 @@ Vision can be considered Hatch-parity for core workflows when all are true:
 3. Simulation is trusted for pathing/quality review and customer proofing
 4. Major machine formats are export/import reliable for normal shop pipelines
 5. Lettering and sequence tools support common business use cases without tool switching
+6. Stitch blocks are editable first-class entities and not only export-time byproducts
+
+## Changelog
+- 2026-02-08: Added direct canvas drag-move parity milestone and acceptance criteria.
+- 2026-02-08: Reframed roadmap around hybrid stitch-block model and added `../inkstitch` reference-first guidance for implementation inspiration.

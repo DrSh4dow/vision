@@ -398,6 +398,41 @@ test.describe("Canvas Interaction", () => {
     await expect(sequencerRows).toHaveCount(1, { timeout: 5_000 });
   });
 
+  test("select tool drag moves shape on canvas", async ({ page }) => {
+    const canvas = page.getByTestId("design-canvas");
+    await page.getByTestId("tool-rect").click();
+    const box = await canvas.boundingBox();
+    if (!box) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    await page.mouse.move(cx - 30, cy - 30);
+    await page.mouse.down();
+    await page.mouse.move(cx + 30, cy + 30, { steps: 5 });
+    await page.mouse.up();
+
+    await expect(page.locator("[data-testid^='sequencer-row-']")).toHaveCount(1, {
+      timeout: 5_000,
+    });
+
+    await page.mouse.move(cx, cy);
+    await page.mouse.down();
+    await page.mouse.move(cx + 80, cy + 30, { steps: 8 });
+    await page.mouse.up();
+
+    // If drag-move committed, first undo should revert movement but keep the shape.
+    await canvas.click({ position: { x: cx, y: cy } });
+    await page.keyboard.press("Control+z");
+    await expect(page.locator("[data-testid^='sequencer-row-']")).toHaveCount(1, {
+      timeout: 5_000,
+    });
+
+    // Second undo should remove the shape creation command.
+    await page.keyboard.press("Control+z");
+    await expect(page.locator("[data-testid^='sequencer-row-']")).toHaveCount(0, {
+      timeout: 5_000,
+    });
+  });
+
   test("sequencer shows stitch objects after shape creation", async ({ page }) => {
     const canvas = page.getByTestId("design-canvas");
     await page.getByTestId("tool-rect").click();

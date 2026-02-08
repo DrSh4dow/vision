@@ -58,6 +58,11 @@ React 19 UI (apps/web) <-> WASM Bridge (packages/wasm-bridge) <-> Rust Engine + 
 - Avoid mocks as much as possible
 - Test actual implementation; do not duplicate logic in tests
 
+## Documentation
+
+- `ROADMAP.md` must include an end-of-file `## Changelog` section
+- Each changelog update must be maximum 2 lines
+
 ## Plan Mode
 
 - Plans must be extremely concise; sacrifice grammar for brevity

@@ -197,6 +197,38 @@ export function App() {
     [engine, selectNode, deselectAll],
   );
 
+  const handleCanvasHitTest = useCallback(
+    (worldX: number, worldY: number) => {
+      if (!engine) return null;
+      return engine.sceneHitTest(worldX, worldY);
+    },
+    [engine],
+  );
+
+  const handleSelectionDragCommit = useCallback(
+    (nodeIds: number[], deltaMm: DesignPoint) => {
+      if (!engine) return;
+      if (Math.abs(deltaMm.x) < 1e-9 && Math.abs(deltaMm.y) < 1e-9) return;
+
+      for (const id of nodeIds) {
+        const node = engine.sceneGetNode(id);
+        if (!node) continue;
+        if (typeof node.kind === "string" || !("Shape" in node.kind)) continue;
+
+        engine.sceneUpdateTransform(id, {
+          x: node.transform.x + deltaMm.x,
+          y: node.transform.y + deltaMm.y,
+          rotation: node.transform.rotation,
+          scaleX: node.transform.scale_x,
+          scaleY: node.transform.scale_y,
+        });
+      }
+
+      refreshScene();
+    },
+    [engine, refreshScene],
+  );
+
   /** Handle shape drag end (rect/ellipse tool). */
   const handleShapeDragEnd = useCallback(
     (startMm: DesignPoint, endMm: DesignPoint) => {
@@ -277,6 +309,8 @@ export function App() {
     activeTool,
     cursorStyle,
     onCanvasClick: handleCanvasClick,
+    onCanvasHitTest: handleCanvasHitTest,
+    onSelectionDragCommit: handleSelectionDragCommit,
     onShapeDragEnd: handleShapeDragEnd,
     onPenClick: handlePenClick,
     penPoints: penState.points,
