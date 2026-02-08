@@ -81,6 +81,14 @@ export interface VisionEngine {
   /** Add a node to the scene. Returns the new node ID. */
   sceneAddNode(name: string, kind: NodeKindData, parentId?: number): number;
 
+  /** Add a node with an initial transform. Returns the new node ID. */
+  sceneAddNodeWithTransform(
+    name: string,
+    kind: NodeKindData,
+    transform: TransformData,
+    parentId?: number,
+  ): number;
+
   /** Remove a node and its descendants. */
   sceneRemoveNode(nodeId: number): void;
 

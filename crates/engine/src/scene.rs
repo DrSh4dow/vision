@@ -401,6 +401,7 @@ impl Scene {
         name: &str,
         kind: NodeKind,
         parent: Option<NodeId>,
+        transform: Transform,
     ) -> Result<NodeId, String> {
         if let Some(pid) = parent
             && !self.nodes.contains_key(&pid)
@@ -420,7 +421,7 @@ impl Scene {
         let node = Node {
             id,
             name: name.to_string(),
-            transform: Transform::identity(),
+            transform,
             kind,
             children: Vec::new(),
             parent,

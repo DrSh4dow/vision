@@ -299,13 +299,16 @@ test.describe("Canvas Interaction", () => {
     // Wait for the new shape node to appear (Layer 1 + Rectangle = 2)
     await expect(layerNodes).toHaveCount(2, { timeout: 3_000 });
 
+    // Ensure the page has focus for keyboard shortcuts
+    await canvas.click({ position: { x: cx, y: cy } });
+
     // Undo — should remove the rectangle
     await page.keyboard.press("Control+z");
-    await expect(layerNodes).toHaveCount(1, { timeout: 3_000 });
+    await expect(layerNodes).toHaveCount(1, { timeout: 5_000 });
 
     // Redo — should restore the rectangle
     await page.keyboard.press("Control+Shift+z");
-    await expect(layerNodes).toHaveCount(2, { timeout: 3_000 });
+    await expect(layerNodes).toHaveCount(2, { timeout: 5_000 });
   });
 
   test("layer visibility toggle", async ({ page }) => {

@@ -18,6 +18,7 @@ import initWasm, {
   import_svg_document,
   import_svg_path,
   scene_add_node,
+  scene_add_node_with_transform,
   scene_create,
   scene_export_design,
   scene_get_node,
@@ -221,6 +222,27 @@ export async function initEngine(): Promise<VisionEngine> {
         const kindJson = JSON.stringify(kind);
         const pid = parentId !== undefined ? BigInt(parentId) : BigInt(-1);
         const id = scene_add_node(name, kindJson, pid);
+        return Number(id);
+      },
+
+      sceneAddNodeWithTransform: (
+        name: string,
+        kind: NodeKindData,
+        transform: TransformData,
+        parentId?: number,
+      ): number => {
+        const kindJson = JSON.stringify(kind);
+        const pid = parentId !== undefined ? BigInt(parentId) : BigInt(-1);
+        const id = scene_add_node_with_transform(
+          name,
+          kindJson,
+          pid,
+          transform.x,
+          transform.y,
+          transform.rotation,
+          transform.scaleX,
+          transform.scaleY,
+        );
         return Number(id);
       },
 

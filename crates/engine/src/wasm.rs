@@ -198,6 +198,53 @@ pub fn scene_add_node(name: &str, kind_json: &str, parent_id: i64) -> Result<i64
         name: name.to_string(),
         kind,
         parent,
+        transform: scene::Transform::identity(),
+    };
+
+    execute_command(cmd).map_err(|e| JsError::new(&e))?;
+    Ok(id.0 as i64)
+}
+
+/// Add a node with an initial transform (single undo step).
+///
+/// Returns the new node's ID (as i64), or throws on error.
+#[allow(clippy::too_many_arguments)]
+#[wasm_bindgen]
+pub fn scene_add_node_with_transform(
+    name: &str,
+    kind_json: &str,
+    parent_id: i64,
+    x: f64,
+    y: f64,
+    rotation: f64,
+    scale_x: f64,
+    scale_y: f64,
+) -> Result<i64, JsError> {
+    let kind: scene::NodeKind = serde_json::from_str(kind_json)
+        .map_err(|e| JsError::new(&format!("Invalid kind JSON: {e}")))?;
+
+    let parent = if parent_id < 0 {
+        None
+    } else {
+        Some(NodeId(parent_id as u64))
+    };
+
+    let id = with_scene_mut(|s| s.alloc_next_id());
+
+    let transform = scene::Transform {
+        x,
+        y,
+        rotation,
+        scale_x,
+        scale_y,
+    };
+
+    let cmd = SceneCommand::AddNode {
+        id,
+        name: name.to_string(),
+        kind,
+        parent,
+        transform,
     };
 
     execute_command(cmd).map_err(|e| JsError::new(&e))?;

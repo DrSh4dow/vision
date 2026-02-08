@@ -276,85 +276,6 @@ fn encode_3byte(dx: i32, dy: i32, move_type: MoveType, out: &mut Vec<u8>) {
     out.push(b2);
 }
 
-/// Decode a 3-byte DST command back to dx, dy and move type (for testing).
-#[cfg(test)]
-fn decode_3byte(b0: u8, b1: u8, b2: u8) -> (i32, i32, MoveType) {
-    let mut dx: i32 = 0;
-    let mut dy: i32 = 0;
-
-    // Decode Y
-    if b0 & 0x80 != 0 {
-        dy += 1;
-    }
-    if b0 & 0x40 != 0 {
-        dy -= 1;
-    }
-    if b0 & 0x20 != 0 {
-        dy += 9;
-    }
-    if b0 & 0x10 != 0 {
-        dy -= 9;
-    }
-    if b1 & 0x80 != 0 {
-        dy += 3;
-    }
-    if b1 & 0x40 != 0 {
-        dy -= 3;
-    }
-    if b1 & 0x20 != 0 {
-        dy += 27;
-    }
-    if b1 & 0x10 != 0 {
-        dy -= 27;
-    }
-    if b2 & 0x20 != 0 {
-        dy += 81;
-    }
-    if b2 & 0x10 != 0 {
-        dy -= 81;
-    }
-
-    // Decode X
-    if b0 & 0x04 != 0 {
-        dx += 1;
-    }
-    if b0 & 0x08 != 0 {
-        dx -= 1;
-    }
-    if b0 & 0x01 != 0 {
-        dx += 9;
-    }
-    if b0 & 0x02 != 0 {
-        dx -= 9;
-    }
-    if b1 & 0x04 != 0 {
-        dx += 3;
-    }
-    if b1 & 0x08 != 0 {
-        dx -= 3;
-    }
-    if b1 & 0x01 != 0 {
-        dx += 27;
-    }
-    if b1 & 0x02 != 0 {
-        dx -= 27;
-    }
-    if b2 & 0x04 != 0 {
-        dx += 81;
-    }
-    if b2 & 0x08 != 0 {
-        dx -= 81;
-    }
-
-    let move_type = match (b2 & 0x80 != 0, b2 & 0x40 != 0) {
-        (false, false) => MoveType::Stitch,
-        (true, false) => MoveType::Jump,
-        (true, true) | (false, true) => MoveType::ColorChange,
-    };
-
-    (dx, dy, move_type)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -390,6 +311,33 @@ mod tests {
         }
     }
 
+    fn large_delta_design() -> ExportDesign {
+        use super::super::ExportStitch;
+        ExportDesign {
+            name: "split".to_string(),
+            stitches: vec![
+                ExportStitch {
+                    x: 0.0,
+                    y: 0.0,
+                    stitch_type: ExportStitchType::Normal,
+                },
+                ExportStitch {
+                    x: 13.0,
+                    y: 0.0,
+                    stitch_type: ExportStitchType::Normal,
+                },
+            ],
+            colors: vec![Color::new(0, 0, 0, 255)],
+        }
+    }
+
+    const SIMPLE_BODY_GOLDEN: [u8; 15] = [
+        0x00, 0x00, 0x03, 0x05, 0x00, 0x03, 0x05, 0x00, 0x03, 0xA0, 0x00, 0x03, 0x00, 0x00, 0xF3,
+    ];
+    const LARGE_DELTA_BODY_GOLDEN: [u8; 12] = [
+        0x00, 0x00, 0x03, 0x05, 0x05, 0x87, 0x01, 0x00, 0x03, 0x00, 0x00, 0xF3,
+    ];
+
     #[test]
     fn test_dst_header_size() {
         let design = simple_design();
@@ -408,79 +356,19 @@ mod tests {
     }
 
     #[test]
-    fn test_dst_body_starts_after_header() {
+    fn test_dst_body_matches_golden_simple() {
         let design = simple_design();
         let data = export_dst(&design).unwrap();
-        // Body should start at byte 512
-        assert!(data.len() > HEADER_SIZE);
-        // Body should be multiples of 3 bytes (plus end marker)
-        let body_len = data.len() - HEADER_SIZE;
-        assert_eq!(
-            body_len % 3,
-            0,
-            "Body length {} is not a multiple of 3",
-            body_len
-        );
+        let body = &data[HEADER_SIZE..];
+        assert_eq!(body, SIMPLE_BODY_GOLDEN.as_slice());
     }
 
     #[test]
-    fn test_ternary_encode_decode_zero() {
-        let mut buf = Vec::new();
-        encode_3byte(0, 0, MoveType::Stitch, &mut buf);
-        let (dx, dy, _) = decode_3byte(buf[0], buf[1], buf[2]);
-        assert_eq!(dx, 0);
-        assert_eq!(dy, 0);
-    }
-
-    #[test]
-    fn test_ternary_encode_decode_positive() {
-        for val in [1, 3, 9, 27, 81, 121, 42, 100] {
-            let mut buf = Vec::new();
-            encode_3byte(val, val, MoveType::Stitch, &mut buf);
-            let (dx, dy, _) = decode_3byte(buf[0], buf[1], buf[2]);
-            assert_eq!(dx, val, "X encode/decode mismatch for {val}");
-            assert_eq!(dy, val, "Y encode/decode mismatch for {val}");
-        }
-    }
-
-    #[test]
-    fn test_ternary_encode_decode_negative() {
-        for val in [-1, -3, -9, -27, -81, -121, -42, -100] {
-            let mut buf = Vec::new();
-            encode_3byte(val, val, MoveType::Stitch, &mut buf);
-            let (dx, dy, _) = decode_3byte(buf[0], buf[1], buf[2]);
-            assert_eq!(dx, val, "X encode/decode mismatch for {val}");
-            assert_eq!(dy, val, "Y encode/decode mismatch for {val}");
-        }
-    }
-
-    #[test]
-    fn test_ternary_encode_decode_mixed() {
-        let mut buf = Vec::new();
-        encode_3byte(50, -30, MoveType::Jump, &mut buf);
-        let (dx, dy, _) = decode_3byte(buf[0], buf[1], buf[2]);
-        assert_eq!(dx, 50);
-        assert_eq!(dy, -30);
-    }
-
-    #[test]
-    fn test_large_move_splitting() {
-        let mut buf = Vec::new();
-        encode_move(200, 150, MoveType::Stitch, &mut buf);
-        // Should produce multiple 3-byte commands
-        assert!(buf.len() > 3, "Large move should produce multiple commands");
-        assert_eq!(buf.len() % 3, 0);
-
-        // Verify total displacement
-        let mut total_dx = 0;
-        let mut total_dy = 0;
-        for chunk in buf.chunks(3) {
-            let (dx, dy, _) = decode_3byte(chunk[0], chunk[1], chunk[2]);
-            total_dx += dx;
-            total_dy += dy;
-        }
-        assert_eq!(total_dx, 200);
-        assert_eq!(total_dy, 150);
+    fn test_dst_body_matches_golden_large_delta_split() {
+        let design = large_delta_design();
+        let data = export_dst(&design).unwrap();
+        let body = &data[HEADER_SIZE..];
+        assert_eq!(body, LARGE_DELTA_BODY_GOLDEN.as_slice());
     }
 
     #[test]

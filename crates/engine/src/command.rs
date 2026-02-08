@@ -17,6 +17,7 @@ pub(crate) enum SceneCommand {
         name: String,
         kind: NodeKind,
         parent: Option<NodeId>,
+        transform: Transform,
     },
     /// Remove a node (stores the full subtree for undo).
     RemoveNode {
@@ -175,13 +176,14 @@ fn apply_command(scene: &mut Scene, cmd: &SceneCommand, reverse: bool) -> Result
             name,
             kind,
             parent,
+            transform,
         } => {
             if reverse {
                 // Undo: remove the node
                 scene.remove_node(*id)?;
             } else {
                 // Forward: add the node
-                scene.add_node_with_id(*id, name, kind.clone(), *parent)?;
+                scene.add_node_with_id(*id, name, kind.clone(), *parent, *transform)?;
             }
         }
         SceneCommand::RemoveNode {
@@ -425,6 +427,7 @@ mod tests {
                 stroke_width: 0.0,
             },
             parent: None,
+            transform: Transform::identity(),
         };
 
         history.execute(&mut scene, cmd).unwrap();
@@ -676,6 +679,7 @@ mod tests {
                     name: "A".to_string(),
                     kind: NodeKind::Group,
                     parent: None,
+                    transform: Transform::identity(),
                 },
             )
             .unwrap();
@@ -693,6 +697,7 @@ mod tests {
                     name: "B".to_string(),
                     kind: NodeKind::Group,
                     parent: None,
+                    transform: Transform::identity(),
                 },
             )
             .unwrap();
@@ -731,6 +736,7 @@ mod tests {
                         name: "N".to_string(),
                         kind: NodeKind::Group,
                         parent: None,
+                        transform: Transform::identity(),
                     },
                 )
                 .unwrap();

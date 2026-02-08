@@ -125,25 +125,24 @@ export function App() {
         name = "Ellipse";
       }
 
-      const nodeId = engine.sceneAddNode(name, kind, layerId);
+      const transform =
+        activeTool === "rect"
+          ? {
+              x: minX,
+              y: minY,
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+            }
+          : {
+              x: minX + w / 2,
+              y: minY + h / 2,
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+            };
 
-      if (activeTool === "rect") {
-        engine.sceneUpdateTransform(nodeId, {
-          x: minX,
-          y: minY,
-          rotation: 0,
-          scaleX: 1,
-          scaleY: 1,
-        });
-      } else {
-        engine.sceneUpdateTransform(nodeId, {
-          x: minX + w / 2,
-          y: minY + h / 2,
-          rotation: 0,
-          scaleX: 1,
-          scaleY: 1,
-        });
-      }
+      const nodeId = engine.sceneAddNodeWithTransform(name, kind, transform, layerId);
 
       refreshScene();
       selectNode(nodeId);
