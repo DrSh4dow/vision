@@ -80,6 +80,35 @@ test.describe("Vision App", () => {
     // Status bar should be anchored to bottom of the canvas region.
     expect(statusBox.y).toBeGreaterThan(canvasBox.y + canvasBox.height - statusBox.height - 4);
   });
+
+  test("file menu contains all required project and export entries", async ({ page }) => {
+    await page.getByTestId("menu-file").click();
+    await expect(page.getByTestId("menu-file-panel")).toBeVisible();
+
+    await expect(page.getByTestId("menu-file-item-new")).toBeVisible();
+    await expect(page.getByTestId("menu-file-item-open")).toBeVisible();
+
+    const importSvg = page.getByTestId("menu-file-item-import-svg");
+    const importBitmap = page.getByTestId("menu-file-item-import-bitmap");
+    await expect(importSvg).toBeVisible();
+    await expect(importSvg.getByTestId("menu-file-item-import-svg-shortcut")).toBeVisible();
+    await expect(importBitmap).toBeVisible();
+    await expect(importBitmap.getByTestId("menu-file-item-import-bitmap-shortcut")).toBeVisible();
+
+    const exportItem = page.getByTestId("menu-file-item-export");
+    await expect(exportItem).toBeVisible();
+    await exportItem.hover();
+
+    const exportSubmenu = page.getByTestId("menu-file-submenu-export");
+    await expect(exportSubmenu).toBeVisible();
+    for (const format of ["dst", "pes", "pec", "jef", "exp", "vp3", "hus", "xxx"]) {
+      await expect(page.getByTestId(`menu-file-submenu-export-item-${format}`)).toBeVisible();
+    }
+
+    await expect(page.getByTestId("menu-file-item-export-production-worksheet")).toBeVisible();
+    await expect(page.getByTestId("menu-file-item-save-project")).toBeVisible();
+    await expect(page.getByTestId("menu-file-item-recent-files")).toBeVisible();
+  });
 });
 
 test.describe("WASM Engine Integration", () => {

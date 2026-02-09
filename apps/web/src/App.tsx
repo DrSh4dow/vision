@@ -48,9 +48,124 @@ const PREVIEW_ROUTING_OVERRIDES: Pick<RoutingOptions, "sequence_mode"> = {
 };
 
 const MENU_BAR_ITEMS = ["File", "Edit", "View", "Design", "Routing", "Help"] as const;
+type MenuBarItem = (typeof MENU_BAR_ITEMS)[number];
+type MenuId = Lowercase<MenuBarItem>;
+
+interface MenuEntry {
+  label: string;
+  shortcut: string;
+  submenu?: MenuEntry[];
+}
+
+const MENU_ENTRIES: Record<MenuId, MenuEntry[]> = {
+  file: [
+    { label: "New", shortcut: "Ctrl+N" },
+    { label: "Open", shortcut: "Ctrl+O" },
+    { label: "Import SVG", shortcut: "Ctrl+Shift+O" },
+    { label: "Import Bitmap", shortcut: "Ctrl+Shift+B" },
+    {
+      label: "Export",
+      shortcut: "Ctrl+E",
+      submenu: [
+        { label: "DST", shortcut: "Alt+1" },
+        { label: "PES", shortcut: "Alt+2" },
+        { label: "PEC", shortcut: "Alt+3" },
+        { label: "JEF", shortcut: "Alt+4" },
+        { label: "EXP", shortcut: "Alt+5" },
+        { label: "VP3", shortcut: "Alt+6" },
+        { label: "HUS", shortcut: "Alt+7" },
+        { label: "XXX", shortcut: "Alt+8" },
+      ],
+    },
+    { label: "Export Production Worksheet", shortcut: "Ctrl+Shift+P" },
+    { label: "Save Project", shortcut: "Ctrl+S" },
+    { label: "Recent Files", shortcut: "Ctrl+R" },
+  ],
+  edit: [
+    { label: "Undo", shortcut: "Ctrl+Z" },
+    { label: "Redo", shortcut: "Ctrl+Shift+Z" },
+    { label: "Cut", shortcut: "Ctrl+X" },
+    { label: "Copy", shortcut: "Ctrl+C" },
+    { label: "Paste", shortcut: "Ctrl+V" },
+    { label: "Duplicate", shortcut: "Ctrl+D" },
+    { label: "Delete", shortcut: "Del" },
+    { label: "Select All", shortcut: "Ctrl+A" },
+  ],
+  view: [
+    { label: "Zoom In", shortcut: "Ctrl++" },
+    { label: "Zoom Out", shortcut: "Ctrl+-" },
+    { label: "Zoom to Fit", shortcut: "Ctrl+0" },
+    { label: "Zoom to Selection", shortcut: "Ctrl+1" },
+    { label: "Toggle Grid", shortcut: "Ctrl+G" },
+    { label: "Toggle Snap", shortcut: "Ctrl+Shift+G" },
+    { label: "Toggle Stitch Preview", shortcut: "Ctrl+Shift+P" },
+    {
+      label: "Simulation Mode",
+      shortcut: "Ctrl+M",
+      submenu: [
+        { label: "Fast", shortcut: "Ctrl+Alt+F" },
+        { label: "Quality", shortcut: "Ctrl+Alt+Q" },
+      ],
+    },
+    { label: "Toggle Diagnostics Panel", shortcut: "Ctrl+Shift+D" },
+    { label: "Toggle Design Inspector", shortcut: "Ctrl+Shift+I" },
+  ],
+  design: [
+    {
+      label: "Stitch Type",
+      shortcut: "Ctrl+T",
+      submenu: [
+        { label: "Running", shortcut: "Ctrl+Alt+R" },
+        { label: "Satin", shortcut: "Ctrl+Alt+S" },
+        { label: "Tatami", shortcut: "Ctrl+Alt+T" },
+        { label: "Contour", shortcut: "Ctrl+Alt+C" },
+        { label: "Spiral", shortcut: "Ctrl+Alt+P" },
+        { label: "Motif", shortcut: "Ctrl+Alt+M" },
+      ],
+    },
+    { label: "Assign Thread Color", shortcut: "Ctrl+Shift+C" },
+    { label: "Auto-Digitize Selection", shortcut: "Ctrl+Shift+A" },
+    { label: "Validate Design", shortcut: "Ctrl+Shift+V" },
+    { label: "Repair Geometry", shortcut: "Ctrl+Shift+R" },
+  ],
+  routing: [
+    {
+      label: "Routing Policy",
+      shortcut: "Ctrl+Shift+P",
+      submenu: [
+        { label: "Balanced", shortcut: "Ctrl+Alt+B" },
+        { label: "Min Travel", shortcut: "Ctrl+Alt+T" },
+        { label: "Min Trims", shortcut: "Ctrl+Alt+M" },
+      ],
+    },
+    {
+      label: "Sequence Mode",
+      shortcut: "Ctrl+Shift+M",
+      submenu: [
+        { label: "Strict Sequencer", shortcut: "Ctrl+Alt+S" },
+        { label: "Optimizer", shortcut: "Ctrl+Alt+O" },
+      ],
+    },
+    { label: "Global Tie Mode", shortcut: "Ctrl+Shift+T" },
+    { label: "Allow Reverse", shortcut: "Ctrl+Shift+R" },
+    { label: "Open Full Routing Settings", shortcut: "Ctrl+Shift+F" },
+  ],
+  help: [
+    { label: "Keyboard Shortcuts", shortcut: "Ctrl+/" },
+    { label: "Documentation", shortcut: "F1" },
+    { label: "About Vision", shortcut: "Ctrl+I" },
+  ],
+};
 
 function colorToCss(color: { r: number; g: number; b: number }): string {
   return `rgb(${color.r}, ${color.g}, ${color.b})`;
+}
+
+function toTestSlug(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
 }
 
 type SimulationPreviewMode = "fast" | "quality";
@@ -107,6 +222,17 @@ export function App() {
     colorCount: 0,
   });
   const defaultsLoadedRef = useRef(false);
+  const menuBarRef = useRef<HTMLElement | null>(null);
+  const [openMenu, setOpenMenu] = useState<MenuId | null>(null);
+  const [openSubmenuIndex, setOpenSubmenuIndex] = useState<number | null>(null);
+  const closeMenus = useCallback(() => {
+    setOpenMenu(null);
+    setOpenSubmenuIndex(null);
+  }, []);
+  const toggleMenu = useCallback((menuId: MenuId) => {
+    setOpenSubmenuIndex(null);
+    setOpenMenu((current) => (current === menuId ? null : menuId));
+  }, []);
 
   // Canvas data: scene render items + stitch overlays
   const canvasDataRef = useRef<CanvasData>({
@@ -214,6 +340,30 @@ export function App() {
   useEffect(() => {
     refreshScene();
   }, [refreshScene]);
+
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent): void => {
+      const menuRoot = menuBarRef.current;
+      if (!menuRoot) return;
+      if (!menuRoot.contains(event.target as Node)) {
+        closeMenus();
+      }
+    };
+
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        closeMenus();
+      }
+    };
+
+    window.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [closeMenus]);
 
   // Sync selected IDs into canvas data ref
   useEffect(() => {
@@ -386,23 +536,116 @@ export function App() {
           className="flex h-8 shrink-0 items-center border-b border-border/40 bg-panel px-3"
           data-testid="menu-bar"
         >
-          <nav className="flex items-center text-[12px] font-medium text-foreground/90" aria-label="Main menu">
-            {MENU_BAR_ITEMS.map((item, index) => (
-              <div key={item} className="flex items-center">
-                <button
-                  type="button"
-                  className="rounded-sm px-2 py-1 hover:bg-accent/40"
-                  data-testid={`menu-${item.toLowerCase()}`}
-                >
-                  {item}
-                </button>
-                {index < MENU_BAR_ITEMS.length - 1 && (
-                  <span className="px-0.5 text-muted-foreground/70" aria-hidden="true">
-                    |
-                  </span>
-                )}
-              </div>
-            ))}
+          <nav
+            ref={menuBarRef}
+            className="flex items-center text-[12px] font-medium text-foreground/90"
+            aria-label="Main menu"
+          >
+            {MENU_BAR_ITEMS.map((item, index) => {
+              const menuId = item.toLowerCase() as MenuId;
+              const isOpen = openMenu === menuId;
+              const entries = MENU_ENTRIES[menuId];
+
+              return (
+                <div key={item} className="relative flex items-center">
+                  <button
+                    type="button"
+                    className={`rounded-sm px-2 py-1 hover:bg-accent/40 ${
+                      isOpen ? "bg-accent/40" : ""
+                    }`}
+                    onClick={() => toggleMenu(menuId)}
+                    data-testid={`menu-${menuId}`}
+                    aria-expanded={isOpen}
+                    aria-haspopup="menu"
+                  >
+                    {item}
+                  </button>
+
+                  {isOpen && (
+                    <div
+                      className="absolute top-full left-0 z-50 mt-1 min-w-[260px] rounded-md border border-border/60 bg-popover p-1 shadow-2xl"
+                      role="menu"
+                      data-testid={`menu-${menuId}-panel`}
+                    >
+                      {entries.map((entry, entryIndex) => {
+                        const itemSlug = toTestSlug(entry.label);
+                        const itemTestId = `menu-${menuId}-item-${itemSlug}`;
+                        const hasSubmenu = entry.submenu !== undefined;
+                        const submenuOpen = openSubmenuIndex === entryIndex;
+
+                        return (
+                          <div key={entry.label} className="relative">
+                            <button
+                              type="button"
+                              className="flex w-full items-center justify-between gap-4 rounded-sm px-2 py-1 text-left text-xs text-foreground hover:bg-accent/40"
+                              onMouseEnter={() =>
+                                setOpenSubmenuIndex(hasSubmenu ? entryIndex : null)
+                              }
+                              onClick={() => {
+                                if (hasSubmenu) {
+                                  setOpenSubmenuIndex((current) =>
+                                    current === entryIndex ? null : entryIndex,
+                                  );
+                                  return;
+                                }
+                                closeMenus();
+                              }}
+                              data-testid={itemTestId}
+                            >
+                              <span>{entry.label}</span>
+                              <span className="flex items-center gap-2 text-[10px] text-muted-foreground/80">
+                                <span data-testid={`${itemTestId}-shortcut`}>{entry.shortcut}</span>
+                                {hasSubmenu && (
+                                  <span aria-hidden="true" className="text-muted-foreground/70">
+                                    ›
+                                  </span>
+                                )}
+                              </span>
+                            </button>
+
+                            {hasSubmenu && submenuOpen && (
+                              <div
+                                className="absolute top-0 left-full z-50 ml-1 min-w-[180px] rounded-md border border-border/60 bg-popover p-1 shadow-2xl"
+                                role="menu"
+                                data-testid={`menu-${menuId}-submenu-${itemSlug}`}
+                              >
+                                {entry.submenu?.map((submenuEntry) => {
+                                  const submenuSlug = toTestSlug(submenuEntry.label);
+                                  const submenuItemTestId = `menu-${menuId}-submenu-${itemSlug}-item-${submenuSlug}`;
+                                  return (
+                                    <button
+                                      key={submenuEntry.label}
+                                      type="button"
+                                      className="flex w-full items-center justify-between gap-4 rounded-sm px-2 py-1 text-left text-xs text-foreground hover:bg-accent/40"
+                                      onClick={closeMenus}
+                                      data-testid={submenuItemTestId}
+                                    >
+                                      <span>{submenuEntry.label}</span>
+                                      <span
+                                        className="text-[10px] text-muted-foreground/80"
+                                        data-testid={`${submenuItemTestId}-shortcut`}
+                                      >
+                                        {submenuEntry.shortcut}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {index < MENU_BAR_ITEMS.length - 1 && (
+                    <span className="px-0.5 text-muted-foreground/70" aria-hidden="true">
+                      |
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </nav>
         </header>
 
@@ -548,7 +791,6 @@ export function App() {
             <footer
               className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex h-8 items-center justify-between border-t border-border/40 bg-panel/90 px-3 text-[10px] text-muted-foreground backdrop-blur-sm"
               data-testid="status-bar"
-              aria-label="Status bar"
             >
               <div className="flex items-center gap-3" data-testid="status-left">
                 <span data-testid="status-cursor">

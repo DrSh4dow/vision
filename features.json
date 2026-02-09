@@ -28,7 +28,7 @@
         "Verify Save Project item present",
         "Verify Recent Files item present"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "ui-menu-bar",
