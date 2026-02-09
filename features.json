@@ -662,7 +662,7 @@
         "Set underlay to Full and verify all three patterns combined",
         "Verify underlay stitches appear below top stitches in preview"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "stitch-engine",
