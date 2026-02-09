@@ -225,10 +225,13 @@ fn apply_command(scene: &mut Scene, cmd: &SceneCommand, reverse: bool) -> Result
         }
         SceneCommand::UpdateKind { id, old, new } => {
             let k = if reverse { old } else { new };
-            let node = scene
-                .get_node_mut(*id)
-                .ok_or_else(|| format!("Node {:?} not found", id))?;
-            node.kind = k.clone();
+            {
+                let node = scene
+                    .get_node_mut(*id)
+                    .ok_or_else(|| format!("Node {:?} not found", id))?;
+                node.kind = k.clone();
+            }
+            scene.sync_shape_stitch_plan_state(*id);
         }
         SceneCommand::MoveNode {
             id,
@@ -275,18 +278,22 @@ fn apply_command(scene: &mut Scene, cmd: &SceneCommand, reverse: bool) -> Result
             } else {
                 (new_commands, *new_closed)
             };
-            let node = scene
-                .get_node_mut(*id)
-                .ok_or_else(|| format!("Node {:?} not found", id))?;
-            if let NodeKind::Shape {
-                shape: ShapeData::Path(ref mut path),
-                ..
-            } = node.kind
             {
-                *path = crate::path::VectorPath::from_commands_with_closed(cmds.clone(), closed);
-            } else {
-                return Err(format!("Node {:?} is not a Path shape", id));
+                let node = scene
+                    .get_node_mut(*id)
+                    .ok_or_else(|| format!("Node {:?} not found", id))?;
+                if let NodeKind::Shape {
+                    shape: ShapeData::Path(ref mut path),
+                    ..
+                } = node.kind
+                {
+                    *path =
+                        crate::path::VectorPath::from_commands_with_closed(cmds.clone(), closed);
+                } else {
+                    return Err(format!("Node {:?} is not a Path shape", id));
+                }
             }
+            scene.sync_shape_stitch_plan_state(*id);
         }
         SceneCommand::Rename {
             id,
@@ -301,46 +308,55 @@ fn apply_command(scene: &mut Scene, cmd: &SceneCommand, reverse: bool) -> Result
         }
         SceneCommand::SetFill { id, old, new } => {
             let fill = if reverse { old } else { new };
-            let node = scene
-                .get_node_mut(*id)
-                .ok_or_else(|| format!("Node {:?} not found", id))?;
-            if let NodeKind::Shape {
-                fill: ref mut f, ..
-            } = node.kind
             {
-                *f = *fill;
-            } else {
-                return Err(format!("Node {:?} is not a Shape", id));
+                let node = scene
+                    .get_node_mut(*id)
+                    .ok_or_else(|| format!("Node {:?} not found", id))?;
+                if let NodeKind::Shape {
+                    fill: ref mut f, ..
+                } = node.kind
+                {
+                    *f = *fill;
+                } else {
+                    return Err(format!("Node {:?} is not a Shape", id));
+                }
             }
+            scene.sync_shape_stitch_plan_state(*id);
         }
         SceneCommand::SetStroke { id, old, new } => {
             let stroke = if reverse { old } else { new };
-            let node = scene
-                .get_node_mut(*id)
-                .ok_or_else(|| format!("Node {:?} not found", id))?;
-            if let NodeKind::Shape {
-                stroke: ref mut s, ..
-            } = node.kind
             {
-                *s = *stroke;
-            } else {
-                return Err(format!("Node {:?} is not a Shape", id));
+                let node = scene
+                    .get_node_mut(*id)
+                    .ok_or_else(|| format!("Node {:?} not found", id))?;
+                if let NodeKind::Shape {
+                    stroke: ref mut s, ..
+                } = node.kind
+                {
+                    *s = *stroke;
+                } else {
+                    return Err(format!("Node {:?} is not a Shape", id));
+                }
             }
+            scene.sync_shape_stitch_plan_state(*id);
         }
         SceneCommand::SetStrokeWidth { id, old, new } => {
             let sw = if reverse { *old } else { *new };
-            let node = scene
-                .get_node_mut(*id)
-                .ok_or_else(|| format!("Node {:?} not found", id))?;
-            if let NodeKind::Shape {
-                stroke_width: ref mut w,
-                ..
-            } = node.kind
             {
-                *w = sw;
-            } else {
-                return Err(format!("Node {:?} is not a Shape", id));
+                let node = scene
+                    .get_node_mut(*id)
+                    .ok_or_else(|| format!("Node {:?} not found", id))?;
+                if let NodeKind::Shape {
+                    stroke_width: ref mut w,
+                    ..
+                } = node.kind
+                {
+                    *w = sw;
+                } else {
+                    return Err(format!("Node {:?} is not a Shape", id));
+                }
             }
+            scene.sync_shape_stitch_plan_state(*id);
         }
     }
     Ok(())
@@ -367,6 +383,8 @@ fn restore_snapshot(
         let root_id = first.node.id;
         scene.reattach_node(root_id, parent, index)?;
     }
+
+    scene.sync_all_stitch_plan_state();
 
     Ok(())
 }

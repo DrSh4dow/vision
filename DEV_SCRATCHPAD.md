@@ -1,12 +1,19 @@
 # Vision Scratchpad
 
 ## Current Branch
-- feat/phase2-sequencer-routing-controls
+- main
 
 ## Latest Completed Slice
 - Phase 2 sequencer-first controls: per-row `allow_reverse`, `entry_exit_mode`, `tie_mode` in left panel.
 - End-to-end wiring: UI -> wasm-bridge -> engine overrides.
 - Validation status: cargo fmt/clippy/test + biome + tsc + vite build + playwright all green.
+
+## Current Wave Checkpoint
+- Wave A (hybrid model foundation) in progress.
+- Added first-class engine model structs (`EmbroideryObject`, `StitchBlock`, `SequenceTrack`) with deterministic shape-sync hooks in `Scene`.
+- Updated command mutation paths to keep stitch-plan state synchronized after shape-kind/stitch-relevant edits.
+- Added scene tests covering hybrid lifecycle + sequencer/override synchronization.
+- Gate status for this checkpoint: `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test` all passing.
 
 ## Next Priority Queue
 1. Phase 2 remaining: first-class `EmbroideryObject`/`StitchBlock`/`SequenceTrack` model separation.

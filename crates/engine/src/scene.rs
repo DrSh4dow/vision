@@ -137,6 +137,15 @@ pub struct Scene {
     shape_meta: HashMap<NodeId, ShapeSequencerMeta>,
     /// Next sequencer index to assign to new shape objects.
     next_sequencer_index: u64,
+    /// First-class embroidery objects keyed by source shape/node id.
+    #[serde(default)]
+    embroidery_objects: HashMap<NodeId, EmbroideryObject>,
+    /// First-class stitch blocks keyed by block id.
+    #[serde(default)]
+    stitch_blocks: HashMap<NodeId, StitchBlock>,
+    /// Stitch execution order independent from layer/render ordering.
+    #[serde(default)]
+    sequence_track: SequenceTrack,
 }
 
 /// Per-shape metadata used by sequencer-first export routing.
@@ -168,6 +177,46 @@ pub struct ObjectRoutingOverrides {
     pub entry_exit_mode: Option<EntryExitMode>,
     #[serde(default)]
     pub tie_mode: Option<TieMode>,
+}
+
+/// First-class embroidery object derived from scene geometry.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct EmbroideryObject {
+    /// Stable object id (currently source shape node id).
+    pub id: NodeId,
+    /// Source node id in scene graph.
+    pub source_node_id: NodeId,
+    /// Stitch parameters captured for deterministic regeneration.
+    pub stitch: crate::StitchParams,
+    /// Fill color from source shape.
+    pub fill: Option<Color>,
+    /// Stroke color from source shape.
+    pub stroke: Option<Color>,
+    /// Stroke width from source shape.
+    pub stroke_width: f64,
+}
+
+/// First-class stitch block persisted separately from source geometry.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct StitchBlock {
+    /// Stable block id (currently source shape node id).
+    pub id: NodeId,
+    /// Owning embroidery object id.
+    pub object_id: NodeId,
+    /// Source node id.
+    pub source_node_id: NodeId,
+    /// Stitch type for this block.
+    pub stitch_type: crate::StitchType,
+    /// Primary thread color for sequencing UI.
+    pub color: Option<Color>,
+    /// Optional per-block routing overrides.
+    pub routing_overrides: ObjectRoutingOverrides,
+}
+
+/// Ordered stitch block execution track.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct SequenceTrack {
+    pub ordered_block_ids: Vec<NodeId>,
 }
 
 /// Stitch-plan row consumed by the sequencer panel.
@@ -204,6 +253,9 @@ impl Scene {
             next_id: 1,
             shape_meta: HashMap::new(),
             next_sequencer_index: 1,
+            embroidery_objects: HashMap::new(),
+            stitch_blocks: HashMap::new(),
+            sequence_track: SequenceTrack::default(),
         }
     }
 
@@ -258,6 +310,7 @@ impl Scene {
 
         self.nodes.insert(id, node);
         self.ensure_shape_meta(id);
+        self.sync_shape_stitch_plan_state(id);
 
         if let Some(pid) = parent {
             self.nodes
@@ -302,6 +355,7 @@ impl Scene {
             .remove(&id)
             .ok_or_else(|| format!("Node {:?} already removed", id))?;
         self.shape_meta.remove(&id);
+        self.remove_stitch_plan_state(id);
         Ok(node)
     }
 
@@ -323,6 +377,21 @@ impl Scene {
     /// Returns the total number of nodes in the scene.
     pub fn node_count(&self) -> usize {
         self.nodes.len()
+    }
+
+    /// Get a first-class embroidery object by id.
+    pub fn embroidery_object(&self, id: NodeId) -> Option<&EmbroideryObject> {
+        self.embroidery_objects.get(&id)
+    }
+
+    /// Get a first-class stitch block by id.
+    pub fn stitch_block(&self, id: NodeId) -> Option<&StitchBlock> {
+        self.stitch_blocks.get(&id)
+    }
+
+    /// Get the sequence track (ordered stitch block ids).
+    pub fn sequence_track(&self) -> &SequenceTrack {
+        &self.sequence_track
     }
 
     /// Move a node to a new parent (or to root level if `new_parent` is `None`).
@@ -498,6 +567,7 @@ impl Scene {
 
         self.nodes.insert(id, node);
         self.ensure_shape_meta(id);
+        self.sync_shape_stitch_plan_state(id);
 
         if let Some(pid) = parent {
             self.nodes
@@ -520,6 +590,8 @@ impl Scene {
             self.next_id = id.0 + 1;
         }
         self.nodes.insert(id, node);
+        self.ensure_shape_meta(id);
+        self.sync_shape_stitch_plan_state(id);
         Ok(())
     }
 
@@ -532,6 +604,80 @@ impl Scene {
     pub fn restore_shape_meta(&mut self, id: NodeId, meta: ShapeSequencerMeta) {
         self.next_sequencer_index = self.next_sequencer_index.max(meta.sequencer_index + 1);
         self.shape_meta.insert(id, meta);
+        self.sync_shape_stitch_plan_state(id);
+        self.sync_sequence_track_from_shape_meta();
+    }
+
+    pub(crate) fn sync_shape_stitch_plan_state(&mut self, id: NodeId) {
+        let Some(node) = self.nodes.get(&id) else {
+            self.remove_stitch_plan_state(id);
+            return;
+        };
+
+        let NodeKind::Shape {
+            fill,
+            stroke,
+            stroke_width,
+            stitch,
+            ..
+        } = &node.kind
+        else {
+            self.remove_stitch_plan_state(id);
+            return;
+        };
+
+        let object = EmbroideryObject {
+            id,
+            source_node_id: id,
+            stitch: *stitch,
+            fill: *fill,
+            stroke: *stroke,
+            stroke_width: *stroke_width,
+        };
+        self.embroidery_objects.insert(id, object);
+
+        let routing_overrides = self.object_routing_overrides(id);
+        let block = StitchBlock {
+            id,
+            object_id: id,
+            source_node_id: id,
+            stitch_type: stitch.stitch_type,
+            color: (*stroke).or(*fill),
+            routing_overrides,
+        };
+        self.stitch_blocks.insert(id, block);
+
+        if !self.sequence_track.ordered_block_ids.contains(&id) {
+            self.sequence_track.ordered_block_ids.push(id);
+        }
+    }
+
+    pub(crate) fn sync_all_stitch_plan_state(&mut self) {
+        let ids: Vec<NodeId> = self.nodes.keys().copied().collect();
+        for id in ids {
+            self.ensure_shape_meta(id);
+            self.sync_shape_stitch_plan_state(id);
+        }
+        self.sequence_track
+            .ordered_block_ids
+            .retain(|id| self.stitch_blocks.contains_key(id));
+        self.sync_sequence_track_from_shape_meta();
+    }
+
+    fn remove_stitch_plan_state(&mut self, id: NodeId) {
+        self.embroidery_objects.remove(&id);
+        self.stitch_blocks.remove(&id);
+        self.sequence_track
+            .ordered_block_ids
+            .retain(|bid| *bid != id);
+    }
+
+    fn sync_sequence_track_from_shape_meta(&mut self) {
+        let ordered = self.sequencer_shape_ids();
+        self.sequence_track.ordered_block_ids = ordered
+            .into_iter()
+            .filter(|id| self.stitch_blocks.contains_key(id))
+            .collect();
     }
 
     fn ensure_shape_meta(&mut self, id: NodeId) {
@@ -541,6 +687,7 @@ impl Scene {
             .is_some_and(|n| matches!(n.kind, NodeKind::Shape { .. }));
         if !is_shape {
             self.shape_meta.remove(&id);
+            self.remove_stitch_plan_state(id);
             return;
         }
 
@@ -603,6 +750,7 @@ impl Scene {
             meta.sequencer_index = (idx + 1) as u64;
         }
         self.next_sequencer_index = (ordered.len() as u64) + 1;
+        self.sync_sequence_track_from_shape_meta();
         Ok(())
     }
 
@@ -627,6 +775,13 @@ impl Scene {
         meta.allow_reverse_override = overrides.allow_reverse;
         meta.entry_exit_override = overrides.entry_exit_mode;
         meta.tie_mode_override = overrides.tie_mode;
+        if let Some(block) = self.stitch_blocks.get_mut(&id) {
+            block.routing_overrides = ObjectRoutingOverrides {
+                allow_reverse: meta.allow_reverse_override,
+                entry_exit_mode: meta.entry_exit_override,
+                tie_mode: meta.tie_mode_override,
+            };
+        }
         Ok(())
     }
 
@@ -639,23 +794,26 @@ impl Scene {
                 tie_mode: meta.tie_mode_override,
             };
         }
+        if let Some(block) = self.stitch_blocks.get(&id) {
+            return block.routing_overrides.clone();
+        }
         ObjectRoutingOverrides::default()
     }
 
     /// Build stitch-plan rows in sequencer order.
     pub fn get_stitch_plan_rows(&self) -> Vec<StitchPlanRow> {
         let mut rows = Vec::new();
-        for id in self.sequencer_shape_ids() {
-            let Some(node) = self.nodes.get(&id) else {
+        let ordered = if self.sequence_track.ordered_block_ids.is_empty() {
+            self.sequencer_shape_ids()
+        } else {
+            self.sequence_track.ordered_block_ids.clone()
+        };
+
+        for id in ordered {
+            let Some(block) = self.stitch_blocks.get(&id) else {
                 continue;
             };
-            let NodeKind::Shape {
-                fill,
-                stroke,
-                stitch,
-                ..
-            } = &node.kind
-            else {
+            let Some(node) = self.nodes.get(&id) else {
                 continue;
             };
             let sequence_index = self
@@ -668,12 +826,12 @@ impl Scene {
                 node_id: id,
                 parent: node.parent,
                 name: node.name.clone(),
-                stitch_type: stitch.stitch_type,
-                color: (*stroke).or(*fill),
+                stitch_type: block.stitch_type,
+                color: block.color,
                 visible: !self.is_in_hidden_layer(id),
                 locked: self.is_in_locked_layer(id),
                 sequence_index,
-                overrides: self.object_routing_overrides(id),
+                overrides: block.routing_overrides.clone(),
             });
         }
         rows
@@ -1731,5 +1889,81 @@ mod tests {
         assert_eq!(rows[0].node_id, shape);
         assert!(!rows[0].visible);
         assert!(rows[0].locked);
+    }
+
+    #[test]
+    fn test_hybrid_state_tracks_shape_lifecycle() {
+        let mut scene = Scene::new();
+        let shape = scene
+            .add_node(
+                "Rect",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(8.0, 8.0, 0.0)),
+                    fill: Some(Color::new(255, 0, 0, 255)),
+                    stroke: None,
+                    stroke_width: 0.0,
+                    stitch: crate::StitchParams::default(),
+                },
+                None,
+            )
+            .unwrap();
+
+        assert!(scene.embroidery_object(shape).is_some());
+        assert!(scene.stitch_block(shape).is_some());
+        assert_eq!(scene.sequence_track().ordered_block_ids, vec![shape]);
+
+        scene.remove_node(shape).unwrap();
+        assert!(scene.embroidery_object(shape).is_none());
+        assert!(scene.stitch_block(shape).is_none());
+        assert!(scene.sequence_track().ordered_block_ids.is_empty());
+    }
+
+    #[test]
+    fn test_hybrid_state_tracks_sequencer_and_overrides() {
+        let mut scene = Scene::new();
+        let a = scene
+            .add_node(
+                "A",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(5.0, 5.0, 0.0)),
+                    fill: Some(Color::new(255, 0, 0, 255)),
+                    stroke: None,
+                    stroke_width: 0.0,
+                    stitch: crate::StitchParams::default(),
+                },
+                None,
+            )
+            .unwrap();
+        let b = scene
+            .add_node(
+                "B",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(5.0, 5.0, 0.0)),
+                    fill: Some(Color::new(0, 255, 0, 255)),
+                    stroke: None,
+                    stroke_width: 0.0,
+                    stitch: crate::StitchParams::default(),
+                },
+                None,
+            )
+            .unwrap();
+
+        scene.reorder_sequencer_shape(b, 0).unwrap();
+        assert_eq!(scene.sequence_track().ordered_block_ids, vec![b, a]);
+
+        let overrides = ObjectRoutingOverrides {
+            allow_reverse: Some(false),
+            entry_exit_mode: Some(EntryExitMode::PreserveShapeStart),
+            tie_mode: Some(TieMode::ColorChange),
+        };
+        scene
+            .set_object_routing_overrides(b, overrides.clone())
+            .unwrap();
+        assert_eq!(
+            scene
+                .stitch_block(b)
+                .map(|block| block.routing_overrides.clone()),
+            Some(overrides)
+        );
     }
 }
