@@ -42,6 +42,12 @@ interface DropHint {
   position: DropPosition;
 }
 
+interface SequencerContextMenuState {
+  row: SequencerRow;
+  screenX: number;
+  screenY: number;
+}
+
 function formatStitchType(stitchType: StitchType): string {
   return stitchType.replaceAll("_", " ");
 }
@@ -99,6 +105,20 @@ function hasCommandOverrideBadges(overrides: StitchBlockCommandOverrides): boole
   );
 }
 
+function clampMenuPosition(
+  screenX: number,
+  screenY: number,
+  menuWidth: number,
+  menuHeight: number,
+): { left: number; top: number } {
+  if (typeof window === "undefined") {
+    return { left: screenX, top: screenY };
+  }
+  const left = Math.max(8, Math.min(screenX, window.innerWidth - menuWidth - 8));
+  const top = Math.max(8, Math.min(screenY, window.innerHeight - menuHeight - 8));
+  return { left, top };
+}
+
 export function SequencerPanel({
   engine,
   selectedIds,
@@ -109,6 +129,7 @@ export function SequencerPanel({
   const [dragId, setDragId] = useState<number | null>(null);
   const [dropHint, setDropHint] = useState<DropHint | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set<number>());
+  const [contextMenu, setContextMenu] = useState<SequencerContextMenuState | null>(null);
 
   const rowById = useMemo(() => {
     return new Map(rows.map((row) => [row.blockId, row]));
@@ -135,6 +156,31 @@ export function SequencerPanel({
     const interval = setInterval(refreshRows, 500);
     return () => clearInterval(interval);
   }, [refreshRows]);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+
+    const onPointerDown = (event: PointerEvent): void => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("[data-testid='sequencer-context-menu']")) {
+        return;
+      }
+      setContextMenu(null);
+    };
+
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        setContextMenu(null);
+      }
+    };
+
+    window.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [contextMenu]);
 
   const computeDropPosition = useCallback((event: React.DragEvent<HTMLElement>): DropPosition => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -294,336 +340,441 @@ export function SequencerPanel({
     [engine, onRefreshScene, refreshRows],
   );
 
+  const handleSequencerContextAction = useCallback(
+    (action: "move_top" | "move_bottom" | "duplicate" | "remove", row: SequencerRow) => {
+      if (action === "move_top") {
+        engine.sceneReorderStitchBlock(row.blockId, 0);
+      } else if (action === "move_bottom") {
+        engine.sceneReorderStitchBlock(row.blockId, Math.max(0, rows.length - 1));
+      } else if (action === "remove") {
+        engine.sceneRemoveNode(row.nodeId);
+      } else if (action === "duplicate") {
+        const node = engine.sceneGetNode(row.nodeId);
+        if (node) {
+          engine.sceneAddNodeWithTransform(
+            `${node.name} Copy`,
+            node.kind,
+            {
+              x: node.transform.x + 2,
+              y: node.transform.y + 2,
+              rotation: node.transform.rotation,
+              scaleX: node.transform.scale_x,
+              scaleY: node.transform.scale_y,
+            },
+            node.parent ?? undefined,
+          );
+        }
+      }
+
+      setContextMenu(null);
+      onRefreshScene();
+      refreshRows();
+    },
+    [engine, onRefreshScene, refreshRows, rows.length],
+  );
+
   if (rows.length === 0) {
     return <p className="px-1.5 text-xs italic text-muted-foreground/80">No stitch objects yet</p>;
   }
 
   return (
-    <ul className="flex flex-col gap-1" data-testid="sequencer-tree" aria-label="Stitch sequencer">
-      {rows.map((row) => {
-        const isSelected = selectedIds.has(row.nodeId);
-        const isExpanded = expandedRows.has(row.blockId);
-        const showDropBefore = dropHint?.targetId === row.blockId && dropHint.position === "before";
-        const showDropAfter = dropHint?.targetId === row.blockId && dropHint.position === "after";
+    <>
+      <ul
+        className="flex flex-col gap-1"
+        data-testid="sequencer-tree"
+        aria-label="Stitch sequencer"
+      >
+        {rows.map((row) => {
+          const isSelected = selectedIds.has(row.nodeId);
+          const isExpanded = expandedRows.has(row.blockId);
+          const showDropBefore =
+            dropHint?.targetId === row.blockId && dropHint.position === "before";
+          const showDropAfter = dropHint?.targetId === row.blockId && dropHint.position === "after";
 
-        return (
-          <li
-            key={row.blockId}
-            data-testid={`sequencer-row-${row.blockId}`}
-            className={cn(
-              "group relative rounded-md",
-              row.locked ? "cursor-not-allowed" : "cursor-grab active:cursor-grabbing",
-            )}
-            draggable={!row.locked}
-            onDragStart={(event) => handleDragStart(event, row)}
-            onDragEnd={handleDragEnd}
-            onDragOver={(event) => handleDragOver(event, row)}
-            onDrop={(event) => handleDrop(event, row)}
-          >
-            <div
+          return (
+            <li
+              key={row.blockId}
+              data-testid={`sequencer-row-${row.blockId}`}
               className={cn(
-                "relative flex h-8 items-center gap-1 rounded-md border border-transparent px-1.5 text-[11px] transition-colors",
-                isSelected
-                  ? "bg-accent/70 text-accent-foreground"
-                  : "text-muted-foreground hover:bg-accent/30 hover:text-foreground",
-                !row.visible && "opacity-50",
-                showDropBefore && "border-t-primary",
-                showDropAfter && "border-b-primary",
+                "group relative rounded-md",
+                row.locked ? "cursor-not-allowed" : "cursor-grab active:cursor-grabbing",
               )}
+              draggable={!row.locked}
+              onDragStart={(event) => handleDragStart(event, row)}
+              onDragEnd={handleDragEnd}
+              onDragOver={(event) => handleDragOver(event, row)}
+              onDrop={(event) => handleDrop(event, row)}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                setContextMenu({
+                  row,
+                  screenX: event.clientX,
+                  screenY: event.clientY,
+                });
+              }}
             >
-              <button
-                type="button"
-                className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                onClick={(event) => onSelectNode(row.nodeId, event.shiftKey)}
-              >
-                <span className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground/70">
-                  <GripVertical className="h-3 w-3" />
-                </span>
-
-                <span className="min-w-0 flex-1 truncate">{row.name}</span>
-
-                <span className="rounded bg-secondary px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-secondary-foreground">
-                  {formatStitchType(row.stitchType)}
-                </span>
-
-                {hasOverrideBadges(row.overrides) && (
-                  <span className="hidden items-center gap-1 md:flex">
-                    {row.overrides.allow_reverse !== null && (
-                      <span
-                        className="rounded border border-border/60 px-1 py-0.5 text-[8px] uppercase tracking-wide"
-                        title={`allow reverse override: ${row.overrides.allow_reverse ? "on" : "off"}`}
-                        data-testid={`sequencer-routing-badge-rev-${row.blockId}`}
-                      >
-                        REV
-                      </span>
-                    )}
-                    {row.overrides.entry_exit_mode !== null && (
-                      <span
-                        className="rounded border border-border/60 px-1 py-0.5 text-[8px] uppercase tracking-wide"
-                        title={`entry/exit override: ${row.overrides.entry_exit_mode}`}
-                        data-testid={`sequencer-routing-badge-entry-${row.blockId}`}
-                      >
-                        ENTRY
-                      </span>
-                    )}
-                    {row.overrides.tie_mode !== null && (
-                      <span
-                        className="rounded border border-border/60 px-1 py-0.5 text-[8px] uppercase tracking-wide"
-                        title={`tie mode override: ${row.overrides.tie_mode}`}
-                        data-testid={`sequencer-routing-badge-tie-${row.blockId}`}
-                      >
-                        TIE
-                      </span>
-                    )}
-                  </span>
-                )}
-
-                {hasCommandOverrideBadges(row.commandOverrides) && (
-                  <span className="hidden items-center gap-1 md:flex">
-                    {row.commandOverrides.trim_before !== null && (
-                      <span
-                        className="rounded border border-border/60 px-1 py-0.5 text-[8px] uppercase tracking-wide"
-                        title={`trim before override: ${row.commandOverrides.trim_before ? "on" : "off"}`}
-                        data-testid={`sequencer-command-badge-trim-before-${row.blockId}`}
-                      >
-                        TB
-                      </span>
-                    )}
-                    {row.commandOverrides.trim_after !== null && (
-                      <span
-                        className="rounded border border-border/60 px-1 py-0.5 text-[8px] uppercase tracking-wide"
-                        title={`trim after override: ${row.commandOverrides.trim_after ? "on" : "off"}`}
-                        data-testid={`sequencer-command-badge-trim-after-${row.blockId}`}
-                      >
-                        TA
-                      </span>
-                    )}
-                    {row.commandOverrides.tie_in !== null && (
-                      <span
-                        className="rounded border border-border/60 px-1 py-0.5 text-[8px] uppercase tracking-wide"
-                        title={`tie in override: ${row.commandOverrides.tie_in ? "on" : "off"}`}
-                        data-testid={`sequencer-command-badge-tie-in-${row.blockId}`}
-                      >
-                        TI
-                      </span>
-                    )}
-                    {row.commandOverrides.tie_out !== null && (
-                      <span
-                        className="rounded border border-border/60 px-1 py-0.5 text-[8px] uppercase tracking-wide"
-                        title={`tie out override: ${row.commandOverrides.tie_out ? "on" : "off"}`}
-                        data-testid={`sequencer-command-badge-tie-out-${row.blockId}`}
-                      >
-                        TO
-                      </span>
-                    )}
-                  </span>
-                )}
-
-                <span
-                  className="h-3 w-3 shrink-0 rounded-full border border-border/60"
-                  style={{
-                    backgroundColor: row.color
-                      ? `rgb(${row.color.r}, ${row.color.g}, ${row.color.b})`
-                      : "transparent",
-                  }}
-                  title="Thread color"
-                />
-
-                <span
-                  className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground/70"
-                  title={row.visible ? "Visible" : "Hidden"}
-                >
-                  {row.visible ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
-                </span>
-
-                {row.locked && (
-                  <span
-                    className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground/80"
-                    title="Locked"
-                  >
-                    <Lock className="h-3 w-3" />
-                  </span>
-                )}
-              </button>
-
-              <button
-                type="button"
+              <div
                 className={cn(
-                  "flex h-6 w-6 shrink-0 items-center justify-center rounded border border-border/50 text-muted-foreground/80 hover:bg-accent/40 hover:text-foreground",
-                  isExpanded && "text-foreground",
+                  "relative flex h-8 items-center gap-1 rounded-md border border-transparent px-1.5 text-[11px] transition-colors",
+                  isSelected
+                    ? "bg-accent/70 text-accent-foreground"
+                    : "text-muted-foreground hover:bg-accent/30 hover:text-foreground",
+                  !row.visible && "opacity-50",
+                  showDropBefore && "border-t-primary",
+                  showDropAfter && "border-b-primary",
                 )}
-                onClick={() => toggleExpandedRow(row.blockId)}
-                title="Per-row routing controls"
-                data-testid={`sequencer-routing-toggle-${row.blockId}`}
               >
-                {isExpanded ? (
-                  <ChevronDown className="h-3.5 w-3.5" />
-                ) : (
-                  <ChevronRight className="h-3.5 w-3.5" />
-                )}
-              </button>
-            </div>
+                <button
+                  type="button"
+                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                  onClick={(event) => onSelectNode(row.nodeId, event.shiftKey)}
+                >
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground/70">
+                    <GripVertical className="h-3 w-3" />
+                  </span>
 
-            {isExpanded && (
-              <div className="mt-1 space-y-1 rounded-md border border-border/60 bg-card/80 p-2">
-                <label className="flex flex-col gap-1 text-[10px] text-muted-foreground">
-                  Allow Reverse
-                  <select
-                    className="h-7 rounded border border-border/40 bg-card px-2 text-[11px] text-foreground"
-                    value={toAllowReverseControlValue(row.overrides.allow_reverse)}
-                    onChange={(event) =>
-                      applyOverridePatch(row, {
-                        allow_reverse: fromAllowReverseControlValue(
-                          event.target.value as AllowReverseControlValue,
-                        ),
-                      })
-                    }
-                    disabled={row.locked}
-                    data-testid={`sequencer-routing-allow-reverse-${row.blockId}`}
+                  <span className="min-w-0 flex-1 truncate">{row.name}</span>
+
+                  <span className="rounded bg-secondary px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-secondary-foreground">
+                    {formatStitchType(row.stitchType)}
+                  </span>
+
+                  {hasOverrideBadges(row.overrides) && (
+                    <span className="hidden items-center gap-1 md:flex">
+                      {row.overrides.allow_reverse !== null && (
+                        <span
+                          className="rounded border border-border/60 px-1 py-0.5 text-[8px] uppercase tracking-wide"
+                          title={`allow reverse override: ${row.overrides.allow_reverse ? "on" : "off"}`}
+                          data-testid={`sequencer-routing-badge-rev-${row.blockId}`}
+                        >
+                          REV
+                        </span>
+                      )}
+                      {row.overrides.entry_exit_mode !== null && (
+                        <span
+                          className="rounded border border-border/60 px-1 py-0.5 text-[8px] uppercase tracking-wide"
+                          title={`entry/exit override: ${row.overrides.entry_exit_mode}`}
+                          data-testid={`sequencer-routing-badge-entry-${row.blockId}`}
+                        >
+                          ENTRY
+                        </span>
+                      )}
+                      {row.overrides.tie_mode !== null && (
+                        <span
+                          className="rounded border border-border/60 px-1 py-0.5 text-[8px] uppercase tracking-wide"
+                          title={`tie mode override: ${row.overrides.tie_mode}`}
+                          data-testid={`sequencer-routing-badge-tie-${row.blockId}`}
+                        >
+                          TIE
+                        </span>
+                      )}
+                    </span>
+                  )}
+
+                  {hasCommandOverrideBadges(row.commandOverrides) && (
+                    <span className="hidden items-center gap-1 md:flex">
+                      {row.commandOverrides.trim_before !== null && (
+                        <span
+                          className="rounded border border-border/60 px-1 py-0.5 text-[8px] uppercase tracking-wide"
+                          title={`trim before override: ${row.commandOverrides.trim_before ? "on" : "off"}`}
+                          data-testid={`sequencer-command-badge-trim-before-${row.blockId}`}
+                        >
+                          TB
+                        </span>
+                      )}
+                      {row.commandOverrides.trim_after !== null && (
+                        <span
+                          className="rounded border border-border/60 px-1 py-0.5 text-[8px] uppercase tracking-wide"
+                          title={`trim after override: ${row.commandOverrides.trim_after ? "on" : "off"}`}
+                          data-testid={`sequencer-command-badge-trim-after-${row.blockId}`}
+                        >
+                          TA
+                        </span>
+                      )}
+                      {row.commandOverrides.tie_in !== null && (
+                        <span
+                          className="rounded border border-border/60 px-1 py-0.5 text-[8px] uppercase tracking-wide"
+                          title={`tie in override: ${row.commandOverrides.tie_in ? "on" : "off"}`}
+                          data-testid={`sequencer-command-badge-tie-in-${row.blockId}`}
+                        >
+                          TI
+                        </span>
+                      )}
+                      {row.commandOverrides.tie_out !== null && (
+                        <span
+                          className="rounded border border-border/60 px-1 py-0.5 text-[8px] uppercase tracking-wide"
+                          title={`tie out override: ${row.commandOverrides.tie_out ? "on" : "off"}`}
+                          data-testid={`sequencer-command-badge-tie-out-${row.blockId}`}
+                        >
+                          TO
+                        </span>
+                      )}
+                    </span>
+                  )}
+
+                  <span
+                    className="h-3 w-3 shrink-0 rounded-full border border-border/60"
+                    style={{
+                      backgroundColor: row.color
+                        ? `rgb(${row.color.r}, ${row.color.g}, ${row.color.b})`
+                        : "transparent",
+                    }}
+                    title="Thread color"
+                  />
+
+                  <span
+                    className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground/70"
+                    title={row.visible ? "Visible" : "Hidden"}
                   >
-                    <option value="inherit">Inherit Global</option>
-                    <option value="force_on">Force On</option>
-                    <option value="force_off">Force Off</option>
-                  </select>
-                </label>
+                    {row.visible ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                  </span>
 
-                <label className="flex flex-col gap-1 text-[10px] text-muted-foreground">
-                  Entry / Exit
-                  <select
-                    className="h-7 rounded border border-border/40 bg-card px-2 text-[11px] text-foreground"
-                    value={toEntryExitControlValue(row.overrides.entry_exit_mode)}
-                    onChange={(event) =>
-                      applyOverridePatch(row, {
-                        entry_exit_mode:
-                          event.target.value === "inherit"
-                            ? null
-                            : (event.target.value as RoutingEntryExitMode),
-                      })
-                    }
-                    disabled={row.locked}
-                    data-testid={`sequencer-routing-entry-exit-${row.blockId}`}
-                    title="User Anchor requires anchor editing workflow (planned)"
-                  >
-                    <option value="inherit">Inherit Global</option>
-                    <option value="auto">Auto</option>
-                    <option value="preserve_shape_start">Preserve Start</option>
-                    <option value="user_anchor">User Anchor</option>
-                  </select>
-                </label>
-
-                <label className="flex flex-col gap-1 text-[10px] text-muted-foreground">
-                  Tie Mode
-                  <select
-                    className="h-7 rounded border border-border/40 bg-card px-2 text-[11px] text-foreground"
-                    value={toTieModeControlValue(row.overrides.tie_mode)}
-                    onChange={(event) =>
-                      applyOverridePatch(row, {
-                        tie_mode:
-                          event.target.value === "inherit"
-                            ? null
-                            : (event.target.value as RoutingTieMode),
-                      })
-                    }
-                    disabled={row.locked}
-                    data-testid={`sequencer-routing-tie-mode-${row.blockId}`}
-                  >
-                    <option value="inherit">Inherit Global</option>
-                    <option value="off">Off</option>
-                    <option value="shape_start_end">Shape Start/End</option>
-                    <option value="color_change">Color Change</option>
-                  </select>
-                </label>
-
-                <div className="mt-1 grid grid-cols-2 gap-1.5">
-                  <label className="flex flex-col gap-1 text-[10px] text-muted-foreground">
-                    Trim Before
-                    <select
-                      className="h-7 rounded border border-border/40 bg-card px-2 text-[11px] text-foreground"
-                      value={toBoolOverrideControlValue(row.commandOverrides.trim_before)}
-                      onChange={(event) =>
-                        applyCommandOverridePatch(row, {
-                          trim_before: fromBoolOverrideControlValue(
-                            event.target.value as BoolOverrideControlValue,
-                          ),
-                        })
-                      }
-                      disabled={row.locked}
-                      data-testid={`sequencer-command-trim-before-${row.blockId}`}
+                  {row.locked && (
+                    <span
+                      className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground/80"
+                      title="Locked"
                     >
-                      <option value="inherit">Inherit</option>
-                      <option value="force_on">Force On</option>
-                      <option value="force_off">Force Off</option>
-                    </select>
-                  </label>
+                      <Lock className="h-3 w-3" />
+                    </span>
+                  )}
+                </button>
 
-                  <label className="flex flex-col gap-1 text-[10px] text-muted-foreground">
-                    Trim After
-                    <select
-                      className="h-7 rounded border border-border/40 bg-card px-2 text-[11px] text-foreground"
-                      value={toBoolOverrideControlValue(row.commandOverrides.trim_after)}
-                      onChange={(event) =>
-                        applyCommandOverridePatch(row, {
-                          trim_after: fromBoolOverrideControlValue(
-                            event.target.value as BoolOverrideControlValue,
-                          ),
-                        })
-                      }
-                      disabled={row.locked}
-                      data-testid={`sequencer-command-trim-after-${row.blockId}`}
-                    >
-                      <option value="inherit">Inherit</option>
-                      <option value="force_on">Force On</option>
-                      <option value="force_off">Force Off</option>
-                    </select>
-                  </label>
-
-                  <label className="flex flex-col gap-1 text-[10px] text-muted-foreground">
-                    Tie In
-                    <select
-                      className="h-7 rounded border border-border/40 bg-card px-2 text-[11px] text-foreground"
-                      value={toBoolOverrideControlValue(row.commandOverrides.tie_in)}
-                      onChange={(event) =>
-                        applyCommandOverridePatch(row, {
-                          tie_in: fromBoolOverrideControlValue(
-                            event.target.value as BoolOverrideControlValue,
-                          ),
-                        })
-                      }
-                      disabled={row.locked}
-                      data-testid={`sequencer-command-tie-in-${row.blockId}`}
-                    >
-                      <option value="inherit">Inherit</option>
-                      <option value="force_on">Force On</option>
-                      <option value="force_off">Force Off</option>
-                    </select>
-                  </label>
-
-                  <label className="flex flex-col gap-1 text-[10px] text-muted-foreground">
-                    Tie Out
-                    <select
-                      className="h-7 rounded border border-border/40 bg-card px-2 text-[11px] text-foreground"
-                      value={toBoolOverrideControlValue(row.commandOverrides.tie_out)}
-                      onChange={(event) =>
-                        applyCommandOverridePatch(row, {
-                          tie_out: fromBoolOverrideControlValue(
-                            event.target.value as BoolOverrideControlValue,
-                          ),
-                        })
-                      }
-                      disabled={row.locked}
-                      data-testid={`sequencer-command-tie-out-${row.blockId}`}
-                    >
-                      <option value="inherit">Inherit</option>
-                      <option value="force_on">Force On</option>
-                      <option value="force_off">Force Off</option>
-                    </select>
-                  </label>
-                </div>
+                <button
+                  type="button"
+                  className={cn(
+                    "flex h-6 w-6 shrink-0 items-center justify-center rounded border border-border/50 text-muted-foreground/80 hover:bg-accent/40 hover:text-foreground",
+                    isExpanded && "text-foreground",
+                  )}
+                  onClick={() => toggleExpandedRow(row.blockId)}
+                  title="Per-row routing controls"
+                  data-testid={`sequencer-routing-toggle-${row.blockId}`}
+                >
+                  {isExpanded ? (
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  )}
+                </button>
               </div>
-            )}
-          </li>
-        );
-      })}
-    </ul>
+
+              {isExpanded && (
+                <div className="mt-1 space-y-1 rounded-md border border-border/60 bg-card/80 p-2">
+                  <label className="flex flex-col gap-1 text-[10px] text-muted-foreground">
+                    Allow Reverse
+                    <select
+                      className="h-7 rounded border border-border/40 bg-card px-2 text-[11px] text-foreground"
+                      value={toAllowReverseControlValue(row.overrides.allow_reverse)}
+                      onChange={(event) =>
+                        applyOverridePatch(row, {
+                          allow_reverse: fromAllowReverseControlValue(
+                            event.target.value as AllowReverseControlValue,
+                          ),
+                        })
+                      }
+                      disabled={row.locked}
+                      data-testid={`sequencer-routing-allow-reverse-${row.blockId}`}
+                    >
+                      <option value="inherit">Inherit Global</option>
+                      <option value="force_on">Force On</option>
+                      <option value="force_off">Force Off</option>
+                    </select>
+                  </label>
+
+                  <label className="flex flex-col gap-1 text-[10px] text-muted-foreground">
+                    Entry / Exit
+                    <select
+                      className="h-7 rounded border border-border/40 bg-card px-2 text-[11px] text-foreground"
+                      value={toEntryExitControlValue(row.overrides.entry_exit_mode)}
+                      onChange={(event) =>
+                        applyOverridePatch(row, {
+                          entry_exit_mode:
+                            event.target.value === "inherit"
+                              ? null
+                              : (event.target.value as RoutingEntryExitMode),
+                        })
+                      }
+                      disabled={row.locked}
+                      data-testid={`sequencer-routing-entry-exit-${row.blockId}`}
+                      title="User Anchor requires anchor editing workflow (planned)"
+                    >
+                      <option value="inherit">Inherit Global</option>
+                      <option value="auto">Auto</option>
+                      <option value="preserve_shape_start">Preserve Start</option>
+                      <option value="user_anchor">User Anchor</option>
+                    </select>
+                  </label>
+
+                  <label className="flex flex-col gap-1 text-[10px] text-muted-foreground">
+                    Tie Mode
+                    <select
+                      className="h-7 rounded border border-border/40 bg-card px-2 text-[11px] text-foreground"
+                      value={toTieModeControlValue(row.overrides.tie_mode)}
+                      onChange={(event) =>
+                        applyOverridePatch(row, {
+                          tie_mode:
+                            event.target.value === "inherit"
+                              ? null
+                              : (event.target.value as RoutingTieMode),
+                        })
+                      }
+                      disabled={row.locked}
+                      data-testid={`sequencer-routing-tie-mode-${row.blockId}`}
+                    >
+                      <option value="inherit">Inherit Global</option>
+                      <option value="off">Off</option>
+                      <option value="shape_start_end">Shape Start/End</option>
+                      <option value="color_change">Color Change</option>
+                    </select>
+                  </label>
+
+                  <div className="mt-1 grid grid-cols-2 gap-1.5">
+                    <label className="flex flex-col gap-1 text-[10px] text-muted-foreground">
+                      Trim Before
+                      <select
+                        className="h-7 rounded border border-border/40 bg-card px-2 text-[11px] text-foreground"
+                        value={toBoolOverrideControlValue(row.commandOverrides.trim_before)}
+                        onChange={(event) =>
+                          applyCommandOverridePatch(row, {
+                            trim_before: fromBoolOverrideControlValue(
+                              event.target.value as BoolOverrideControlValue,
+                            ),
+                          })
+                        }
+                        disabled={row.locked}
+                        data-testid={`sequencer-command-trim-before-${row.blockId}`}
+                      >
+                        <option value="inherit">Inherit</option>
+                        <option value="force_on">Force On</option>
+                        <option value="force_off">Force Off</option>
+                      </select>
+                    </label>
+
+                    <label className="flex flex-col gap-1 text-[10px] text-muted-foreground">
+                      Trim After
+                      <select
+                        className="h-7 rounded border border-border/40 bg-card px-2 text-[11px] text-foreground"
+                        value={toBoolOverrideControlValue(row.commandOverrides.trim_after)}
+                        onChange={(event) =>
+                          applyCommandOverridePatch(row, {
+                            trim_after: fromBoolOverrideControlValue(
+                              event.target.value as BoolOverrideControlValue,
+                            ),
+                          })
+                        }
+                        disabled={row.locked}
+                        data-testid={`sequencer-command-trim-after-${row.blockId}`}
+                      >
+                        <option value="inherit">Inherit</option>
+                        <option value="force_on">Force On</option>
+                        <option value="force_off">Force Off</option>
+                      </select>
+                    </label>
+
+                    <label className="flex flex-col gap-1 text-[10px] text-muted-foreground">
+                      Tie In
+                      <select
+                        className="h-7 rounded border border-border/40 bg-card px-2 text-[11px] text-foreground"
+                        value={toBoolOverrideControlValue(row.commandOverrides.tie_in)}
+                        onChange={(event) =>
+                          applyCommandOverridePatch(row, {
+                            tie_in: fromBoolOverrideControlValue(
+                              event.target.value as BoolOverrideControlValue,
+                            ),
+                          })
+                        }
+                        disabled={row.locked}
+                        data-testid={`sequencer-command-tie-in-${row.blockId}`}
+                      >
+                        <option value="inherit">Inherit</option>
+                        <option value="force_on">Force On</option>
+                        <option value="force_off">Force Off</option>
+                      </select>
+                    </label>
+
+                    <label className="flex flex-col gap-1 text-[10px] text-muted-foreground">
+                      Tie Out
+                      <select
+                        className="h-7 rounded border border-border/40 bg-card px-2 text-[11px] text-foreground"
+                        value={toBoolOverrideControlValue(row.commandOverrides.tie_out)}
+                        onChange={(event) =>
+                          applyCommandOverridePatch(row, {
+                            tie_out: fromBoolOverrideControlValue(
+                              event.target.value as BoolOverrideControlValue,
+                            ),
+                          })
+                        }
+                        disabled={row.locked}
+                        data-testid={`sequencer-command-tie-out-${row.blockId}`}
+                      >
+                        <option value="inherit">Inherit</option>
+                        <option value="force_on">Force On</option>
+                        <option value="force_off">Force Off</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+
+      {contextMenu && (
+        <div
+          className="fixed z-50 w-56 rounded-md border border-border/60 bg-popover p-1 shadow-2xl"
+          style={clampMenuPosition(contextMenu.screenX, contextMenu.screenY, 224, 220)}
+          data-testid="sequencer-context-menu"
+        >
+          <button
+            type="button"
+            className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent/40"
+            onClick={() => handleSequencerContextAction("move_top", contextMenu.row)}
+            data-testid="sequencer-context-move-top"
+          >
+            Move to Top
+          </button>
+          <button
+            type="button"
+            className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent/40"
+            onClick={() => handleSequencerContextAction("move_bottom", contextMenu.row)}
+            data-testid="sequencer-context-move-bottom"
+          >
+            Move to Bottom
+          </button>
+          <button
+            type="button"
+            className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent/40"
+            onClick={() => setContextMenu(null)}
+            data-testid="sequencer-context-insert-color-change"
+          >
+            Insert Color Change
+          </button>
+          <button
+            type="button"
+            className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent/40"
+            onClick={() => setContextMenu(null)}
+            data-testid="sequencer-context-group-adjacent"
+          >
+            Group with Adjacent
+          </button>
+          <button
+            type="button"
+            className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent/40"
+            onClick={() => handleSequencerContextAction("duplicate", contextMenu.row)}
+            data-testid="sequencer-context-duplicate"
+          >
+            Duplicate
+          </button>
+          <button
+            type="button"
+            className="block w-full rounded px-2 py-1 text-left text-xs text-destructive hover:bg-destructive/10"
+            onClick={() => handleSequencerContextAction("remove", contextMenu.row)}
+            data-testid="sequencer-context-remove"
+          >
+            Remove
+          </button>
+        </div>
+      )}
+    </>
   );
 }

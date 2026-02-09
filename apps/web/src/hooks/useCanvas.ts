@@ -23,6 +23,15 @@ export interface CanvasClickEvent {
   button: number;
 }
 
+/** Canvas context-menu callback (world + screen coordinates). */
+export interface CanvasContextMenuEvent {
+  worldX: number;
+  worldY: number;
+  screenX: number;
+  screenY: number;
+  nodeId: number | null;
+}
+
 /** Options for the canvas hook. */
 interface UseCanvasOptions {
   /** Whether the engine is ready (triggers initial render). */
@@ -37,6 +46,8 @@ interface UseCanvasOptions {
   onCanvasClick?: (event: CanvasClickEvent) => void;
   /** Called to hit-test a point in world-space (mm). */
   onCanvasHitTest?: (worldX: number, worldY: number) => number | null;
+  /** Called when the user requests a context menu on canvas. */
+  onCanvasContextMenu?: (event: CanvasContextMenuEvent) => void;
   /** Called when a shape drag is completed (rect/ellipse tool). */
   onShapeDragEnd?: (startMm: DesignPoint, endMm: DesignPoint) => void;
   /** Called when pen tool clicks to add a point. */
@@ -68,6 +79,7 @@ export function useCanvas({
   cursorStyle,
   onCanvasClick,
   onCanvasHitTest,
+  onCanvasContextMenu,
   onShapeDragEnd,
   onPenClick,
   onSelectionDragCommit,
@@ -317,6 +329,19 @@ export function useCanvas({
       }
     };
 
+    const onContextMenu = (e: MouseEvent): void => {
+      e.preventDefault();
+      const worldPt = screenToWorld(e.clientX, e.clientY);
+      const hitId = onCanvasHitTest ? onCanvasHitTest(worldPt.x, worldPt.y) : null;
+      onCanvasContextMenu?.({
+        worldX: worldPt.x,
+        worldY: worldPt.y,
+        screenX: e.clientX,
+        screenY: e.clientY,
+        nodeId: hitId,
+      });
+    };
+
     const onMouseMove = (e: MouseEvent): void => {
       onCursorMove?.(screenToWorld(e.clientX, e.clientY));
 
@@ -412,6 +437,7 @@ export function useCanvas({
 
     el.addEventListener("wheel", onWheel, { passive: false });
     el.addEventListener("mousedown", onMouseDown);
+    el.addEventListener("contextmenu", onContextMenu);
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
     window.addEventListener("keydown", onKeyDown);
@@ -420,6 +446,7 @@ export function useCanvas({
     return () => {
       el.removeEventListener("wheel", onWheel);
       el.removeEventListener("mousedown", onMouseDown);
+      el.removeEventListener("contextmenu", onContextMenu);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
       window.removeEventListener("keydown", onKeyDown);
@@ -430,6 +457,7 @@ export function useCanvas({
     cursorStyle,
     onCanvasClick,
     onCanvasHitTest,
+    onCanvasContextMenu,
     onShapeDragEnd,
     onPenClick,
     onSelectionDragCommit,

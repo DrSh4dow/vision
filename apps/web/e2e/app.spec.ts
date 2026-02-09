@@ -371,6 +371,112 @@ test.describe("Vision App", () => {
     await expect(page.getByTestId("diagnostics-drawer")).toBeVisible();
     await expect(page.getByTestId("diagnostics-panel")).toBeVisible();
   });
+
+  test("right-clicking a canvas object opens structured context menu and applies actions", async ({
+    page,
+  }) => {
+    const canvas = page.getByTestId("design-canvas");
+    await page.getByTestId("tool-rect").click();
+
+    const box = await canvas.boundingBox();
+    if (!box) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    await page.mouse.move(cx - 30, cy - 30);
+    await page.mouse.down();
+    await page.mouse.move(cx + 30, cy + 30, { steps: 5 });
+    await page.mouse.up();
+
+    await expect(page.locator("[data-testid^='sequencer-row-']")).toHaveCount(1, {
+      timeout: 3_000,
+    });
+
+    await page.mouse.click(cx, cy, { button: "right" });
+    const objectMenu = page.getByTestId("canvas-object-context-menu");
+    await expect(objectMenu).toBeVisible();
+
+    await expect(page.getByTestId("context-object-stitch-type")).toBeVisible();
+    await expect(page.getByTestId("context-object-thread-color")).toBeVisible();
+    await expect(page.getByTestId("context-object-density")).toBeVisible();
+    await expect(page.getByTestId("context-object-angle")).toBeVisible();
+    await expect(page.getByTestId("context-object-underlay")).toBeVisible();
+    await expect(page.getByTestId("context-object-compensation")).toBeVisible();
+
+    await expect(page.getByTestId("context-object-routing-overrides")).toBeVisible();
+    await expect(page.getByTestId("context-object-trim-command")).toBeVisible();
+    await expect(page.getByTestId("context-object-tie-command")).toBeVisible();
+
+    await expect(page.getByTestId("context-object-lock")).toBeVisible();
+    await expect(page.getByTestId("context-object-hide")).toBeVisible();
+    await expect(page.getByTestId("context-object-duplicate")).toBeVisible();
+    await expect(page.getByTestId("context-object-delete")).toBeVisible();
+
+    const order = await objectMenu.evaluate((node) =>
+      Array.from(node.querySelectorAll("button[data-testid]")).map((button) =>
+        button.getAttribute("data-testid"),
+      ),
+    );
+    expect(order.indexOf("context-object-stitch-type")).toBeLessThan(
+      order.indexOf("context-object-routing-overrides"),
+    );
+    expect(order.indexOf("context-object-routing-overrides")).toBeLessThan(
+      order.indexOf("context-object-lock"),
+    );
+
+    await page.getByTestId("context-object-delete").click();
+    await expect(page.locator("[data-testid^='sequencer-row-']")).toHaveCount(0, {
+      timeout: 3_000,
+    });
+  });
+
+  test("right-clicking canvas background opens workspace context menu", async ({ page }) => {
+    const canvas = page.getByTestId("design-canvas");
+    const box = await canvas.boundingBox();
+    if (!box) return;
+
+    await page.mouse.click(box.x + 40, box.y + 40, { button: "right" });
+    await expect(page.getByTestId("canvas-background-context-menu")).toBeVisible();
+    await expect(page.getByTestId("context-background-paste")).toBeVisible();
+    await expect(page.getByTestId("context-background-import")).toBeVisible();
+    await expect(page.getByTestId("context-background-zoom-in")).toBeVisible();
+    await expect(page.getByTestId("context-background-zoom-out")).toBeVisible();
+    await expect(page.getByTestId("context-background-grid-settings")).toBeVisible();
+    await expect(page.getByTestId("context-background-snap-behavior")).toBeVisible();
+  });
+
+  test("right-clicking a sequencer row opens sequence-specific context menu", async ({ page }) => {
+    const canvas = page.getByTestId("design-canvas");
+    await page.getByTestId("tool-rect").click();
+
+    const box = await canvas.boundingBox();
+    if (!box) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+
+    await page.mouse.move(cx - 60, cy - 40);
+    await page.mouse.down();
+    await page.mouse.move(cx - 10, cy + 10, { steps: 5 });
+    await page.mouse.up();
+
+    await page.getByTestId("tool-rect").click();
+    await page.mouse.move(cx + 10, cy - 20);
+    await page.mouse.down();
+    await page.mouse.move(cx + 60, cy + 30, { steps: 5 });
+    await page.mouse.up();
+
+    await expect(page.locator("[data-testid^='sequencer-row-']")).toHaveCount(2, {
+      timeout: 3_000,
+    });
+
+    await page.locator("[data-testid^='sequencer-row-']").first().click({ button: "right" });
+    await expect(page.getByTestId("sequencer-context-menu")).toBeVisible();
+    await expect(page.getByTestId("sequencer-context-move-top")).toBeVisible();
+    await expect(page.getByTestId("sequencer-context-move-bottom")).toBeVisible();
+    await expect(page.getByTestId("sequencer-context-insert-color-change")).toBeVisible();
+    await expect(page.getByTestId("sequencer-context-group-adjacent")).toBeVisible();
+    await expect(page.getByTestId("sequencer-context-duplicate")).toBeVisible();
+    await expect(page.getByTestId("sequencer-context-remove")).toBeVisible();
+  });
 });
 
 test.describe("WASM Engine Integration", () => {

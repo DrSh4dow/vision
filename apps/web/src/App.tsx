@@ -20,7 +20,7 @@ import { Separator } from "@/components/ui/separator";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ELLIPSE_FILL, ELLIPSE_STROKE, RECT_FILL, RECT_STROKE } from "@/constants/colors";
 import { DEFAULT_STITCH_LENGTH, DEFAULT_STITCH_PARAMS } from "@/constants/embroidery";
-import type { CanvasClickEvent } from "@/hooks/useCanvas";
+import type { CanvasClickEvent, CanvasContextMenuEvent } from "@/hooks/useCanvas";
 import { useCanvas } from "@/hooks/useCanvas";
 import { useEngine } from "@/hooks/useEngine";
 import { usePenTool } from "@/hooks/usePenTool";
@@ -181,6 +181,20 @@ function formatSewTime(stitchCount: number): string {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
+function clampMenuPosition(
+  screenX: number,
+  screenY: number,
+  menuWidth: number,
+  menuHeight: number,
+): { left: number; top: number } {
+  if (typeof window === "undefined") {
+    return { left: screenX, top: screenY };
+  }
+  const left = Math.max(8, Math.min(screenX, window.innerWidth - menuWidth - 8));
+  const top = Math.max(8, Math.min(screenY, window.innerHeight - menuHeight - 8));
+  return { left, top };
+}
+
 function normalizeShortcut(shortcut: string): string {
   return shortcut.toLowerCase().replace(/\s+/g, "");
 }
@@ -243,6 +257,14 @@ function buildMenuShortcutCommands(): Record<string, MenuShortcutCommand> {
 const MENU_SHORTCUT_COMMANDS = buildMenuShortcutCommands();
 
 type SimulationPreviewMode = "fast" | "quality";
+type CanvasContextMenuKind = "object" | "background";
+
+interface CanvasContextMenuState {
+  kind: CanvasContextMenuKind;
+  nodeId: number | null;
+  screenX: number;
+  screenY: number;
+}
 
 function buildStitchOverlays(
   timeline: SimulationTimeline,
@@ -301,6 +323,7 @@ export function App() {
     infos: 0,
   });
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
+  const [canvasContextMenu, setCanvasContextMenu] = useState<CanvasContextMenuState | null>(null);
   const [lastMenuCommand, setLastMenuCommand] = useState("Idle");
   const defaultsLoadedRef = useRef(false);
   const menuBarRef = useRef<HTMLElement | null>(null);
@@ -519,6 +542,34 @@ export function App() {
   }, [diagnosticsOpen]);
 
   useEffect(() => {
+    if (!canvasContextMenu) return;
+
+    const onPointerDown = (event: PointerEvent): void => {
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.closest("[data-testid='canvas-object-context-menu']") ||
+        target?.closest("[data-testid='canvas-background-context-menu']")
+      ) {
+        return;
+      }
+      setCanvasContextMenu(null);
+    };
+
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        setCanvasContextMenu(null);
+      }
+    };
+
+    window.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [canvasContextMenu]);
+
+  useEffect(() => {
     const onPointerDown = (event: PointerEvent): void => {
       const menuRoot = menuBarRef.current;
       if (!menuRoot) return;
@@ -576,6 +627,7 @@ export function App() {
   /** Handle canvas click (select tool). */
   const handleCanvasClick = useCallback(
     (event: CanvasClickEvent) => {
+      setCanvasContextMenu(null);
       if (!engine) return;
       const hitId = engine.sceneHitTest(event.worldX, event.worldY);
       if (hitId !== null) {
@@ -593,6 +645,22 @@ export function App() {
       return engine.sceneHitTest(worldX, worldY);
     },
     [engine],
+  );
+
+  const handleCanvasContextMenu = useCallback(
+    (event: CanvasContextMenuEvent) => {
+      if (event.nodeId !== null) {
+        selectNode(event.nodeId);
+      }
+
+      setCanvasContextMenu({
+        kind: event.nodeId === null ? "background" : "object",
+        nodeId: event.nodeId,
+        screenX: event.screenX,
+        screenY: event.screenY,
+      });
+    },
+    [selectNode],
   );
 
   const handleSelectionDragCommit = useCallback(
@@ -693,6 +761,35 @@ export function App() {
     [addPoint],
   );
 
+  const handleDeleteContextNode = useCallback(() => {
+    if (!engine || !canvasContextMenu || canvasContextMenu.nodeId === null) return;
+    engine.sceneRemoveNode(canvasContextMenu.nodeId);
+    deselectAll();
+    refreshScene();
+    setCanvasContextMenu(null);
+  }, [canvasContextMenu, deselectAll, engine, refreshScene]);
+
+  const handleDuplicateContextNode = useCallback(() => {
+    if (!engine || !canvasContextMenu || canvasContextMenu.nodeId === null) return;
+    const node = engine.sceneGetNode(canvasContextMenu.nodeId);
+    if (!node) return;
+
+    engine.sceneAddNodeWithTransform(
+      `${node.name} Copy`,
+      node.kind,
+      {
+        x: node.transform.x + 2,
+        y: node.transform.y + 2,
+        rotation: node.transform.rotation,
+        scaleX: node.transform.scale_x,
+        scaleY: node.transform.scale_y,
+      },
+      node.parent ?? undefined,
+    );
+    refreshScene();
+    setCanvasContextMenu(null);
+  }, [canvasContextMenu, engine, refreshScene]);
+
   const canvasRef = useCanvas({
     ready: !loading && !error,
     canvasData: canvasDataRef,
@@ -700,6 +797,7 @@ export function App() {
     cursorStyle,
     onCanvasClick: handleCanvasClick,
     onCanvasHitTest: handleCanvasHitTest,
+    onCanvasContextMenu: handleCanvasContextMenu,
     onSelectionDragCommit: handleSelectionDragCommit,
     onShapeDragEnd: handleShapeDragEnd,
     onPenClick: handlePenClick,
@@ -998,6 +1096,182 @@ export function App() {
                 />
               </div>
             </div>
+
+            {canvasContextMenu?.kind === "object" && (
+              <div
+                className="fixed z-50 w-64 rounded-md border border-border/60 bg-popover p-1 shadow-2xl"
+                style={clampMenuPosition(
+                  canvasContextMenu.screenX,
+                  canvasContextMenu.screenY,
+                  256,
+                  420,
+                )}
+                data-testid="canvas-object-context-menu"
+              >
+                <div className="px-2 py-1 text-[10px] font-semibold uppercase text-muted-foreground">
+                  Stitch Settings
+                </div>
+                <button
+                  type="button"
+                  className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent/40"
+                  data-testid="context-object-stitch-type"
+                >
+                  Stitch Type
+                </button>
+                <button
+                  type="button"
+                  className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent/40"
+                  data-testid="context-object-thread-color"
+                >
+                  Thread Color
+                </button>
+                <button
+                  type="button"
+                  className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent/40"
+                  data-testid="context-object-density"
+                >
+                  Density
+                </button>
+                <button
+                  type="button"
+                  className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent/40"
+                  data-testid="context-object-angle"
+                >
+                  Angle
+                </button>
+                <button
+                  type="button"
+                  className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent/40"
+                  data-testid="context-object-underlay"
+                >
+                  Underlay
+                </button>
+                <button
+                  type="button"
+                  className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent/40"
+                  data-testid="context-object-compensation"
+                >
+                  Compensation
+                </button>
+
+                <div className="my-1 border-t border-border/50" />
+                <div className="px-2 py-1 text-[10px] font-semibold uppercase text-muted-foreground">
+                  Routing
+                </div>
+                <button
+                  type="button"
+                  className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent/40"
+                  data-testid="context-object-routing-overrides"
+                >
+                  Routing Overrides
+                </button>
+                <button
+                  type="button"
+                  className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent/40"
+                  data-testid="context-object-trim-command"
+                >
+                  Trim Command
+                </button>
+                <button
+                  type="button"
+                  className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent/40"
+                  data-testid="context-object-tie-command"
+                >
+                  Tie Command
+                </button>
+
+                <div className="my-1 border-t border-border/50" />
+                <div className="px-2 py-1 text-[10px] font-semibold uppercase text-muted-foreground">
+                  Object Management
+                </div>
+                <button
+                  type="button"
+                  className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent/40"
+                  data-testid="context-object-lock"
+                >
+                  Lock
+                </button>
+                <button
+                  type="button"
+                  className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent/40"
+                  data-testid="context-object-hide"
+                >
+                  Hide
+                </button>
+                <button
+                  type="button"
+                  className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent/40"
+                  onClick={handleDuplicateContextNode}
+                  data-testid="context-object-duplicate"
+                >
+                  Duplicate
+                </button>
+                <button
+                  type="button"
+                  className="block w-full rounded px-2 py-1 text-left text-xs text-destructive hover:bg-destructive/10"
+                  onClick={handleDeleteContextNode}
+                  data-testid="context-object-delete"
+                >
+                  Delete
+                </button>
+              </div>
+            )}
+
+            {canvasContextMenu?.kind === "background" && (
+              <div
+                className="fixed z-50 w-56 rounded-md border border-border/60 bg-popover p-1 shadow-2xl"
+                style={clampMenuPosition(
+                  canvasContextMenu.screenX,
+                  canvasContextMenu.screenY,
+                  224,
+                  220,
+                )}
+                data-testid="canvas-background-context-menu"
+              >
+                <button
+                  type="button"
+                  className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent/40"
+                  data-testid="context-background-paste"
+                >
+                  Paste
+                </button>
+                <button
+                  type="button"
+                  className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent/40"
+                  data-testid="context-background-import"
+                >
+                  Import
+                </button>
+                <button
+                  type="button"
+                  className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent/40"
+                  data-testid="context-background-zoom-in"
+                >
+                  Zoom In
+                </button>
+                <button
+                  type="button"
+                  className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent/40"
+                  data-testid="context-background-zoom-out"
+                >
+                  Zoom Out
+                </button>
+                <button
+                  type="button"
+                  className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent/40"
+                  data-testid="context-background-grid-settings"
+                >
+                  Grid Settings
+                </button>
+                <button
+                  type="button"
+                  className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent/40"
+                  data-testid="context-background-snap-behavior"
+                >
+                  Snap Behavior
+                </button>
+              </div>
+            )}
 
             {engine && (
               <div

@@ -152,7 +152,7 @@
         "Verify menu is organized with stitch settings first, routing second, management last",
         "Select a menu item and verify it applies to the object"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "ui-context-menu",
