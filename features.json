@@ -85,7 +85,7 @@
         "Verify Allow Reverse toggle",
         "Verify link to open full routing settings in Design Inspector"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "ui-menu-bar",

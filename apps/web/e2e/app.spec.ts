@@ -174,6 +174,42 @@ test.describe("Vision App", () => {
     await expect(page.getByTestId("menu-design-item-validate-design")).toBeVisible();
     await expect(page.getByTestId("menu-design-item-repair-geometry")).toBeVisible();
   });
+
+  test("routing menu contains policy, sequence mode, tie mode, reverse, and inspector link", async ({
+    page,
+  }) => {
+    await page.getByTestId("menu-routing").click();
+    await expect(page.getByTestId("menu-routing-panel")).toBeVisible();
+
+    const routingPolicy = page.getByTestId("menu-routing-item-routing-policy");
+    await expect(routingPolicy).toBeVisible();
+    await routingPolicy.hover();
+    await expect(page.getByTestId("menu-routing-submenu-routing-policy")).toBeVisible();
+    await expect(
+      page.getByTestId("menu-routing-submenu-routing-policy-item-balanced"),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId("menu-routing-submenu-routing-policy-item-min-travel"),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId("menu-routing-submenu-routing-policy-item-min-trims"),
+    ).toBeVisible();
+
+    const sequenceMode = page.getByTestId("menu-routing-item-sequence-mode");
+    await expect(sequenceMode).toBeVisible();
+    await sequenceMode.hover();
+    await expect(page.getByTestId("menu-routing-submenu-sequence-mode")).toBeVisible();
+    await expect(
+      page.getByTestId("menu-routing-submenu-sequence-mode-item-strict-sequencer"),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId("menu-routing-submenu-sequence-mode-item-optimizer"),
+    ).toBeVisible();
+
+    await expect(page.getByTestId("menu-routing-item-global-tie-mode")).toBeVisible();
+    await expect(page.getByTestId("menu-routing-item-allow-reverse")).toBeVisible();
+    await expect(page.getByTestId("menu-routing-item-open-full-routing-settings")).toBeVisible();
+  });
 });
 
 test.describe("WASM Engine Integration", () => {
