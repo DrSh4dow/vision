@@ -780,7 +780,7 @@
         "Verify color grouping is respected",
         "Verify sequencer order is respected in Strict Sequencer mode"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "stitch-engine",
