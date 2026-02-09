@@ -320,7 +320,7 @@
         "Verify shape appears in sequencer with default stitch parameters",
         "Verify tool switches back to Select after shape creation"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "tool-text",
