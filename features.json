@@ -904,7 +904,7 @@
         "Set an override and verify inline badge appears on the row (REV, TIE, TB, TA, TI, TO)",
         "Reset to Inherit and verify badge disappears"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "sequencer",
