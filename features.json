@@ -106,7 +106,7 @@
         "Verify every actionable item displays its keyboard shortcut to the right of the label",
         "Verify shortcuts are consistent with actual key bindings"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "ui-toolbar",

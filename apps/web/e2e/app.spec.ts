@@ -219,6 +219,76 @@ test.describe("Vision App", () => {
     await expect(page.getByTestId("menu-help-item-about-vision")).toBeVisible();
   });
 
+  test("all menu actions show inline shortcuts and shortcuts trigger matching commands", async ({
+    page,
+  }) => {
+    const menus = ["file", "edit", "view", "design", "routing", "help"] as const;
+
+    for (const menu of menus) {
+      await page.getByTestId(`menu-${menu}`).click();
+      const panel = page.getByTestId(`menu-${menu}-panel`);
+      await expect(panel).toBeVisible();
+
+      const directItems = panel.locator(`button[data-testid^='menu-${menu}-item-']`);
+      const count = await directItems.count();
+      expect(count).toBeGreaterThan(0);
+      for (let index = 0; index < count; index += 1) {
+        const item = directItems.nth(index);
+        await expect(item.locator("[data-testid$='-shortcut']")).toBeVisible();
+      }
+      await page.keyboard.press("Escape");
+    }
+
+    const submenuSpecs = [
+      { menu: "file", trigger: "menu-file-item-export", panel: "menu-file-submenu-export" },
+      {
+        menu: "view",
+        trigger: "menu-view-item-simulation-mode",
+        panel: "menu-view-submenu-simulation-mode",
+      },
+      {
+        menu: "design",
+        trigger: "menu-design-item-stitch-type",
+        panel: "menu-design-submenu-stitch-type",
+      },
+      {
+        menu: "routing",
+        trigger: "menu-routing-item-routing-policy",
+        panel: "menu-routing-submenu-routing-policy",
+      },
+      {
+        menu: "routing",
+        trigger: "menu-routing-item-sequence-mode",
+        panel: "menu-routing-submenu-sequence-mode",
+      },
+    ] as const;
+    for (const submenuSpec of submenuSpecs) {
+      await page.getByTestId(`menu-${submenuSpec.menu}`).click();
+      await page.getByTestId(submenuSpec.trigger).hover();
+      const submenu = page.getByTestId(submenuSpec.panel);
+      await expect(submenu).toBeVisible();
+      const submenuItems = submenu.locator("button[data-testid*='-item-']");
+      const count = await submenuItems.count();
+      expect(count).toBeGreaterThan(0);
+      for (let index = 0; index < count; index += 1) {
+        const item = submenuItems.nth(index);
+        await expect(item.locator("[data-testid$='-shortcut']")).toBeVisible();
+      }
+      await page.keyboard.press("Escape");
+    }
+
+    await page.keyboard.press("Control+Shift+D");
+    await expect(page.getByTestId("status-command")).toContainText(
+      "View / Toggle Diagnostics Panel",
+    );
+    await page.keyboard.press("F1");
+    await expect(page.getByTestId("status-command")).toContainText("Help / Documentation");
+    await page.keyboard.press("Alt+2");
+    await expect(page.getByTestId("status-command")).toContainText("File / Export > PES");
+    await page.keyboard.press("Control+Shift+Z");
+    await expect(page.getByTestId("status-command")).toContainText("Edit / Redo");
+  });
+
   test("floating toolbar exposes only select pen text rect ellipse tools with shortcuts", async ({
     page,
   }) => {

@@ -57,6 +57,12 @@ interface MenuEntry {
   submenu?: MenuEntry[];
 }
 
+interface MenuShortcutCommand {
+  menuId: MenuId;
+  itemLabel: string;
+  submenuLabel?: string;
+}
+
 const MENU_ENTRIES: Record<MenuId, MenuEntry[]> = {
   file: [
     { label: "New", shortcut: "Ctrl+N" },
@@ -175,6 +181,67 @@ function formatSewTime(stitchCount: number): string {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
+function normalizeShortcut(shortcut: string): string {
+  return shortcut.toLowerCase().replace(/\s+/g, "");
+}
+
+function shortcutFromKeyboardEvent(event: KeyboardEvent): string | null {
+  const tokens: string[] = [];
+  if (event.ctrlKey || event.metaKey) tokens.push("ctrl");
+  if (event.shiftKey) tokens.push("shift");
+  if (event.altKey) tokens.push("alt");
+
+  let key = event.key.toLowerCase();
+  if (key === " ") key = "space";
+  if (key === "plus" || (key === "=" && event.shiftKey)) key = "+";
+  if (key === "subtract") key = "-";
+  if (key === "escape") key = "esc";
+
+  if (["control", "shift", "alt", "meta"].includes(key)) return null;
+
+  if (tokens.length === 0 && !["f1", "delete"].includes(key)) {
+    return null;
+  }
+
+  if (key === "delete") {
+    key = "del";
+  }
+
+  tokens.push(key);
+  return normalizeShortcut(tokens.join("+"));
+}
+
+function buildMenuShortcutCommands(): Record<string, MenuShortcutCommand> {
+  const entries: [string, MenuShortcutCommand][] = [];
+  for (const [menuId, menuEntries] of Object.entries(MENU_ENTRIES) as [MenuId, MenuEntry[]][]) {
+    for (const entry of menuEntries) {
+      entries.push([
+        normalizeShortcut(entry.shortcut),
+        {
+          menuId,
+          itemLabel: entry.label,
+        },
+      ]);
+
+      if (!entry.submenu) continue;
+      for (const submenuEntry of entry.submenu) {
+        entries.push([
+          normalizeShortcut(submenuEntry.shortcut),
+          {
+            menuId,
+            itemLabel: entry.label,
+            submenuLabel: submenuEntry.label,
+          },
+        ]);
+      }
+    }
+  }
+
+  return Object.fromEntries(entries);
+}
+
+const MENU_SHORTCUT_COMMANDS = buildMenuShortcutCommands();
+
 type SimulationPreviewMode = "fast" | "quality";
 
 function buildStitchOverlays(
@@ -234,6 +301,7 @@ export function App() {
     infos: 0,
   });
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
+  const [lastMenuCommand, setLastMenuCommand] = useState("Idle");
   const defaultsLoadedRef = useRef(false);
   const menuBarRef = useRef<HTMLElement | null>(null);
   const [openMenu, setOpenMenu] = useState<MenuId | null>(null);
@@ -294,6 +362,56 @@ export function App() {
         : nextSummary,
     );
   }, [engine, playbackEnabled, playbackTick, routingOptions, showThreadPreview, simulationMode]);
+
+  const executeMenuCommand = useCallback(
+    (command: MenuShortcutCommand) => {
+      const commandPath = command.submenuLabel
+        ? `${command.itemLabel} > ${command.submenuLabel}`
+        : command.itemLabel;
+      const menuTitle =
+        MENU_BAR_ITEMS.find((menuItem) => menuItem.toLowerCase() === command.menuId) ??
+        command.menuId;
+      setLastMenuCommand(`${menuTitle} / ${commandPath}`);
+
+      const commandId = `${command.menuId}/${toTestSlug(command.itemLabel)}${
+        command.submenuLabel ? `/${toTestSlug(command.submenuLabel)}` : ""
+      }`;
+
+      switch (commandId) {
+        case "edit/undo":
+          if (engine?.sceneUndo()) {
+            refreshScene();
+          }
+          break;
+        case "edit/redo":
+          if (engine?.sceneRedo()) {
+            refreshScene();
+          }
+          break;
+        case "view/toggle-stitch-preview":
+          setShowThreadPreview((previous) => !previous);
+          break;
+        case "view/simulation-mode/fast":
+          setSimulationMode("fast");
+          break;
+        case "view/simulation-mode/quality":
+          setSimulationMode("quality");
+          break;
+        case "view/toggle-diagnostics-panel":
+          setDiagnosticsOpen((previous) => !previous);
+          break;
+        case "routing/allow-reverse":
+          setRoutingOptions((previous) => ({
+            ...previous,
+            allow_reverse: !previous.allow_reverse,
+          }));
+          break;
+      }
+
+      closeMenus();
+    },
+    [closeMenus, engine, refreshScene],
+  );
 
   const { selectedIds, selectNode, deselectAll } = useSelection(engine, refreshScene);
   const { penState, addPoint, finishPath, cancelPath } = usePenTool(
@@ -423,6 +541,29 @@ export function App() {
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [closeMenus]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
+      ) {
+        return;
+      }
+
+      const normalizedShortcut = shortcutFromKeyboardEvent(event);
+      if (!normalizedShortcut) return;
+      const command = MENU_SHORTCUT_COMMANDS[normalizedShortcut];
+      if (!command) return;
+
+      event.preventDefault();
+      executeMenuCommand(command);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [executeMenuCommand]);
 
   // Sync selected IDs into canvas data ref
   useEffect(() => {
@@ -649,7 +790,10 @@ export function App() {
                                   );
                                   return;
                                 }
-                                closeMenus();
+                                executeMenuCommand({
+                                  menuId,
+                                  itemLabel: entry.label,
+                                });
                               }}
                               data-testid={itemTestId}
                             >
@@ -678,7 +822,13 @@ export function App() {
                                       key={submenuEntry.label}
                                       type="button"
                                       className="flex w-full items-center justify-between gap-4 rounded-sm px-2 py-1 text-left text-xs text-foreground hover:bg-accent/40"
-                                      onClick={closeMenus}
+                                      onClick={() =>
+                                        executeMenuCommand({
+                                          menuId,
+                                          itemLabel: entry.label,
+                                          submenuLabel: submenuEntry.label,
+                                        })
+                                      }
                                       data-testid={submenuItemTestId}
                                     >
                                       <span>{submenuEntry.label}</span>
@@ -898,6 +1048,9 @@ export function App() {
                 <span data-testid="status-stitches">Stitches {statusSummary.stitchCount}</span>
                 <span data-testid="status-colors">Colors {statusSummary.colorCount}</span>
                 <span data-testid="status-sew-time">Sew {sewTimeEstimate}</span>
+                <span className="max-w-[180px] truncate" data-testid="status-command">
+                  {lastMenuCommand}
+                </span>
               </div>
               <div className="pointer-events-auto" data-testid="status-right">
                 <button
