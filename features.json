@@ -504,7 +504,7 @@
         "Verify binary file downloads instantly",
         "Verify file is valid PEC format with color block data"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "export",
