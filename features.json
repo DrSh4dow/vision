@@ -121,7 +121,7 @@
         "Verify active tool is visually highlighted",
         "Verify no other tools or controls on the toolbar"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "ui-status-bar",

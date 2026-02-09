@@ -218,6 +218,39 @@ test.describe("Vision App", () => {
     await expect(page.getByTestId("menu-help-item-documentation")).toBeVisible();
     await expect(page.getByTestId("menu-help-item-about-vision")).toBeVisible();
   });
+
+  test("floating toolbar exposes only select pen text rect ellipse tools with shortcuts", async ({
+    page,
+  }) => {
+    const toolbar = page.getByRole("toolbar", { name: "Drawing tools" });
+    await expect(toolbar).toBeVisible();
+    await expect(toolbar).toHaveClass(/backdrop-blur/);
+
+    const toolButtons = toolbar.locator("button[data-testid^='tool-']");
+    await expect(toolButtons).toHaveCount(5);
+
+    const select = page.getByTestId("tool-select");
+    const pen = page.getByTestId("tool-pen");
+    const text = page.getByTestId("tool-text");
+    const rect = page.getByTestId("tool-rect");
+    const ellipse = page.getByTestId("tool-ellipse");
+    await expect(select).toBeVisible();
+    await expect(pen).toBeVisible();
+    await expect(text).toBeVisible();
+    await expect(rect).toBeVisible();
+    await expect(ellipse).toBeVisible();
+
+    await page.keyboard.press("t");
+    await expect(text).toHaveAttribute("aria-pressed", "true");
+    await page.keyboard.press("v");
+    await expect(select).toHaveAttribute("aria-pressed", "true");
+    await page.keyboard.press("p");
+    await expect(pen).toHaveAttribute("aria-pressed", "true");
+    await page.keyboard.press("r");
+    await expect(rect).toHaveAttribute("aria-pressed", "true");
+    await page.keyboard.press("e");
+    await expect(ellipse).toHaveAttribute("aria-pressed", "true");
+  });
 });
 
 test.describe("WASM Engine Integration", () => {
