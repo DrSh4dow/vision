@@ -292,6 +292,7 @@ Additional parity gates:
 2. Route metrics benchmark thresholds on standard design pack
 3. Visual regression checks for simulation quality modes
 4. Cross-format import/export regression pack
+5. Phase 1 dual gate command: `scripts/check-phase1-gate.sh` (metric thresholds + Playwright visual snapshots)
 
 ## 9) Performance Targets
 
@@ -333,6 +334,7 @@ Vision can be considered Hatch-parity for core workflows when all are true:
 6. Stitch blocks are editable first-class entities and not only export-time byproducts
 
 ## Changelog
+- 2026-02-09: Added Phase 1 dual gate (`scripts/check-phase1-gate.sh`) plus Playwright visual baseline suite for screenshot-driven parity checks.
 - 2026-02-09: Added explicit phase execution status tracker; Phase 2 now records sequencer-first controls + hybrid API milestone progress.
 - 2026-02-08: Added direct canvas drag-move parity milestone and acceptance criteria.
 - 2026-02-08: Reframed roadmap around hybrid stitch-block model and added `../inkstitch` reference-first guidance for implementation inspiration.

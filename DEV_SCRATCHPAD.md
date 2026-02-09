@@ -15,11 +15,13 @@
 - Added scene tests covering hybrid lifecycle + sequencer/override synchronization.
 - Exposed hybrid scene APIs through WASM + bridge (`sceneGetEmbroideryObjects`, `sceneGetStitchBlocks`, `sceneGetSequenceTrack`) with Zod schemas and typed engine interface support.
 - Gate status for this checkpoint: required Rust + web checks all passing (`fmt`, `clippy`, `test`, `biome`, `tsc`, `vite build`, `playwright`).
+- Added Phase 1 dual gate script (`scripts/check-phase1-gate.sh`) to enforce both metric-threshold parity and visual snapshot parity.
+- Added Playwright visual baseline suite (`apps/web/e2e/visual.spec.ts`) with committed snapshots for home and satin-control workspace review.
 
 ## Next Priority Queue
 1. Phase 2 remaining: first-class `EmbroideryObject`/`StitchBlock`/`SequenceTrack` model separation.
 2. Deterministic geometry-edit -> stitch-block regen semantics + persistence invariants.
-3. Routing parity hardening against Ink/Stitch corpus with dual gate (visual + metric thresholds).
+3. Expand parity corpus beyond smoke fixtures and tune algorithm quality gaps vs `../inkstitch`.
 
 ## Bench/Parity Notes
 - Reference source for behavior inspiration: `../inkstitch`.
