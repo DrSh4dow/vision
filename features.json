@@ -227,7 +227,7 @@
         "Verify canvas renders smoothly at 60fps during pan/zoom with objects present",
         "Verify zoom has min and max limits"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "canvas",
