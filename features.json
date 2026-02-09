@@ -171,7 +171,7 @@
         "Right-click a row in the sequencer",
         "Verify context menu with Move to Top, Move to Bottom, Insert Color Change, Group with Adjacent, Duplicate, Remove"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "ui-design-inspector",
