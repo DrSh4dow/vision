@@ -394,6 +394,27 @@ impl Scene {
         &self.sequence_track
     }
 
+    /// Get all first-class embroidery objects ordered by source id.
+    pub fn get_embroidery_objects(&self) -> Vec<EmbroideryObject> {
+        let mut out: Vec<EmbroideryObject> = self.embroidery_objects.values().cloned().collect();
+        out.sort_by_key(|obj| obj.id.0);
+        out
+    }
+
+    /// Get stitch blocks in sequence-track order.
+    pub fn get_stitch_blocks(&self) -> Vec<StitchBlock> {
+        let ordered = if self.sequence_track.ordered_block_ids.is_empty() {
+            self.sequencer_shape_ids()
+        } else {
+            self.sequence_track.ordered_block_ids.clone()
+        };
+
+        ordered
+            .into_iter()
+            .filter_map(|id| self.stitch_blocks.get(&id).cloned())
+            .collect()
+    }
+
     /// Move a node to a new parent (or to root level if `new_parent` is `None`).
     ///
     /// # Arguments

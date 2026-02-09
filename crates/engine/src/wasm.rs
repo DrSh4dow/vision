@@ -554,6 +554,36 @@ pub fn scene_get_stitch_plan() -> Result<String, JsError> {
     })
 }
 
+/// Get first-class embroidery objects as JSON.
+#[wasm_bindgen]
+pub fn scene_get_embroidery_objects() -> Result<String, JsError> {
+    with_scene(|s| {
+        let objects = s.get_embroidery_objects();
+        serde_json::to_string(&objects)
+            .map_err(|e| JsError::new(&format!("Serialization error: {e}")))
+    })
+}
+
+/// Get first-class stitch blocks in sequence-track order as JSON.
+#[wasm_bindgen]
+pub fn scene_get_stitch_blocks() -> Result<String, JsError> {
+    with_scene(|s| {
+        let blocks = s.get_stitch_blocks();
+        serde_json::to_string(&blocks)
+            .map_err(|e| JsError::new(&format!("Serialization error: {e}")))
+    })
+}
+
+/// Get the sequence track as JSON.
+#[wasm_bindgen]
+pub fn scene_get_sequence_track() -> Result<String, JsError> {
+    with_scene(|s| {
+        let track = s.sequence_track().clone();
+        serde_json::to_string(&track)
+            .map_err(|e| JsError::new(&format!("Serialization error: {e}")))
+    })
+}
+
 /// Get the full scene tree as JSON (for layers panel).
 #[wasm_bindgen]
 pub fn scene_get_tree() -> Result<String, JsError> {

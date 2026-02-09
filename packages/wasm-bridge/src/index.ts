@@ -24,9 +24,12 @@ import initWasm, {
   scene_create,
   scene_export_design,
   scene_export_design_with_options,
+  scene_get_embroidery_objects,
   scene_get_node,
   scene_get_path_commands,
   scene_get_render_list,
+  scene_get_sequence_track,
+  scene_get_stitch_blocks,
   scene_get_stitch_plan,
   scene_get_tree,
   scene_hit_test,
@@ -57,6 +60,7 @@ import type { VisionEngine } from "./engine";
 import { flatToPoints, pointsToFlat } from "./helpers";
 import {
   BoundingBoxSchema,
+  EmbroideryObjectSchema,
   ExportDesignSchema,
   ObjectRoutingOverridesSchema,
   PathDataSchema,
@@ -66,6 +70,8 @@ import {
   RoutingOptionsSchema,
   SatinResultSchema,
   SceneNodeInfoSchema,
+  SequenceTrackSchema,
+  StitchBlockSchema,
   StitchParamsSchema,
   StitchPlanRowSchema,
   ThreadColorSchema,
@@ -74,6 +80,7 @@ import {
 import type {
   BoundingBox,
   Color,
+  EmbroideryObject,
   ExportDesign,
   NodeKindData,
   ObjectRoutingOverrides,
@@ -85,6 +92,8 @@ import type {
   RoutingOptions,
   SatinResult,
   SceneNodeInfo,
+  SequenceTrack,
+  StitchBlock,
   StitchParams,
   StitchPlanRow,
   StitchType,
@@ -99,6 +108,7 @@ export type { VisionEngine } from "./engine";
 // Re-export schemas for consumers that need runtime validation
 export {
   BoundingBoxSchema,
+  EmbroideryObjectSchema,
   ExportDesignSchema,
   ObjectRoutingOverridesSchema,
   PathDataSchema,
@@ -108,6 +118,8 @@ export {
   RoutingOptionsSchema,
   SatinResultSchema,
   SceneNodeInfoSchema,
+  SequenceTrackSchema,
+  StitchBlockSchema,
   StitchParamsSchema,
   StitchPlanRowSchema,
   ThreadColorSchema,
@@ -118,6 +130,7 @@ export type {
   BoundingBox,
   Color,
   CompensationMode,
+  EmbroideryObject,
   ExportDesign,
   ExportStitch,
   ExportStitchType,
@@ -138,8 +151,10 @@ export type {
   RoutingTieMode,
   SatinResult,
   SceneNodeInfo,
+  SequenceTrack,
   ShapeKindData,
   Stitch,
+  StitchBlock,
   StitchParams,
   StitchPlanRow,
   StitchType,
@@ -393,6 +408,23 @@ export async function initEngine(): Promise<VisionEngine> {
         const json = scene_get_stitch_plan();
         const parsed: unknown = JSON.parse(json);
         return (parsed as unknown[]).map((item) => StitchPlanRowSchema.parse(item));
+      },
+
+      sceneGetEmbroideryObjects: (): EmbroideryObject[] => {
+        const json = scene_get_embroidery_objects();
+        const parsed: unknown = JSON.parse(json);
+        return (parsed as unknown[]).map((item) => EmbroideryObjectSchema.parse(item));
+      },
+
+      sceneGetStitchBlocks: (): StitchBlock[] => {
+        const json = scene_get_stitch_blocks();
+        const parsed: unknown = JSON.parse(json);
+        return (parsed as unknown[]).map((item) => StitchBlockSchema.parse(item));
+      },
+
+      sceneGetSequenceTrack: (): SequenceTrack => {
+        const json = scene_get_sequence_track();
+        return SequenceTrackSchema.parse(JSON.parse(json));
       },
 
       sceneGetRenderList: (): RenderItem[] => {

@@ -157,6 +157,28 @@ export const ObjectRoutingOverridesSchema = z.object({
   tie_mode: RoutingTieModeSchema.nullable().default(null),
 });
 
+export const EmbroideryObjectSchema = z.object({
+  id: z.number(),
+  source_node_id: z.number(),
+  stitch: StitchParamsSchema,
+  fill: ColorSchema.nullable(),
+  stroke: ColorSchema.nullable(),
+  stroke_width: z.number(),
+});
+
+export const StitchBlockSchema = z.object({
+  id: z.number(),
+  object_id: z.number(),
+  source_node_id: z.number(),
+  stitch_type: StitchTypeSchema,
+  color: ColorSchema.nullable(),
+  routing_overrides: ObjectRoutingOverridesSchema,
+});
+
+export const SequenceTrackSchema = z.object({
+  ordered_block_ids: z.array(z.number()),
+});
+
 // ============================================================================
 // Scene Graph Schemas
 // ============================================================================

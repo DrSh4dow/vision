@@ -8,6 +8,7 @@
 import type {
   BoundingBox,
   Color,
+  EmbroideryObject,
   ExportDesign,
   NodeKindData,
   ObjectRoutingOverrides,
@@ -19,6 +20,8 @@ import type {
   RoutingOptions,
   SatinResult,
   SceneNodeInfo,
+  SequenceTrack,
+  StitchBlock,
   StitchParams,
   StitchPlanRow,
   ThreadBrand,
@@ -145,6 +148,15 @@ export interface VisionEngine {
 
   /** Get sequencer rows in machine execution order. */
   sceneGetStitchPlan(): StitchPlanRow[];
+
+  /** Get first-class embroidery objects. */
+  sceneGetEmbroideryObjects(): EmbroideryObject[];
+
+  /** Get first-class stitch blocks in sequence-track order. */
+  sceneGetStitchBlocks(): StitchBlock[];
+
+  /** Get sequence-track ordering data. */
+  sceneGetSequenceTrack(): SequenceTrack;
 
   /** Get the render list (visible shapes with world transforms). */
   sceneGetRenderList(): RenderItem[];

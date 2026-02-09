@@ -13,7 +13,8 @@
 - Added first-class engine model structs (`EmbroideryObject`, `StitchBlock`, `SequenceTrack`) with deterministic shape-sync hooks in `Scene`.
 - Updated command mutation paths to keep stitch-plan state synchronized after shape-kind/stitch-relevant edits.
 - Added scene tests covering hybrid lifecycle + sequencer/override synchronization.
-- Gate status for this checkpoint: `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test` all passing.
+- Exposed hybrid scene APIs through WASM + bridge (`sceneGetEmbroideryObjects`, `sceneGetStitchBlocks`, `sceneGetSequenceTrack`) with Zod schemas and typed engine interface support.
+- Gate status for this checkpoint: required Rust + web checks all passing (`fmt`, `clippy`, `test`, `biome`, `tsc`, `vite build`, `playwright`).
 
 ## Next Priority Queue
 1. Phase 2 remaining: first-class `EmbroideryObject`/`StitchBlock`/`SequenceTrack` model separation.

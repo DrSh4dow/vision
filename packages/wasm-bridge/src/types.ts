@@ -174,6 +174,31 @@ export interface ObjectRoutingOverrides {
   tie_mode: RoutingTieMode | null;
 }
 
+/** First-class embroidery object derived from scene geometry. */
+export interface EmbroideryObject {
+  id: number;
+  source_node_id: number;
+  stitch: StitchParams;
+  fill: Color | null;
+  stroke: Color | null;
+  stroke_width: number;
+}
+
+/** First-class stitch block persisted separately from source geometry. */
+export interface StitchBlock {
+  id: number;
+  object_id: number;
+  source_node_id: number;
+  stitch_type: StitchType;
+  color: Color | null;
+  routing_overrides: ObjectRoutingOverrides;
+}
+
+/** Ordered stitch block execution track. */
+export interface SequenceTrack {
+  ordered_block_ids: number[];
+}
+
 // ============================================================================
 // Scene Graph Types
 // ============================================================================
