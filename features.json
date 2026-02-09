@@ -796,7 +796,7 @@
         "Verify all commands visible in sequencer",
         "Verify per-block command overrides (trim before/after, tie in/out) are respected in output"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "stitch-engine",
