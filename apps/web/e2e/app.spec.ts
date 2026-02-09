@@ -129,6 +129,31 @@ test.describe("Vision App", () => {
     await expect(page.getByTestId("menu-edit-item-select-all")).toBeVisible();
     await expect(page.getByTestId("menu-edit-item-select-all-shortcut")).toHaveText("Ctrl+A");
   });
+
+  test("view menu contains zoom, toggles, simulation mode, diagnostics, and inspector", async ({
+    page,
+  }) => {
+    await page.getByTestId("menu-view").click();
+    await expect(page.getByTestId("menu-view-panel")).toBeVisible();
+
+    await expect(page.getByTestId("menu-view-item-zoom-in")).toBeVisible();
+    await expect(page.getByTestId("menu-view-item-zoom-out")).toBeVisible();
+    await expect(page.getByTestId("menu-view-item-zoom-to-fit")).toBeVisible();
+    await expect(page.getByTestId("menu-view-item-zoom-to-selection")).toBeVisible();
+    await expect(page.getByTestId("menu-view-item-toggle-grid")).toBeVisible();
+    await expect(page.getByTestId("menu-view-item-toggle-snap")).toBeVisible();
+    await expect(page.getByTestId("menu-view-item-toggle-stitch-preview")).toBeVisible();
+
+    const simulationMode = page.getByTestId("menu-view-item-simulation-mode");
+    await expect(simulationMode).toBeVisible();
+    await simulationMode.hover();
+    await expect(page.getByTestId("menu-view-submenu-simulation-mode")).toBeVisible();
+    await expect(page.getByTestId("menu-view-submenu-simulation-mode-item-fast")).toBeVisible();
+    await expect(page.getByTestId("menu-view-submenu-simulation-mode-item-quality")).toBeVisible();
+
+    await expect(page.getByTestId("menu-view-item-toggle-diagnostics-panel")).toBeVisible();
+    await expect(page.getByTestId("menu-view-item-toggle-design-inspector")).toBeVisible();
+  });
 });
 
 test.describe("WASM Engine Integration", () => {

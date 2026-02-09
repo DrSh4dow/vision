@@ -59,7 +59,7 @@
         "Verify Toggle Diagnostics Panel item",
         "Verify Toggle Design Inspector item"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "ui-menu-bar",
