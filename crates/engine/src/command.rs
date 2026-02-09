@@ -5,7 +5,9 @@
 
 use crate::Color;
 use crate::path::PathCommand;
-use crate::scene::{Node, NodeId, NodeKind, Scene, Transform};
+use crate::scene::{
+    Node, NodeId, NodeKind, ObjectRoutingOverrides, Scene, ShapeSequencerMeta, Transform,
+};
 use crate::shapes::ShapeData;
 
 /// A reversible scene mutation.
@@ -54,6 +56,18 @@ pub(crate) enum SceneCommand {
         old_index: usize,
         new_index: usize,
     },
+    /// Reorder a shape in sequencer execution order.
+    ReorderSequencer {
+        id: NodeId,
+        old_index: usize,
+        new_index: usize,
+    },
+    /// Update object-level routing overrides for a shape.
+    SetObjectRoutingOverrides {
+        id: NodeId,
+        old: ObjectRoutingOverrides,
+        new: ObjectRoutingOverrides,
+    },
     /// Update a shape node's path commands.
     SetPathCommands {
         id: NodeId,
@@ -88,6 +102,7 @@ pub(crate) enum SceneCommand {
 #[derive(Debug, Clone)]
 pub(crate) struct NodeSnapshot {
     pub(crate) node: Node,
+    pub(crate) shape_meta: Option<ShapeSequencerMeta>,
 }
 
 /// Manages the undo/redo history for a scene.
@@ -236,6 +251,18 @@ fn apply_command(scene: &mut Scene, cmd: &SceneCommand, reverse: bool) -> Result
             let idx = if reverse { *old_index } else { *new_index };
             scene.reorder_child(*id, idx)?;
         }
+        SceneCommand::ReorderSequencer {
+            id,
+            old_index,
+            new_index,
+        } => {
+            let idx = if reverse { *old_index } else { *new_index };
+            scene.reorder_sequencer_shape(*id, idx)?;
+        }
+        SceneCommand::SetObjectRoutingOverrides { id, old, new } => {
+            let overrides = if reverse { old } else { new };
+            scene.set_object_routing_overrides(*id, overrides.clone())?;
+        }
         SceneCommand::SetPathCommands {
             id,
             old_commands,
@@ -330,6 +357,9 @@ fn restore_snapshot(
     for snap in snapshot {
         let node = &snap.node;
         scene.restore_node(node.clone())?;
+        if let Some(meta) = &snap.shape_meta {
+            scene.restore_shape_meta(node.id, meta.clone());
+        }
     }
 
     // Re-attach the root node to its parent at the original index
@@ -381,7 +411,10 @@ pub(crate) fn build_remove_command(scene: &Scene, id: NodeId) -> Result<SceneCom
 /// Recursively snapshot a node and all its descendants.
 fn snapshot_subtree(scene: &Scene, id: NodeId, out: &mut Vec<NodeSnapshot>) {
     if let Some(node) = scene.get_node(id) {
-        out.push(NodeSnapshot { node: node.clone() });
+        out.push(NodeSnapshot {
+            node: node.clone(),
+            shape_meta: scene.get_shape_meta(id).cloned(),
+        });
         let children: Vec<NodeId> = node.children.clone();
         for child_id in children {
             snapshot_subtree(scene, child_id, out);
@@ -811,5 +844,69 @@ mod tests {
 
         history.undo(&mut scene).unwrap();
         assert_eq!(scene.root_children(), &[a, b, c]);
+    }
+
+    #[test]
+    fn test_command_reorder_sequencer_undo() {
+        let mut scene = Scene::new();
+        let make_shape = || NodeKind::Shape {
+            shape: ShapeData::Rect(RectShape::new(5.0, 5.0, 0.0)),
+            fill: Some(Color::new(120, 120, 120, 255)),
+            stroke: Some(Color::new(120, 120, 120, 255)),
+            stroke_width: 0.4,
+            stitch: crate::StitchParams::default(),
+        };
+
+        let a = scene.add_node("A", make_shape(), None).unwrap();
+        let b = scene.add_node("B", make_shape(), None).unwrap();
+        let c = scene.add_node("C", make_shape(), None).unwrap();
+
+        let mut history = CommandHistory::new(100);
+        let cmd = SceneCommand::ReorderSequencer {
+            id: c,
+            old_index: 2,
+            new_index: 0,
+        };
+        history.execute(&mut scene, cmd).unwrap();
+        assert_eq!(scene.sequencer_shape_ids(), vec![c, a, b]);
+
+        history.undo(&mut scene).unwrap();
+        assert_eq!(scene.sequencer_shape_ids(), vec![a, b, c]);
+    }
+
+    #[test]
+    fn test_command_set_object_routing_overrides_undo() {
+        let mut scene = Scene::new();
+        let id = scene
+            .add_node(
+                "Path",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(10.0, 10.0, 0.0)),
+                    fill: Some(Color::new(0, 0, 0, 255)),
+                    stroke: Some(Color::new(0, 0, 0, 255)),
+                    stroke_width: 0.5,
+                    stitch: crate::StitchParams::default(),
+                },
+                None,
+            )
+            .unwrap();
+
+        let mut history = CommandHistory::new(100);
+        let old = scene.object_routing_overrides(id);
+        let new = ObjectRoutingOverrides {
+            allow_reverse: Some(false),
+            entry_exit_mode: Some(crate::export_pipeline::EntryExitMode::PreserveShapeStart),
+            tie_mode: Some(crate::export_pipeline::TieMode::ColorChange),
+        };
+        let cmd = SceneCommand::SetObjectRoutingOverrides {
+            id,
+            old: old.clone(),
+            new: new.clone(),
+        };
+        history.execute(&mut scene, cmd).unwrap();
+        assert_eq!(scene.object_routing_overrides(id), new);
+
+        history.undo(&mut scene).unwrap();
+        assert_eq!(scene.object_routing_overrides(id), old);
     }
 }

@@ -10,6 +10,7 @@ import type {
   Color,
   ExportDesign,
   NodeKindData,
+  ObjectRoutingOverrides,
   PathData,
   Point,
   QualityMetrics,
@@ -19,6 +20,7 @@ import type {
   SatinResult,
   SceneNodeInfo,
   StitchParams,
+  StitchPlanRow,
   ThreadBrand,
   ThreadColor,
   TransformData,
@@ -132,8 +134,17 @@ export interface VisionEngine {
   /** Reorder a node within its parent's children. */
   sceneReorderChild(nodeId: number, newIndex: number): void;
 
+  /** Reorder a stitch block within sequencer execution order. */
+  sceneReorderStitchBlock(blockId: number, newIndex: number): void;
+
+  /** Set object-level routing overrides for a stitch block. */
+  sceneSetObjectRoutingOverrides(blockId: number, overrides: ObjectRoutingOverrides): void;
+
   /** Get the full scene tree (for sequencer/panel UI). */
   sceneGetTree(): TreeNode[];
+
+  /** Get sequencer rows in machine execution order. */
+  sceneGetStitchPlan(): StitchPlanRow[];
 
   /** Get the render list (visible shapes with world transforms). */
   sceneGetRenderList(): RenderItem[];

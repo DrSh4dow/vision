@@ -151,6 +151,12 @@ export const RoutingOptionsSchema = z.object({
   sequence_mode: RoutingSequenceModeSchema.default("strict_sequencer"),
 });
 
+export const ObjectRoutingOverridesSchema = z.object({
+  allow_reverse: z.boolean().nullable().default(null),
+  entry_exit_mode: RoutingEntryExitModeSchema.nullable().default(null),
+  tie_mode: RoutingTieModeSchema.nullable().default(null),
+});
+
 // ============================================================================
 // Scene Graph Schemas
 // ============================================================================
@@ -272,6 +278,19 @@ export const RenderItemSchema = z.object({
   ]),
   kind: NodeKindDataSchema,
   name: z.string(),
+});
+
+export const StitchPlanRowSchema = z.object({
+  block_id: z.number(),
+  node_id: z.number(),
+  parent: z.number().nullable(),
+  name: z.string(),
+  stitch_type: StitchTypeSchema,
+  color: ColorSchema.nullable(),
+  visible: z.boolean(),
+  locked: z.boolean(),
+  sequence_index: z.number(),
+  overrides: ObjectRoutingOverridesSchema,
 });
 
 export const BoundingBoxSchema = z.object({

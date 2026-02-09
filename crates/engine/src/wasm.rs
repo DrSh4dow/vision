@@ -496,6 +496,64 @@ pub fn scene_reorder_child(node_id: i64, new_index: u32) -> Result<(), JsError> 
     execute_command(cmd).map_err(|e| JsError::new(&e))
 }
 
+/// Reorder a stitch block within sequencer execution order.
+#[wasm_bindgen]
+pub fn scene_reorder_stitch_block(block_id: i64, new_index: u32) -> Result<(), JsError> {
+    let id = NodeId(block_id as u64);
+    let old_index = with_scene(|s| {
+        s.sequencer_shape_ids()
+            .iter()
+            .position(|candidate| *candidate == id)
+            .ok_or_else(|| format!("Stitch block {id:?} not found"))
+    })
+    .map_err(|e| JsError::new(&e))?;
+
+    let cmd = SceneCommand::ReorderSequencer {
+        id,
+        old_index,
+        new_index: new_index as usize,
+    };
+    execute_command(cmd).map_err(|e| JsError::new(&e))
+}
+
+/// Set object-level routing overrides for a stitch block.
+#[wasm_bindgen]
+pub fn scene_set_object_routing_overrides(
+    block_id: i64,
+    overrides_json: &str,
+) -> Result<(), JsError> {
+    let id = NodeId(block_id as u64);
+    let new: scene::ObjectRoutingOverrides = if overrides_json.trim().is_empty() {
+        scene::ObjectRoutingOverrides::default()
+    } else {
+        serde_json::from_str(overrides_json)
+            .map_err(|e| JsError::new(&format!("Invalid routing overrides JSON: {e}")))?
+    };
+
+    let old = with_scene(|s| {
+        let node = s
+            .get_node(id)
+            .ok_or_else(|| format!("Node {id:?} not found"))?;
+        if !matches!(node.kind, scene::NodeKind::Shape { .. }) {
+            return Err(format!("Node {id:?} is not a Shape"));
+        }
+        Ok(s.object_routing_overrides(id))
+    })
+    .map_err(|e| JsError::new(&e))?;
+
+    let cmd = SceneCommand::SetObjectRoutingOverrides { id, old, new };
+    execute_command(cmd).map_err(|e| JsError::new(&e))
+}
+
+/// Get stitch-plan rows in sequencer order as JSON.
+#[wasm_bindgen]
+pub fn scene_get_stitch_plan() -> Result<String, JsError> {
+    with_scene(|s| {
+        let rows = s.get_stitch_plan_rows();
+        serde_json::to_string(&rows).map_err(|e| JsError::new(&format!("Serialization error: {e}")))
+    })
+}
+
 /// Get the full scene tree as JSON (for layers panel).
 #[wasm_bindgen]
 pub fn scene_get_tree() -> Result<String, JsError> {

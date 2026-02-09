@@ -331,11 +331,71 @@ test.describe("Canvas Interaction", () => {
     await expect(sequencerRow).toBeVisible();
     await sequencerRow.click();
 
-    // Verify selection state is applied
-    await expect(sequencerRow).toHaveClass(/bg-accent\/70/);
+    // Verify selection state is applied to the row container.
+    await expect(sequencerRow.locator("div").first()).toHaveClass(/bg-accent\/70/);
 
     // No errors should have been thrown (previously crashed with "can't convert undefined to BigInt")
     expect(errors).toEqual([]);
+  });
+
+  test("per-row sequencer routing overrides can be edited from the left panel", async ({
+    page,
+  }) => {
+    const canvas = page.getByTestId("design-canvas");
+    await page.getByTestId("tool-rect").click();
+
+    const box = await canvas.boundingBox();
+    if (!box) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    await page.mouse.move(cx - 30, cy - 30);
+    await page.mouse.down();
+    await page.mouse.move(cx + 30, cy + 30, { steps: 5 });
+    await page.mouse.up();
+
+    await expect(page.locator("[data-testid^='sequencer-row-']")).toHaveCount(1, {
+      timeout: 5_000,
+    });
+
+    const routingToggle = page.locator("[data-testid^='sequencer-routing-toggle-']").first();
+    await expect(routingToggle).toBeVisible();
+    await routingToggle.click();
+
+    const allowReverse = page.locator("[data-testid^='sequencer-routing-allow-reverse-']").first();
+    const entryExit = page.locator("[data-testid^='sequencer-routing-entry-exit-']").first();
+    const tieMode = page.locator("[data-testid^='sequencer-routing-tie-mode-']").first();
+
+    await expect(allowReverse).toBeVisible();
+    await expect(entryExit).toBeVisible();
+    await expect(tieMode).toBeVisible();
+
+    await allowReverse.selectOption("force_off");
+    await entryExit.selectOption("preserve_shape_start");
+    await tieMode.selectOption("color_change");
+
+    await expect(
+      page.locator("[data-testid^='sequencer-routing-badge-rev-']").first(),
+    ).toBeVisible();
+    await expect(
+      page.locator("[data-testid^='sequencer-routing-badge-entry-']").first(),
+    ).toBeVisible();
+    await expect(
+      page.locator("[data-testid^='sequencer-routing-badge-tie-']").first(),
+    ).toBeVisible();
+
+    // Wait beyond the polling refresh interval to ensure overrides persist in engine state.
+    await page.waitForTimeout(700);
+    await expect(allowReverse).toHaveValue("force_off");
+    await expect(entryExit).toHaveValue("preserve_shape_start");
+    await expect(tieMode).toHaveValue("color_change");
+
+    await allowReverse.selectOption("inherit");
+    await entryExit.selectOption("inherit");
+    await tieMode.selectOption("inherit");
+
+    await expect(page.locator("[data-testid^='sequencer-routing-badge-rev-']")).toHaveCount(0);
+    await expect(page.locator("[data-testid^='sequencer-routing-badge-entry-']")).toHaveCount(0);
+    await expect(page.locator("[data-testid^='sequencer-routing-badge-tie-']")).toHaveCount(0);
   });
 
   test("keyboard tool switching", async ({ page }) => {

@@ -11,7 +11,7 @@ use crate::Point;
 use crate::StitchType;
 use crate::constants::{DEFAULT_FLATTEN_TOLERANCE, DEFAULT_STITCH_LENGTH};
 use crate::format::{ExportDesign, ExportStitch, ExportStitchType};
-use crate::scene::{NodeKind, Scene};
+use crate::scene::{NodeKind, ObjectRoutingOverrides, Scene};
 use crate::stitch::fill::{
     generate_contour_fill, generate_motif_fill, generate_spiral_fill, generate_tatami_fill,
 };
@@ -29,6 +29,7 @@ struct ShapeStitchBlock {
     color: Color,
     stitches: Vec<crate::Stitch>,
     source_order: usize,
+    routing_overrides: ObjectRoutingOverrides,
 }
 
 impl ShapeStitchBlock {
@@ -208,7 +209,7 @@ pub fn scene_to_export_design_with_routing(
         stitch_length
     };
 
-    let render_items = scene.render_list();
+    let render_items = scene.render_list_sequencer_order();
     let mut blocks: Vec<ShapeStitchBlock> = Vec::new();
 
     // Build shape stitch blocks first; final command assembly is done after optional routing.
@@ -440,6 +441,7 @@ pub fn scene_to_export_design_with_routing(
             color,
             stitches: shape_stitches,
             source_order,
+            routing_overrides: scene.object_routing_overrides(item.id),
         });
     }
 
@@ -457,13 +459,14 @@ pub fn scene_to_export_design_with_routing(
     let mut run_since_trim_mm = 0.0;
 
     for block in blocks {
+        let block_routing = routing_with_overrides(routing, &block.routing_overrides);
         let color = block.color;
         let shape_stitches = block.stitches;
         let start_point = shape_stitches[0].position;
 
         // Insert color change if the color differs from the previous shape
         if current_color.is_some() && current_color != Some(color) {
-            if matches!(routing.tie_mode, TieMode::ColorChange)
+            if matches!(block_routing.tie_mode, TieMode::ColorChange)
                 && let Some(anchor) = current_position
             {
                 emit_tie_sequence(
@@ -489,7 +492,7 @@ pub fn scene_to_export_design_with_routing(
                 stitch_type: ExportStitchType::ColorChange,
             });
             current_position = Some(start_point);
-            if matches!(routing.tie_mode, TieMode::ColorChange) {
+            if matches!(block_routing.tie_mode, TieMode::ColorChange) {
                 emit_tie_sequence(
                     &mut stitches,
                     start_point,
@@ -509,7 +512,7 @@ pub fn scene_to_export_design_with_routing(
         if let Some(prev) = current_position {
             let travel = distance(prev, start_point);
             if travel > f64::EPSILON {
-                if should_insert_trim(routing, travel, run_since_trim_mm)
+                if should_insert_trim(block_routing, travel, run_since_trim_mm)
                     && stitches
                         .last()
                         .is_some_and(|s| s.stitch_type != ExportStitchType::Trim)
@@ -531,7 +534,7 @@ pub fn scene_to_export_design_with_routing(
             }
         }
 
-        if matches!(routing.tie_mode, TieMode::ShapeStartEnd) {
+        if matches!(block_routing.tie_mode, TieMode::ShapeStartEnd) {
             emit_tie_sequence(
                 &mut stitches,
                 start_point,
@@ -565,7 +568,7 @@ pub fn scene_to_export_design_with_routing(
             current_position = Some(stitch.position);
         }
 
-        if matches!(routing.tie_mode, TieMode::ShapeStartEnd)
+        if matches!(block_routing.tie_mode, TieMode::ShapeStartEnd)
             && let Some(anchor) = current_position
         {
             emit_tie_sequence(
@@ -817,6 +820,23 @@ fn should_insert_trim(routing: RoutingOptions, travel_mm: f64, run_since_trim_mm
     )
 }
 
+fn routing_with_overrides(
+    routing: RoutingOptions,
+    overrides: &ObjectRoutingOverrides,
+) -> RoutingOptions {
+    let mut effective = routing;
+    if let Some(allow_reverse) = overrides.allow_reverse {
+        effective.allow_reverse = allow_reverse;
+    }
+    if let Some(entry_exit_mode) = overrides.entry_exit_mode {
+        effective.entry_exit_mode = entry_exit_mode;
+    }
+    if let Some(tie_mode) = overrides.tie_mode {
+        effective.tie_mode = tie_mode;
+    }
+    effective
+}
+
 /// Reorder shape stitch blocks to reduce travel distance based on routing options.
 fn optimize_blocks_for_travel(
     blocks: Vec<ShapeStitchBlock>,
@@ -875,7 +895,9 @@ fn optimize_blocks_for_travel(
                     let score = bucket
                         .iter()
                         .map(|b| {
-                            let (cost, _) = best_route_score(end, b, routing);
+                            let block_routing =
+                                routing_with_overrides(routing, &b.routing_overrides);
+                            let (cost, _) = best_route_score(end, b, block_routing);
                             cost
                         })
                         .fold(f64::INFINITY, f64::min);
@@ -907,7 +929,8 @@ fn orient_blocks_for_strict_sequencer(
 
     for mut block in blocks {
         if let Some(end) = current_end {
-            let (_, reverse) = best_route_score(end, &block, routing);
+            let block_routing = routing_with_overrides(routing, &block.routing_overrides);
+            let (_, reverse) = best_route_score(end, &block, block_routing);
             if reverse {
                 block.stitches.reverse();
             }
@@ -956,15 +979,18 @@ fn select_next_block_index(
             .iter()
             .enumerate()
             .min_by(|(_, a), (_, b)| {
-                let (score_a, _) = best_route_score(end, a, routing);
-                let (score_b, _) = best_route_score(end, b, routing);
+                let routing_a = routing_with_overrides(routing, &a.routing_overrides);
+                let routing_b = routing_with_overrides(routing, &b.routing_overrides);
+                let (score_a, _) = best_route_score(end, a, routing_a);
+                let (score_b, _) = best_route_score(end, b, routing_b);
                 score_a
                     .partial_cmp(&score_b)
                     .unwrap_or(std::cmp::Ordering::Equal)
                     .then_with(|| a.source_order.cmp(&b.source_order))
             })
             .map(|(index, block)| {
-                let (_, reverse) = best_route_score(end, block, routing);
+                let block_routing = routing_with_overrides(routing, &block.routing_overrides);
+                let (_, reverse) = best_route_score(end, block, block_routing);
                 (index, reverse)
             })
             .unwrap_or((0, false)),
@@ -2052,6 +2078,79 @@ mod tests {
         assert!(
             with_reverse_metrics.travel_distance_mm < no_reverse_metrics.travel_distance_mm,
             "reverse-enabled routing should reduce travel for opposite-direction path blocks"
+        );
+    }
+
+    #[test]
+    fn test_route_object_override_can_disable_reverse_per_block() {
+        let build_scene = || {
+            let mut scene = Scene::new();
+
+            let mut path_a = VectorPath::new();
+            path_a.move_to(Point::new(0.0, 0.0));
+            path_a.line_to(Point::new(80.0, 0.0));
+
+            let mut path_b = VectorPath::new();
+            path_b.move_to(Point::new(20.0, 0.0));
+            path_b.line_to(Point::new(100.0, 0.0));
+
+            let kind_a = NodeKind::Shape {
+                shape: ShapeData::Path(path_a),
+                fill: None,
+                stroke: Some(Color::new(40, 140, 240, 255)),
+                stroke_width: 0.5,
+                stitch: crate::StitchParams::default(),
+            };
+            let kind_b = NodeKind::Shape {
+                shape: ShapeData::Path(path_b),
+                fill: None,
+                stroke: Some(Color::new(40, 140, 240, 255)),
+                stroke_width: 0.5,
+                stitch: crate::StitchParams::default(),
+            };
+
+            scene.add_node("A", kind_a, None).unwrap();
+            let b = scene.add_node("B", kind_b, None).unwrap();
+            (scene, b)
+        };
+
+        let (scene_no_override, _) = build_scene();
+        let (mut scene_override, b) = build_scene();
+        scene_override
+            .set_object_routing_overrides(
+                b,
+                crate::scene::ObjectRoutingOverrides {
+                    allow_reverse: Some(false),
+                    ..crate::scene::ObjectRoutingOverrides::default()
+                },
+            )
+            .unwrap();
+
+        let with_reverse = scene_to_export_design_with_routing(
+            &scene_no_override,
+            2.0,
+            RoutingOptions {
+                allow_reverse: true,
+                ..RoutingOptions::default()
+            },
+        )
+        .unwrap();
+
+        let override_disabled = scene_to_export_design_with_routing(
+            &scene_override,
+            2.0,
+            RoutingOptions {
+                allow_reverse: true,
+                ..RoutingOptions::default()
+            },
+        )
+        .unwrap();
+
+        let with_reverse_metrics = compute_route_metrics(&with_reverse);
+        let override_disabled_metrics = compute_route_metrics(&override_disabled);
+        assert!(
+            override_disabled_metrics.travel_distance_mm > with_reverse_metrics.travel_distance_mm,
+            "per-block allow_reverse override=false should increase travel for this fixture"
         );
     }
 

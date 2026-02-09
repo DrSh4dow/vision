@@ -27,6 +27,7 @@ import initWasm, {
   scene_get_node,
   scene_get_path_commands,
   scene_get_render_list,
+  scene_get_stitch_plan,
   scene_get_tree,
   scene_hit_test,
   scene_move_node,
@@ -38,9 +39,11 @@ import initWasm, {
   scene_remove_node,
   scene_rename_node,
   scene_reorder_child,
+  scene_reorder_stitch_block,
   scene_route_metrics,
   scene_route_metrics_with_options,
   scene_set_fill,
+  scene_set_object_routing_overrides,
   scene_set_path_commands,
   scene_set_stroke,
   scene_set_stroke_width,
@@ -55,6 +58,7 @@ import { flatToPoints, pointsToFlat } from "./helpers";
 import {
   BoundingBoxSchema,
   ExportDesignSchema,
+  ObjectRoutingOverridesSchema,
   PathDataSchema,
   QualityMetricsSchema,
   RenderItemSchema,
@@ -63,6 +67,7 @@ import {
   SatinResultSchema,
   SceneNodeInfoSchema,
   StitchParamsSchema,
+  StitchPlanRowSchema,
   ThreadColorSchema,
   TreeNodeSchema,
 } from "./schemas";
@@ -71,6 +76,7 @@ import type {
   Color,
   ExportDesign,
   NodeKindData,
+  ObjectRoutingOverrides,
   PathData,
   Point,
   QualityMetrics,
@@ -80,6 +86,7 @@ import type {
   SatinResult,
   SceneNodeInfo,
   StitchParams,
+  StitchPlanRow,
   StitchType,
   ThreadBrand,
   ThreadColor,
@@ -93,6 +100,7 @@ export type { VisionEngine } from "./engine";
 export {
   BoundingBoxSchema,
   ExportDesignSchema,
+  ObjectRoutingOverridesSchema,
   PathDataSchema,
   QualityMetricsSchema,
   RenderItemSchema,
@@ -101,6 +109,7 @@ export {
   SatinResultSchema,
   SceneNodeInfoSchema,
   StitchParamsSchema,
+  StitchPlanRowSchema,
   ThreadColorSchema,
   TreeNodeSchema,
 } from "./schemas";
@@ -115,6 +124,7 @@ export type {
   FillStartMode,
   MotifPattern,
   NodeKindData,
+  ObjectRoutingOverrides,
   PathCommand,
   PathData,
   Point,
@@ -131,6 +141,7 @@ export type {
   ShapeKindData,
   Stitch,
   StitchParams,
+  StitchPlanRow,
   StitchType,
   ThreadBrand,
   ThreadColor,
@@ -360,10 +371,28 @@ export async function initEngine(): Promise<VisionEngine> {
         scene_reorder_child(BigInt(nodeId), newIndex);
       },
 
+      sceneReorderStitchBlock: (blockId: number, newIndex: number): void => {
+        scene_reorder_stitch_block(BigInt(blockId), newIndex);
+      },
+
+      sceneSetObjectRoutingOverrides: (
+        blockId: number,
+        overrides: ObjectRoutingOverrides,
+      ): void => {
+        const parsed = ObjectRoutingOverridesSchema.parse(overrides);
+        scene_set_object_routing_overrides(BigInt(blockId), JSON.stringify(parsed));
+      },
+
       sceneGetTree: (): TreeNode[] => {
         const json = scene_get_tree();
         const parsed: unknown = JSON.parse(json);
         return (parsed as unknown[]).map((item) => TreeNodeSchema.parse(item));
+      },
+
+      sceneGetStitchPlan: (): StitchPlanRow[] => {
+        const json = scene_get_stitch_plan();
+        const parsed: unknown = JSON.parse(json);
+        return (parsed as unknown[]).map((item) => StitchPlanRowSchema.parse(item));
       },
 
       sceneGetRenderList: (): RenderItem[] => {

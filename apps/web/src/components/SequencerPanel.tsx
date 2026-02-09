@@ -1,5 +1,12 @@
-import type { StitchType, TreeNode, VisionEngine } from "@vision/wasm-bridge";
-import { Eye, EyeOff, GripVertical, Lock } from "lucide-react";
+import type {
+  ObjectRoutingOverrides,
+  RoutingEntryExitMode,
+  RoutingTieMode,
+  StitchPlanRow,
+  StitchType,
+  VisionEngine,
+} from "@vision/wasm-bridge";
+import { ChevronDown, ChevronRight, Eye, EyeOff, GripVertical, Lock } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { cn } from "@/lib/utils";
@@ -12,16 +19,20 @@ interface SequencerPanelProps {
 }
 
 interface SequencerRow {
-  id: number;
-  parentId: number | null;
+  blockId: number;
+  nodeId: number;
   name: string;
   stitchType: StitchType;
   color: { r: number; g: number; b: number; a: number } | null;
   visible: boolean;
   locked: boolean;
+  overrides: ObjectRoutingOverrides;
 }
 
 type DropPosition = "before" | "after";
+type AllowReverseControlValue = "inherit" | "force_on" | "force_off";
+type EntryExitControlValue = "inherit" | RoutingEntryExitMode;
+type TieModeControlValue = "inherit" | RoutingTieMode;
 
 interface DropHint {
   targetId: number;
@@ -32,12 +43,34 @@ function formatStitchType(stitchType: StitchType): string {
   return stitchType.replaceAll("_", " ");
 }
 
-function resolveSiblingIds(engine: VisionEngine, parentId: number | null): number[] {
-  if (parentId === null) {
-    return engine.sceneGetTree().map((node) => node.id);
+function toAllowReverseControlValue(value: boolean | null): AllowReverseControlValue {
+  if (value === null) {
+    return "inherit";
   }
-  const parent = engine.sceneGetNode(parentId);
-  return parent?.children ?? [];
+  return value ? "force_on" : "force_off";
+}
+
+function fromAllowReverseControlValue(value: AllowReverseControlValue): boolean | null {
+  if (value === "inherit") {
+    return null;
+  }
+  return value === "force_on";
+}
+
+function toEntryExitControlValue(value: RoutingEntryExitMode | null): EntryExitControlValue {
+  return value ?? "inherit";
+}
+
+function toTieModeControlValue(value: RoutingTieMode | null): TieModeControlValue {
+  return value ?? "inherit";
+}
+
+function hasOverrideBadges(overrides: ObjectRoutingOverrides): boolean {
+  return (
+    overrides.allow_reverse !== null ||
+    overrides.entry_exit_mode !== null ||
+    overrides.tie_mode !== null
+  );
 }
 
 export function SequencerPanel({
@@ -49,51 +82,24 @@ export function SequencerPanel({
   const [rows, setRows] = useState<SequencerRow[]>([]);
   const [dragId, setDragId] = useState<number | null>(null);
   const [dropHint, setDropHint] = useState<DropHint | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set<number>());
 
   const rowById = useMemo(() => {
-    return new Map(rows.map((row) => [row.id, row]));
+    return new Map(rows.map((row) => [row.blockId, row]));
   }, [rows]);
 
   const refreshRows = useCallback(() => {
-    const tree = engine.sceneGetTree();
-    const next: SequencerRow[] = [];
-
-    const collect = (
-      nodes: TreeNode[],
-      inheritedVisible: boolean,
-      inheritedLocked: boolean,
-    ): void => {
-      for (const node of nodes) {
-        let currentVisible = inheritedVisible;
-        let currentLocked = inheritedLocked;
-
-        if (typeof node.kind !== "string" && "Layer" in node.kind) {
-          currentVisible = inheritedVisible && node.kind.Layer.visible;
-          currentLocked = inheritedLocked || node.kind.Layer.locked;
-        }
-
-        if (node.kind === "Shape") {
-          const info = engine.sceneGetNode(node.id);
-          if (info && typeof info.kind !== "string" && "Shape" in info.kind) {
-            next.push({
-              id: node.id,
-              parentId: info.parent,
-              name: info.name,
-              stitchType: info.kind.Shape.stitch.type,
-              color: info.kind.Shape.stroke ?? info.kind.Shape.fill,
-              visible: currentVisible,
-              locked: currentLocked,
-            });
-          }
-        }
-
-        if (node.children.length > 0) {
-          collect(node.children, currentVisible, currentLocked);
-        }
-      }
-    };
-
-    collect(tree, true, false);
+    const stitchPlan = engine.sceneGetStitchPlan();
+    const next: SequencerRow[] = stitchPlan.map((row: StitchPlanRow) => ({
+      blockId: row.block_id,
+      nodeId: row.node_id,
+      name: row.name,
+      stitchType: row.stitch_type,
+      color: row.color,
+      visible: row.visible,
+      locked: row.locked,
+      overrides: row.overrides,
+    }));
     setRows(next);
   }, [engine]);
 
@@ -114,9 +120,9 @@ export function SequencerPanel({
       event.preventDefault();
       return;
     }
-    setDragId(row.id);
+    setDragId(row.blockId);
     event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", String(row.id));
+    event.dataTransfer.setData("text/plain", String(row.blockId));
   }, []);
 
   const handleDragEnd = useCallback(() => {
@@ -126,12 +132,12 @@ export function SequencerPanel({
 
   const handleDragOver = useCallback(
     (event: React.DragEvent<HTMLElement>, row: SequencerRow) => {
-      if (dragId === null || dragId === row.id || row.locked) {
+      if (dragId === null || dragId === row.blockId || row.locked) {
         return;
       }
 
       const dragged = rowById.get(dragId);
-      if (!dragged || dragged.locked || dragged.parentId !== row.parentId) {
+      if (!dragged || dragged.locked) {
         return;
       }
 
@@ -140,10 +146,10 @@ export function SequencerPanel({
 
       const position = computeDropPosition(event);
       setDropHint((prev) => {
-        if (prev && prev.targetId === row.id && prev.position === position) {
+        if (prev && prev.targetId === row.blockId && prev.position === position) {
           return prev;
         }
-        return { targetId: row.id, position };
+        return { targetId: row.blockId, position };
       });
     },
     [computeDropPosition, dragId, rowById],
@@ -152,25 +158,25 @@ export function SequencerPanel({
   const handleDrop = useCallback(
     (event: React.DragEvent<HTMLElement>, target: SequencerRow) => {
       event.preventDefault();
-      if (dragId === null || dragId === target.id) {
+      if (dragId === null || dragId === target.blockId) {
         return;
       }
 
       const dragged = rowById.get(dragId);
-      if (!dragged || dragged.locked || target.locked || dragged.parentId !== target.parentId) {
+      if (!dragged || dragged.locked || target.locked) {
         setDropHint(null);
         return;
       }
 
-      const siblingIds = resolveSiblingIds(engine, dragged.parentId);
-      const oldIndex = siblingIds.indexOf(dragId);
-      const targetIndex = siblingIds.indexOf(target.id);
+      const orderedIds = rows.map((row) => row.blockId);
+      const oldIndex = orderedIds.indexOf(dragId);
+      const targetIndex = orderedIds.indexOf(target.blockId);
       if (oldIndex < 0 || targetIndex < 0) {
         setDropHint(null);
         return;
       }
 
-      const hint = dropHint && dropHint.targetId === target.id ? dropHint : null;
+      const hint = dropHint && dropHint.targetId === target.blockId ? dropHint : null;
       const position = hint?.position ?? computeDropPosition(event);
       let intendedIndex = position === "before" ? targetIndex : targetIndex + 1;
       if (oldIndex < intendedIndex) {
@@ -178,7 +184,7 @@ export function SequencerPanel({
       }
 
       if (intendedIndex !== oldIndex) {
-        engine.sceneReorderChild(dragId, intendedIndex);
+        engine.sceneReorderStitchBlock(dragId, intendedIndex);
         onRefreshScene();
         refreshRows();
       }
@@ -186,7 +192,49 @@ export function SequencerPanel({
       setDropHint(null);
       setDragId(null);
     },
-    [computeDropPosition, dragId, dropHint, engine, onRefreshScene, refreshRows, rowById],
+    [computeDropPosition, dragId, dropHint, engine, onRefreshScene, refreshRows, rowById, rows],
+  );
+
+  const toggleExpandedRow = useCallback((blockId: number) => {
+    setExpandedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(blockId)) {
+        next.delete(blockId);
+      } else {
+        next.add(blockId);
+      }
+      return next;
+    });
+  }, []);
+
+  const applyOverridePatch = useCallback(
+    (row: SequencerRow, patch: Partial<ObjectRoutingOverrides>) => {
+      const nextOverrides: ObjectRoutingOverrides = {
+        ...row.overrides,
+        ...patch,
+      };
+
+      setRows((prev) =>
+        prev.map((candidate) =>
+          candidate.blockId === row.blockId
+            ? {
+                ...candidate,
+                overrides: nextOverrides,
+              }
+            : candidate,
+        ),
+      );
+
+      try {
+        engine.sceneSetObjectRoutingOverrides(row.blockId, nextOverrides);
+        onRefreshScene();
+        refreshRows();
+      } catch (error) {
+        console.error("Failed to set per-row routing overrides", error);
+        refreshRows();
+      }
+    },
+    [engine, onRefreshScene, refreshRows],
   );
 
   if (rows.length === 0) {
@@ -196,71 +244,199 @@ export function SequencerPanel({
   return (
     <ul className="flex flex-col gap-1" data-testid="sequencer-tree" aria-label="Stitch sequencer">
       {rows.map((row) => {
-        const isSelected = selectedIds.has(row.id);
-        const showDropBefore = dropHint?.targetId === row.id && dropHint.position === "before";
-        const showDropAfter = dropHint?.targetId === row.id && dropHint.position === "after";
+        const isSelected = selectedIds.has(row.nodeId);
+        const isExpanded = expandedRows.has(row.blockId);
+        const showDropBefore = dropHint?.targetId === row.blockId && dropHint.position === "before";
+        const showDropAfter = dropHint?.targetId === row.blockId && dropHint.position === "after";
 
         return (
           <li
-            key={row.id}
+            key={row.blockId}
+            data-testid={`sequencer-row-${row.blockId}`}
             className={cn(
-              "group relative flex h-8 items-center gap-2 rounded-md border border-transparent px-1.5 text-[11px] transition-colors",
+              "group relative rounded-md",
               row.locked ? "cursor-not-allowed" : "cursor-grab active:cursor-grabbing",
-              isSelected
-                ? "bg-accent/70 text-accent-foreground"
-                : "text-muted-foreground hover:bg-accent/30 hover:text-foreground",
-              !row.visible && "opacity-50",
-              showDropBefore && "border-t-primary",
-              showDropAfter && "border-b-primary",
             )}
-            data-testid={`sequencer-row-${row.id}`}
             draggable={!row.locked}
             onDragStart={(event) => handleDragStart(event, row)}
             onDragEnd={handleDragEnd}
             onDragOver={(event) => handleDragOver(event, row)}
             onDrop={(event) => handleDrop(event, row)}
           >
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 text-left"
-              onClick={(event) => onSelectNode(row.id, event.shiftKey)}
-            >
-              <span className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground/70">
-                <GripVertical className="h-3 w-3" />
-              </span>
-
-              <span className="min-w-0 flex-1 truncate">{row.name}</span>
-
-              <span className="rounded bg-secondary px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-secondary-foreground">
-                {formatStitchType(row.stitchType)}
-              </span>
-
-              <span
-                className="h-3 w-3 shrink-0 rounded-full border border-border/60"
-                style={{
-                  backgroundColor: row.color
-                    ? `rgb(${row.color.r}, ${row.color.g}, ${row.color.b})`
-                    : "transparent",
-                }}
-                title="Thread color"
-              />
-
-              <span
-                className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground/70"
-                title={row.visible ? "Visible" : "Hidden"}
-              >
-                {row.visible ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
-              </span>
-
-              {row.locked && (
-                <span
-                  className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground/80"
-                  title="Locked"
-                >
-                  <Lock className="h-3 w-3" />
-                </span>
+            <div
+              className={cn(
+                "relative flex h-8 items-center gap-1 rounded-md border border-transparent px-1.5 text-[11px] transition-colors",
+                isSelected
+                  ? "bg-accent/70 text-accent-foreground"
+                  : "text-muted-foreground hover:bg-accent/30 hover:text-foreground",
+                !row.visible && "opacity-50",
+                showDropBefore && "border-t-primary",
+                showDropAfter && "border-b-primary",
               )}
-            </button>
+            >
+              <button
+                type="button"
+                className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                onClick={(event) => onSelectNode(row.nodeId, event.shiftKey)}
+              >
+                <span className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground/70">
+                  <GripVertical className="h-3 w-3" />
+                </span>
+
+                <span className="min-w-0 flex-1 truncate">{row.name}</span>
+
+                <span className="rounded bg-secondary px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-secondary-foreground">
+                  {formatStitchType(row.stitchType)}
+                </span>
+
+                {hasOverrideBadges(row.overrides) && (
+                  <span className="hidden items-center gap-1 md:flex">
+                    {row.overrides.allow_reverse !== null && (
+                      <span
+                        className="rounded border border-border/60 px-1 py-0.5 text-[8px] uppercase tracking-wide"
+                        title={`allow reverse override: ${row.overrides.allow_reverse ? "on" : "off"}`}
+                        data-testid={`sequencer-routing-badge-rev-${row.blockId}`}
+                      >
+                        REV
+                      </span>
+                    )}
+                    {row.overrides.entry_exit_mode !== null && (
+                      <span
+                        className="rounded border border-border/60 px-1 py-0.5 text-[8px] uppercase tracking-wide"
+                        title={`entry/exit override: ${row.overrides.entry_exit_mode}`}
+                        data-testid={`sequencer-routing-badge-entry-${row.blockId}`}
+                      >
+                        ENTRY
+                      </span>
+                    )}
+                    {row.overrides.tie_mode !== null && (
+                      <span
+                        className="rounded border border-border/60 px-1 py-0.5 text-[8px] uppercase tracking-wide"
+                        title={`tie mode override: ${row.overrides.tie_mode}`}
+                        data-testid={`sequencer-routing-badge-tie-${row.blockId}`}
+                      >
+                        TIE
+                      </span>
+                    )}
+                  </span>
+                )}
+
+                <span
+                  className="h-3 w-3 shrink-0 rounded-full border border-border/60"
+                  style={{
+                    backgroundColor: row.color
+                      ? `rgb(${row.color.r}, ${row.color.g}, ${row.color.b})`
+                      : "transparent",
+                  }}
+                  title="Thread color"
+                />
+
+                <span
+                  className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground/70"
+                  title={row.visible ? "Visible" : "Hidden"}
+                >
+                  {row.visible ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                </span>
+
+                {row.locked && (
+                  <span
+                    className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground/80"
+                    title="Locked"
+                  >
+                    <Lock className="h-3 w-3" />
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                className={cn(
+                  "flex h-6 w-6 shrink-0 items-center justify-center rounded border border-border/50 text-muted-foreground/80 hover:bg-accent/40 hover:text-foreground",
+                  isExpanded && "text-foreground",
+                )}
+                onClick={() => toggleExpandedRow(row.blockId)}
+                title="Per-row routing controls"
+                data-testid={`sequencer-routing-toggle-${row.blockId}`}
+              >
+                {isExpanded ? (
+                  <ChevronDown className="h-3.5 w-3.5" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5" />
+                )}
+              </button>
+            </div>
+
+            {isExpanded && (
+              <div className="mt-1 space-y-1 rounded-md border border-border/60 bg-card/80 p-2">
+                <label className="flex flex-col gap-1 text-[10px] text-muted-foreground">
+                  Allow Reverse
+                  <select
+                    className="h-7 rounded border border-border/40 bg-card px-2 text-[11px] text-foreground"
+                    value={toAllowReverseControlValue(row.overrides.allow_reverse)}
+                    onChange={(event) =>
+                      applyOverridePatch(row, {
+                        allow_reverse: fromAllowReverseControlValue(
+                          event.target.value as AllowReverseControlValue,
+                        ),
+                      })
+                    }
+                    disabled={row.locked}
+                    data-testid={`sequencer-routing-allow-reverse-${row.blockId}`}
+                  >
+                    <option value="inherit">Inherit Global</option>
+                    <option value="force_on">Force On</option>
+                    <option value="force_off">Force Off</option>
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-1 text-[10px] text-muted-foreground">
+                  Entry / Exit
+                  <select
+                    className="h-7 rounded border border-border/40 bg-card px-2 text-[11px] text-foreground"
+                    value={toEntryExitControlValue(row.overrides.entry_exit_mode)}
+                    onChange={(event) =>
+                      applyOverridePatch(row, {
+                        entry_exit_mode:
+                          event.target.value === "inherit"
+                            ? null
+                            : (event.target.value as RoutingEntryExitMode),
+                      })
+                    }
+                    disabled={row.locked}
+                    data-testid={`sequencer-routing-entry-exit-${row.blockId}`}
+                    title="User Anchor requires anchor editing workflow (planned)"
+                  >
+                    <option value="inherit">Inherit Global</option>
+                    <option value="auto">Auto</option>
+                    <option value="preserve_shape_start">Preserve Start</option>
+                    <option value="user_anchor">User Anchor</option>
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-1 text-[10px] text-muted-foreground">
+                  Tie Mode
+                  <select
+                    className="h-7 rounded border border-border/40 bg-card px-2 text-[11px] text-foreground"
+                    value={toTieModeControlValue(row.overrides.tie_mode)}
+                    onChange={(event) =>
+                      applyOverridePatch(row, {
+                        tie_mode:
+                          event.target.value === "inherit"
+                            ? null
+                            : (event.target.value as RoutingTieMode),
+                      })
+                    }
+                    disabled={row.locked}
+                    data-testid={`sequencer-routing-tie-mode-${row.blockId}`}
+                  >
+                    <option value="inherit">Inherit Global</option>
+                    <option value="off">Off</option>
+                    <option value="shape_start_end">Shape Start/End</option>
+                    <option value="color_change">Color Change</option>
+                  </select>
+                </label>
+              </div>
+            )}
           </li>
         );
       })}

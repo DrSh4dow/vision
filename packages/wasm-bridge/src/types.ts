@@ -167,6 +167,13 @@ export interface RoutingOptions {
   sequence_mode: RoutingSequenceMode;
 }
 
+/** Per-object routing overrides for stitch blocks. */
+export interface ObjectRoutingOverrides {
+  allow_reverse: boolean | null;
+  entry_exit_mode: RoutingEntryExitMode | null;
+  tie_mode: RoutingTieMode | null;
+}
+
 // ============================================================================
 // Scene Graph Types
 // ============================================================================
@@ -242,6 +249,20 @@ export interface RenderItem {
   world_transform: [number, number, number, number, number, number];
   kind: NodeKindData;
   name: string;
+}
+
+/** Stitch-plan row shown in sequencer UI. */
+export interface StitchPlanRow {
+  block_id: number;
+  node_id: number;
+  parent: number | null;
+  name: string;
+  stitch_type: StitchType;
+  color: Color | null;
+  visible: boolean;
+  locked: boolean;
+  sequence_index: number;
+  overrides: ObjectRoutingOverrides;
 }
 
 /** Axis-aligned bounding box. */

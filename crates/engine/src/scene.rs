@@ -7,6 +7,7 @@
 use std::collections::HashMap;
 
 use crate::Color;
+use crate::export_pipeline::{EntryExitMode, TieMode};
 use crate::path::BoundingBox;
 use crate::shapes::ShapeData;
 
@@ -132,6 +133,66 @@ pub struct Scene {
     root_children: Vec<NodeId>,
     /// Next available node ID.
     next_id: u64,
+    /// Per-shape sequencer/routing metadata.
+    shape_meta: HashMap<NodeId, ShapeSequencerMeta>,
+    /// Next sequencer index to assign to new shape objects.
+    next_sequencer_index: u64,
+}
+
+/// Per-shape metadata used by sequencer-first export routing.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ShapeSequencerMeta {
+    pub sequencer_index: u64,
+    pub allow_reverse_override: Option<bool>,
+    pub entry_exit_override: Option<EntryExitMode>,
+    pub tie_mode_override: Option<TieMode>,
+}
+
+impl ShapeSequencerMeta {
+    fn with_index(sequencer_index: u64) -> Self {
+        Self {
+            sequencer_index,
+            allow_reverse_override: None,
+            entry_exit_override: None,
+            tie_mode_override: None,
+        }
+    }
+}
+
+/// Editable routing overrides for a single stitch object.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
+pub struct ObjectRoutingOverrides {
+    #[serde(default)]
+    pub allow_reverse: Option<bool>,
+    #[serde(default)]
+    pub entry_exit_mode: Option<EntryExitMode>,
+    #[serde(default)]
+    pub tie_mode: Option<TieMode>,
+}
+
+/// Stitch-plan row consumed by the sequencer panel.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct StitchPlanRow {
+    /// Stable block id (currently shape node id).
+    pub block_id: NodeId,
+    /// Source shape node id.
+    pub node_id: NodeId,
+    /// Parent in scene tree, for reference only.
+    pub parent: Option<NodeId>,
+    /// Display name.
+    pub name: String,
+    /// Stitch type from object params.
+    pub stitch_type: crate::StitchType,
+    /// Primary thread color.
+    pub color: Option<Color>,
+    /// Effective visibility (layer visibility folded in).
+    pub visible: bool,
+    /// Effective lock (layer locks folded in).
+    pub locked: bool,
+    /// Sequencer execution index.
+    pub sequence_index: u64,
+    /// Optional routing overrides.
+    pub overrides: ObjectRoutingOverrides,
 }
 
 impl Scene {
@@ -141,6 +202,8 @@ impl Scene {
             nodes: HashMap::new(),
             root_children: Vec::new(),
             next_id: 1,
+            shape_meta: HashMap::new(),
+            next_sequencer_index: 1,
         }
     }
 
@@ -194,6 +257,7 @@ impl Scene {
         };
 
         self.nodes.insert(id, node);
+        self.ensure_shape_meta(id);
 
         if let Some(pid) = parent {
             self.nodes
@@ -236,7 +300,9 @@ impl Scene {
 
         self.nodes
             .remove(&id)
-            .ok_or_else(|| format!("Node {:?} already removed", id))
+            .ok_or_else(|| format!("Node {:?} already removed", id))?;
+        self.shape_meta.remove(&id);
+        Ok(node)
     }
 
     /// Get an immutable reference to a node.
@@ -431,6 +497,7 @@ impl Scene {
         };
 
         self.nodes.insert(id, node);
+        self.ensure_shape_meta(id);
 
         if let Some(pid) = parent {
             self.nodes
@@ -454,6 +521,187 @@ impl Scene {
         }
         self.nodes.insert(id, node);
         Ok(())
+    }
+
+    /// Get a shape's sequencer/routing metadata.
+    pub fn get_shape_meta(&self, id: NodeId) -> Option<&ShapeSequencerMeta> {
+        self.shape_meta.get(&id)
+    }
+
+    /// Restore shape metadata for a node (used by undo snapshot restore).
+    pub fn restore_shape_meta(&mut self, id: NodeId, meta: ShapeSequencerMeta) {
+        self.next_sequencer_index = self.next_sequencer_index.max(meta.sequencer_index + 1);
+        self.shape_meta.insert(id, meta);
+    }
+
+    fn ensure_shape_meta(&mut self, id: NodeId) {
+        let is_shape = self
+            .nodes
+            .get(&id)
+            .is_some_and(|n| matches!(n.kind, NodeKind::Shape { .. }));
+        if !is_shape {
+            self.shape_meta.remove(&id);
+            return;
+        }
+
+        self.shape_meta.entry(id).or_insert_with(|| {
+            let idx = self.next_sequencer_index;
+            self.next_sequencer_index += 1;
+            ShapeSequencerMeta::with_index(idx)
+        });
+    }
+
+    /// Return shape ids sorted by sequencer order.
+    pub fn sequencer_shape_ids(&self) -> Vec<NodeId> {
+        let mut ids: Vec<NodeId> = self
+            .nodes
+            .values()
+            .filter(|node| matches!(node.kind, NodeKind::Shape { .. }))
+            .map(|node| node.id)
+            .collect();
+
+        ids.sort_by(|a, b| {
+            let ai = self
+                .shape_meta
+                .get(a)
+                .map(|m| m.sequencer_index)
+                .unwrap_or(u64::MAX);
+            let bi = self
+                .shape_meta
+                .get(b)
+                .map(|m| m.sequencer_index)
+                .unwrap_or(u64::MAX);
+            ai.cmp(&bi).then_with(|| a.0.cmp(&b.0))
+        });
+        ids
+    }
+
+    /// Reorder a shape within sequencer execution order.
+    pub fn reorder_sequencer_shape(&mut self, id: NodeId, new_index: usize) -> Result<(), String> {
+        if !self
+            .nodes
+            .get(&id)
+            .is_some_and(|n| matches!(n.kind, NodeKind::Shape { .. }))
+        {
+            return Err(format!("Node {:?} is not a Shape", id));
+        }
+
+        let mut ordered = self.sequencer_shape_ids();
+        let current_index = ordered
+            .iter()
+            .position(|candidate| *candidate == id)
+            .ok_or_else(|| format!("Shape {:?} not found in sequencer order", id))?;
+        ordered.remove(current_index);
+        let target = new_index.min(ordered.len());
+        ordered.insert(target, id);
+
+        for (idx, shape_id) in ordered.iter().enumerate() {
+            let meta = self
+                .shape_meta
+                .entry(*shape_id)
+                .or_insert_with(|| ShapeSequencerMeta::with_index((idx + 1) as u64));
+            meta.sequencer_index = (idx + 1) as u64;
+        }
+        self.next_sequencer_index = (ordered.len() as u64) + 1;
+        Ok(())
+    }
+
+    /// Update object-level routing overrides for a shape.
+    pub fn set_object_routing_overrides(
+        &mut self,
+        id: NodeId,
+        overrides: ObjectRoutingOverrides,
+    ) -> Result<(), String> {
+        if !self
+            .nodes
+            .get(&id)
+            .is_some_and(|n| matches!(n.kind, NodeKind::Shape { .. }))
+        {
+            return Err(format!("Node {:?} is not a Shape", id));
+        }
+        let meta = self.shape_meta.entry(id).or_insert_with(|| {
+            let idx = self.next_sequencer_index;
+            self.next_sequencer_index += 1;
+            ShapeSequencerMeta::with_index(idx)
+        });
+        meta.allow_reverse_override = overrides.allow_reverse;
+        meta.entry_exit_override = overrides.entry_exit_mode;
+        meta.tie_mode_override = overrides.tie_mode;
+        Ok(())
+    }
+
+    /// Get object-level routing overrides for a shape.
+    pub fn object_routing_overrides(&self, id: NodeId) -> ObjectRoutingOverrides {
+        if let Some(meta) = self.shape_meta.get(&id) {
+            return ObjectRoutingOverrides {
+                allow_reverse: meta.allow_reverse_override,
+                entry_exit_mode: meta.entry_exit_override,
+                tie_mode: meta.tie_mode_override,
+            };
+        }
+        ObjectRoutingOverrides::default()
+    }
+
+    /// Build stitch-plan rows in sequencer order.
+    pub fn get_stitch_plan_rows(&self) -> Vec<StitchPlanRow> {
+        let mut rows = Vec::new();
+        for id in self.sequencer_shape_ids() {
+            let Some(node) = self.nodes.get(&id) else {
+                continue;
+            };
+            let NodeKind::Shape {
+                fill,
+                stroke,
+                stitch,
+                ..
+            } = &node.kind
+            else {
+                continue;
+            };
+            let sequence_index = self
+                .shape_meta
+                .get(&id)
+                .map(|m| m.sequencer_index)
+                .unwrap_or(u64::MAX);
+            rows.push(StitchPlanRow {
+                block_id: id,
+                node_id: id,
+                parent: node.parent,
+                name: node.name.clone(),
+                stitch_type: stitch.stitch_type,
+                color: (*stroke).or(*fill),
+                visible: !self.is_in_hidden_layer(id),
+                locked: self.is_in_locked_layer(id),
+                sequence_index,
+                overrides: self.object_routing_overrides(id),
+            });
+        }
+        rows
+    }
+
+    /// Get render items in sequencer order (fallback to render order for shapes
+    /// with missing metadata).
+    pub fn render_list_sequencer_order(&self) -> Vec<RenderItem> {
+        let render_items = self.render_list();
+        let mut by_id: HashMap<NodeId, RenderItem> =
+            render_items.iter().cloned().map(|it| (it.id, it)).collect();
+
+        let mut ordered = Vec::with_capacity(render_items.len());
+        for shape_id in self.sequencer_shape_ids() {
+            if let Some(item) = by_id.remove(&shape_id) {
+                ordered.push(item);
+            }
+        }
+
+        for item in render_items {
+            let item_id = item.id;
+            if by_id.contains_key(&item_id) {
+                ordered.push(item);
+                by_id.remove(&item_id);
+            }
+        }
+
+        ordered
     }
 
     /// Re-attach a restored node to its parent at a specific index (for undo).
@@ -550,6 +798,24 @@ impl Scene {
             if let Some(node) = self.nodes.get(&cid) {
                 if let NodeKind::Layer { visible, .. } = &node.kind
                     && !visible
+                {
+                    return true;
+                }
+                current = node.parent;
+            } else {
+                break;
+            }
+        }
+        false
+    }
+
+    /// Check if a node is inside a locked layer.
+    fn is_in_locked_layer(&self, id: NodeId) -> bool {
+        let mut current = Some(id);
+        while let Some(cid) = current {
+            if let Some(node) = self.nodes.get(&cid) {
+                if let NodeKind::Layer { locked, .. } = &node.kind
+                    && *locked
                 {
                     return true;
                 }
@@ -1346,5 +1612,124 @@ mod tests {
         assert_eq!(tree[0].children.len(), 2, "Layer has 2 children");
         assert_eq!(tree[0].children[0].name, "R1");
         assert_eq!(tree[0].children[1].name, "R2");
+    }
+
+    #[test]
+    fn test_sequencer_reorder_updates_shape_order() {
+        let mut scene = Scene::new();
+        let a = scene
+            .add_node(
+                "A",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(5.0, 5.0, 0.0)),
+                    fill: Some(Color::new(255, 0, 0, 255)),
+                    stroke: None,
+                    stroke_width: 0.0,
+                    stitch: crate::StitchParams::default(),
+                },
+                None,
+            )
+            .unwrap();
+        let b = scene
+            .add_node(
+                "B",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(5.0, 5.0, 0.0)),
+                    fill: Some(Color::new(0, 255, 0, 255)),
+                    stroke: None,
+                    stroke_width: 0.0,
+                    stitch: crate::StitchParams::default(),
+                },
+                None,
+            )
+            .unwrap();
+        let c = scene
+            .add_node(
+                "C",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(5.0, 5.0, 0.0)),
+                    fill: Some(Color::new(0, 0, 255, 255)),
+                    stroke: None,
+                    stroke_width: 0.0,
+                    stitch: crate::StitchParams::default(),
+                },
+                None,
+            )
+            .unwrap();
+
+        assert_eq!(scene.sequencer_shape_ids(), vec![a, b, c]);
+        scene.reorder_sequencer_shape(c, 0).unwrap();
+        assert_eq!(scene.sequencer_shape_ids(), vec![c, a, b]);
+        assert_eq!(
+            scene
+                .get_stitch_plan_rows()
+                .iter()
+                .map(|row| row.block_id)
+                .collect::<Vec<NodeId>>(),
+            vec![c, a, b]
+        );
+    }
+
+    #[test]
+    fn test_object_routing_overrides_roundtrip() {
+        let mut scene = Scene::new();
+        let id = scene
+            .add_node(
+                "Path",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(8.0, 8.0, 0.0)),
+                    fill: None,
+                    stroke: Some(Color::new(0, 0, 0, 255)),
+                    stroke_width: 0.4,
+                    stitch: crate::StitchParams::default(),
+                },
+                None,
+            )
+            .unwrap();
+
+        let overrides = ObjectRoutingOverrides {
+            allow_reverse: Some(false),
+            entry_exit_mode: Some(EntryExitMode::PreserveShapeStart),
+            tie_mode: Some(TieMode::ColorChange),
+        };
+        scene
+            .set_object_routing_overrides(id, overrides.clone())
+            .unwrap();
+        assert_eq!(scene.object_routing_overrides(id), overrides);
+    }
+
+    #[test]
+    fn test_stitch_plan_rows_include_visibility_and_locked_state() {
+        let mut scene = Scene::new();
+        let hidden_layer = scene
+            .add_node(
+                "Hidden",
+                NodeKind::Layer {
+                    name: "Hidden".to_string(),
+                    visible: false,
+                    locked: true,
+                },
+                None,
+            )
+            .unwrap();
+        let shape = scene
+            .add_node(
+                "Rect",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(8.0, 8.0, 0.0)),
+                    fill: Some(Color::new(255, 0, 0, 255)),
+                    stroke: None,
+                    stroke_width: 0.0,
+                    stitch: crate::StitchParams::default(),
+                },
+                Some(hidden_layer),
+            )
+            .unwrap();
+
+        let rows = scene.get_stitch_plan_rows();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].node_id, shape);
+        assert!(!rows[0].visible);
+        assert!(rows[0].locked);
     }
 }
