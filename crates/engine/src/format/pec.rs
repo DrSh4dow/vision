@@ -76,6 +76,14 @@ pub static PEC_COLORS: [(u8, u8, u8); 65] = [
     (255, 200, 200), // 64: Applique
 ];
 
+/// Export stitch data to raw PEC bytes.
+pub fn export_pec(design: &ExportDesign) -> Result<Vec<u8>, String> {
+    if design.stitches.is_empty() {
+        return Err("Design must contain at least one stitch".to_string());
+    }
+    Ok(write_pec_block(design))
+}
+
 /// Find the nearest PEC palette index for a given RGB color.
 pub fn nearest_pec_color(r: u8, g: u8, b: u8) -> u8 {
     let r = r as i32;

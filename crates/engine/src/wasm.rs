@@ -173,6 +173,14 @@ pub fn export_pes(design_json: &str) -> Result<Vec<u8>, JsError> {
     format::pes::export_pes(&design).map_err(|e| JsError::new(&e))
 }
 
+/// Export stitch data to PEC format.
+#[wasm_bindgen]
+pub fn export_pec(design_json: &str) -> Result<Vec<u8>, JsError> {
+    let design: format::ExportDesign = serde_json::from_str(design_json)
+        .map_err(|e| JsError::new(&format!("Invalid design JSON: {e}")))?;
+    format::pec::export_pec(&design).map_err(|e| JsError::new(&e))
+}
+
 /// Convert the current scene graph to an `ExportDesign` JSON string.
 ///
 /// Walks visible shapes, generates configured stitch types, applies routing
@@ -267,6 +275,36 @@ pub fn scene_quality_metrics_with_options(
     .map_err(|e| JsError::new(&e))?;
     let metrics = crate::export_pipeline::compute_quality_metrics(&design, stitch_length);
     serde_json::to_string(&metrics).map_err(|e| JsError::new(&format!("Serialization error: {e}")))
+}
+
+/// Build simulation timeline metadata from the current scene export.
+#[wasm_bindgen]
+pub fn scene_simulation_timeline(stitch_length: f64) -> Result<String, JsError> {
+    let design = with_scene(|s| crate::export_pipeline::scene_to_export_design(s, stitch_length))
+        .map_err(|e| JsError::new(&e))?;
+    let timeline = crate::export_pipeline::build_simulation_timeline(&design);
+    serde_json::to_string(&timeline).map_err(|e| JsError::new(&format!("Serialization error: {e}")))
+}
+
+/// Build simulation timeline metadata from the current scene export with routing options.
+#[wasm_bindgen]
+pub fn scene_simulation_timeline_with_options(
+    stitch_length: f64,
+    routing_options_json: &str,
+) -> Result<String, JsError> {
+    let routing = if routing_options_json.trim().is_empty() {
+        crate::export_pipeline::RoutingOptions::default()
+    } else {
+        serde_json::from_str::<crate::export_pipeline::RoutingOptions>(routing_options_json)
+            .map_err(|e| JsError::new(&format!("Invalid routing options: {e}")))?
+    };
+
+    let design = with_scene(|s| {
+        crate::export_pipeline::scene_to_export_design_with_routing(s, stitch_length, routing)
+    })
+    .map_err(|e| JsError::new(&e))?;
+    let timeline = crate::export_pipeline::build_simulation_timeline(&design);
+    serde_json::to_string(&timeline).map_err(|e| JsError::new(&format!("Serialization error: {e}")))
 }
 
 // =============================================================================
@@ -585,6 +623,16 @@ pub fn scene_get_sequence_track() -> Result<String, JsError> {
     with_scene(|s| {
         let track = s.sequence_track().clone();
         serde_json::to_string(&track)
+            .map_err(|e| JsError::new(&format!("Serialization error: {e}")))
+    })
+}
+
+/// Get scene validation diagnostics as JSON.
+#[wasm_bindgen]
+pub fn scene_validation_diagnostics() -> Result<String, JsError> {
+    with_scene(|s| {
+        let diagnostics = s.validation_diagnostics();
+        serde_json::to_string(&diagnostics)
             .map_err(|e| JsError::new(&format!("Serialization error: {e}")))
     })
 }

@@ -156,6 +156,18 @@ export function ImportExportActions({
     }
   }, [engine, routingOptions]);
 
+  const handleExportPec = useCallback(() => {
+    try {
+      const metrics = engine.sceneRouteMetricsWithOptions(DEFAULT_STITCH_LENGTH, routingOptions);
+      console.info("PEC route metrics", metrics);
+      const design = engine.sceneExportDesignWithOptions(DEFAULT_STITCH_LENGTH, routingOptions);
+      const data = engine.exportPec(design);
+      downloadFile(data, "design.pec", "application/octet-stream");
+    } catch (err) {
+      console.warn("PEC export failed:", err);
+    }
+  }, [engine, routingOptions]);
+
   return (
     <div className="relative flex items-center gap-0.5">
       <input
@@ -258,6 +270,21 @@ export function ImportExportActions({
           </Button>
         </TooltipTrigger>
         <TooltipContent>Export PES (Brother)</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+            onClick={handleExportPec}
+            data-testid="export-pec-btn"
+          >
+            <Download className="!size-3" />
+            PEC
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Export PEC</TooltipContent>
       </Tooltip>
 
       {showRoutingPanel && (

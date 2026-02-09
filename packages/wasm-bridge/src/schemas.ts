@@ -131,6 +131,35 @@ export const QualityMetricsSchema = z.object({
   coverage_error_pct: z.number(),
 });
 
+const DiagnosticSeveritySchema = z.enum(["info", "warning", "error"]);
+
+export const SceneDiagnosticSchema = z.object({
+  code: z.string(),
+  message: z.string(),
+  severity: DiagnosticSeveritySchema,
+  node_id: z.number().nullable(),
+});
+
+export const SimulationTimelineSegmentSchema = z.object({
+  color_index: z.number(),
+  color: ColorSchema,
+  start_stitch_index: z.number(),
+  end_stitch_index: z.number(),
+  stitch_count: z.number(),
+  normal_count: z.number(),
+  jump_count: z.number(),
+  trim_count: z.number(),
+  color_change_count: z.number(),
+});
+
+export const SimulationTimelineSchema = z.object({
+  total_stitches: z.number(),
+  total_steps: z.number(),
+  segments: z.array(SimulationTimelineSegmentSchema),
+  stitches: z.array(ExportStitchSchema),
+  colors: z.array(ColorSchema),
+});
+
 const RoutingPolicySchema = z.enum(["balanced", "min_travel", "min_trims"]);
 const RoutingEntryExitModeSchema = z.enum(["auto", "preserve_shape_start", "user_anchor"]);
 const RoutingTieModeSchema = z.enum(["off", "shape_start_end", "color_change"]);

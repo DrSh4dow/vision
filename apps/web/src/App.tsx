@@ -1,13 +1,14 @@
 import type {
-  ExportDesign,
   NodeKindData,
   RenderItem,
   RoutingOptions,
+  SimulationTimeline,
   StitchParams,
 } from "@vision/wasm-bridge";
 import { Circle, MousePointer2, PenTool, Square } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { DiagnosticsPanel } from "@/components/DiagnosticsPanel";
 import { ImportExportActions } from "@/components/ImportExportActions";
 import { PropertiesPanel } from "@/components/PropertiesPanel";
 import { SequencerPanel } from "@/components/SequencerPanel";
@@ -50,62 +51,40 @@ function colorToCss(color: { r: number; g: number; b: number }): string {
   return `rgb(${color.r}, ${color.g}, ${color.b})`;
 }
 
+type SimulationPreviewMode = "fast" | "quality";
+
 function buildStitchOverlays(
-  design: ExportDesign,
-  playhead?: number,
+  timeline: SimulationTimeline,
+  playhead: number,
+  previewMode: SimulationPreviewMode,
 ): CanvasData["stitchOverlays"] {
-  if (design.stitches.length === 0 || design.colors.length === 0) {
+  if (timeline.stitches.length === 0 || timeline.segments.length === 0) {
     return [];
   }
 
-  const overlays: CanvasData["stitchOverlays"] = [];
-  let colorIndex = 0;
-  let current = {
-    id: `stitch-${colorIndex}`,
-    label: `Thread ${colorIndex + 1}`,
-    points: [] as DesignPoint[],
-    commands: [] as ExportDesign["stitches"][number]["stitch_type"][],
-    color: colorToCss(design.colors[colorIndex]),
-    showDots: false,
-    simulateThread: true,
-    threadWidthMm: 0.35,
-    playhead,
-  };
-
-  for (const stitch of design.stitches) {
-    if (stitch.stitch_type === "End") {
-      continue;
-    }
-
-    const p = { x: stitch.x, y: stitch.y };
-    current.points.push(p);
-    current.commands.push(stitch.stitch_type);
-
-    if (stitch.stitch_type === "ColorChange") {
-      if (current.points.length > 1) {
-        overlays.push(current);
+  return timeline.segments
+    .map((segment) => {
+      const start = Math.max(0, segment.start_stitch_index);
+      const end = Math.min(timeline.stitches.length - 1, segment.end_stitch_index);
+      const stitches = timeline.stitches.slice(start, end + 1);
+      const points = stitches.map((stitch) => ({ x: stitch.x, y: stitch.y }));
+      const commands = stitches.map((stitch) => stitch.stitch_type);
+      if (points.length <= 1) {
+        return null;
       }
-      colorIndex += 1;
-      const nextColor = design.colors[Math.min(colorIndex, design.colors.length - 1)];
-      current = {
-        id: `stitch-${colorIndex}`,
-        label: `Thread ${colorIndex + 1}`,
-        points: [p],
-        commands: ["Jump"],
-        color: colorToCss(nextColor),
-        showDots: false,
-        simulateThread: true,
-        threadWidthMm: 0.35,
-        playhead,
+      return {
+        id: `stitch-${segment.color_index}-${start}`,
+        label: `Thread ${segment.color_index + 1}`,
+        points,
+        commands,
+        color: colorToCss(segment.color),
+        showDots: previewMode === "fast",
+        simulateThread: previewMode === "quality",
+        threadWidthMm: previewMode === "quality" ? 0.38 : 0.26,
+        playhead: Math.max(-1, playhead - start),
       };
-    }
-  }
-
-  if (current.points.length > 1) {
-    overlays.push(current);
-  }
-
-  return overlays;
+    })
+    .filter((overlay): overlay is NonNullable<typeof overlay> => overlay !== null);
 }
 
 export function App() {
@@ -114,6 +93,7 @@ export function App() {
   const [showThreadPreview, setShowThreadPreview] = useState(true);
   const [playbackEnabled, setPlaybackEnabled] = useState(false);
   const [playbackTick, setPlaybackTick] = useState(0);
+  const [simulationMode, setSimulationMode] = useState<SimulationPreviewMode>("quality");
   const [routingOptions, setRoutingOptions] = useState<RoutingOptions>(FALLBACK_ROUTING_OPTIONS);
   const [defaultStitchParams, setDefaultStitchParams] =
     useState<StitchParams>(DEFAULT_STITCH_PARAMS);
@@ -133,10 +113,13 @@ export function App() {
     let stitchOverlays = canvasDataRef.current.stitchOverlays;
     if (showThreadPreview) {
       try {
-        const design = engine.sceneExportDesignWithOptions(DEFAULT_STITCH_LENGTH, routingOptions);
-        const maxStep = Math.max(0, design.stitches.length - 1);
-        const playhead = playbackEnabled ? playbackTick % Math.max(1, maxStep) : maxStep;
-        stitchOverlays = buildStitchOverlays(design, playhead);
+        const timeline = engine.sceneSimulationTimelineWithOptions(
+          DEFAULT_STITCH_LENGTH,
+          routingOptions,
+        );
+        const totalSteps = Math.max(1, timeline.total_steps);
+        const playhead = playbackEnabled ? playbackTick % totalSteps : totalSteps - 1;
+        stitchOverlays = buildStitchOverlays(timeline, playhead, simulationMode);
       } catch (_err) {
         stitchOverlays = [];
       }
@@ -149,7 +132,7 @@ export function App() {
       renderItems: items,
       stitchOverlays,
     };
-  }, [engine, playbackEnabled, playbackTick, routingOptions, showThreadPreview]);
+  }, [engine, playbackEnabled, playbackTick, routingOptions, showThreadPreview, simulationMode]);
 
   const { selectedIds, selectNode, deselectAll } = useSelection(engine, refreshScene);
   const { penState, addPoint, finishPath, cancelPath } = usePenTool(
@@ -411,6 +394,18 @@ export function App() {
                 >
                   {playbackEnabled ? "Stop" : "Play"}
                 </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-[10px] text-muted-foreground hover:text-foreground"
+                  onClick={() =>
+                    setSimulationMode((prev) => (prev === "quality" ? "fast" : "quality"))
+                  }
+                  disabled={!showThreadPreview}
+                  data-testid="toggle-simulation-mode"
+                >
+                  {simulationMode === "quality" ? "Sim Quality" : "Sim Fast"}
+                </Button>
               </>
             )}
           </div>
@@ -520,6 +515,17 @@ export function App() {
                 <SectionHeader>Thread Palette</SectionHeader>
                 <div className="px-3 pb-3">
                   <ThreadPalettePanel engine={engine} />
+                </div>
+
+                <div className="mx-3 border-t border-border/50" />
+
+                <SectionHeader>Diagnostics</SectionHeader>
+                <div className="px-3 pb-3">
+                  <DiagnosticsPanel
+                    engine={engine}
+                    selectedIds={selectedIds}
+                    onSelectNode={selectNode}
+                  />
                 </div>
               </>
             )}

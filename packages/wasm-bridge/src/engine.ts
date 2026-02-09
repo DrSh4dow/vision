@@ -19,8 +19,10 @@ import type {
   RouteMetrics,
   RoutingOptions,
   SatinResult,
+  SceneDiagnostic,
   SceneNodeInfo,
   SequenceTrack,
+  SimulationTimeline,
   StitchBlock,
   StitchParams,
   StitchPlanRow,
@@ -73,6 +75,9 @@ export interface VisionEngine {
   /** Export design to PES (Brother) format. */
   exportPes(design: ExportDesign): Uint8Array;
 
+  /** Export design to PEC (Brother color block) format. */
+  exportPec(design: ExportDesign): Uint8Array;
+
   /**
    * Generate an ExportDesign from the current scene graph.
    * Walks visible shapes, generates running stitches along outlines.
@@ -94,6 +99,15 @@ export interface VisionEngine {
 
   /** Compute extended quality metrics with explicit routing options. */
   sceneQualityMetricsWithOptions(stitchLength: number, options: RoutingOptions): QualityMetrics;
+
+  /** Build simulation timeline metadata for scene export. */
+  sceneSimulationTimeline(stitchLength: number): SimulationTimeline;
+
+  /** Build simulation timeline metadata with explicit routing options. */
+  sceneSimulationTimelineWithOptions(
+    stitchLength: number,
+    options: RoutingOptions,
+  ): SimulationTimeline;
 
   /** Return canonical engine defaults for stitch params. */
   engineDefaultStitchParams(): StitchParams;
@@ -157,6 +171,9 @@ export interface VisionEngine {
 
   /** Get sequence-track ordering data. */
   sceneGetSequenceTrack(): SequenceTrack;
+
+  /** Get deterministic validation diagnostics for scene/preflight. */
+  sceneValidationDiagnostics(): SceneDiagnostic[];
 
   /** Get the render list (visible shapes with world transforms). */
   sceneGetRenderList(): RenderItem[];

@@ -185,6 +185,33 @@ test.describe("Import/Export Actions", () => {
     expect(download.suggestedFilename()).toBe("design.pes");
   });
 
+  test("export PEC triggers download after shape creation", async ({ page }) => {
+    const canvas = page.getByTestId("design-canvas");
+    await expect(canvas).toBeVisible();
+
+    await page.getByTestId("tool-rect").click();
+    const box = await canvas.boundingBox();
+    if (!box) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    await page.mouse.move(cx - 40, cy - 40);
+    await page.mouse.down();
+    await page.mouse.move(cx + 40, cy + 40, { steps: 5 });
+    await page.mouse.up();
+
+    await expect(page.locator("[data-testid^='sequencer-row-']")).toHaveCount(1, {
+      timeout: 3_000,
+    });
+
+    const pecBtn = page.getByTestId("export-pec-btn");
+    await expect(pecBtn).toBeVisible();
+
+    const downloadPromise = page.waitForEvent("download", { timeout: 5_000 });
+    await pecBtn.click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe("design.pec");
+  });
+
   test("satin controls are available for selected shapes", async ({ page }) => {
     const canvas = page.getByTestId("design-canvas");
     await expect(canvas).toBeVisible();
@@ -239,6 +266,7 @@ test.describe("Import/Export Actions", () => {
   test("routing reverse toggle is available", async ({ page }) => {
     await expect(page.getByTestId("routing-policy-select")).toBeVisible();
     await expect(page.getByTestId("routing-allow-reverse")).toBeVisible();
+    await expect(page.getByTestId("toggle-simulation-mode")).toBeVisible();
   });
 
   test("advanced routing controls and metrics panel are available", async ({ page }) => {
@@ -256,6 +284,37 @@ test.describe("Import/Export Actions", () => {
     await expect(page.getByTestId("routing-allow-color-merge")).toBeVisible();
     await expect(page.getByTestId("routing-metrics-panel")).toBeVisible();
     await expect(page.getByTestId("routing-metrics-inline")).toBeVisible();
+    await expect(page.getByTestId("quality-metrics-panel")).toBeVisible();
+  });
+});
+
+test.describe("Diagnostics Panel", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/");
+    const status = page.getByTestId("engine-status");
+    await expect(status).toContainText(/Engine v/, { timeout: 15_000 });
+  });
+
+  test("open tatami path appears in diagnostics", async ({ page }) => {
+    const canvas = page.getByTestId("design-canvas");
+    await page.getByTestId("tool-pen").click();
+    const box = await canvas.boundingBox();
+    if (!box) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    await page.mouse.click(cx - 50, cy - 30);
+    await page.mouse.click(cx + 20, cy - 10);
+    await page.mouse.click(cx + 10, cy + 35);
+    await page.keyboard.press("Enter");
+
+    const stitchType = page.getByTestId("prop-stitch-type");
+    await expect(stitchType).toBeVisible();
+    await stitchType.selectOption("tatami");
+
+    await expect(page.getByTestId("diagnostics-panel")).toBeVisible();
+    await expect(page.getByTestId("diagnostics-count-error")).not.toHaveText("0", {
+      timeout: 3_000,
+    });
   });
 });
 

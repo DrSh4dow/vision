@@ -244,6 +244,24 @@ pub struct StitchPlanRow {
     pub overrides: ObjectRoutingOverrides,
 }
 
+/// Severity level for scene validation diagnostics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DiagnosticSeverity {
+    Info,
+    Warning,
+    Error,
+}
+
+/// Deterministic validation diagnostic for stitch-plan and geometry issues.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SceneDiagnostic {
+    pub code: String,
+    pub message: String,
+    pub severity: DiagnosticSeverity,
+    pub node_id: Option<NodeId>,
+}
+
 impl Scene {
     /// Create a new empty scene.
     pub fn new() -> Self {
@@ -896,6 +914,128 @@ impl Scene {
         ordered
     }
 
+    /// Compute deterministic scene validation diagnostics.
+    ///
+    /// Used by UI diagnostics panels and export preflight checks.
+    pub fn validation_diagnostics(&self) -> Vec<SceneDiagnostic> {
+        let mut diagnostics = Vec::new();
+        let mut shape_ids: Vec<NodeId> = self
+            .nodes
+            .values()
+            .filter(|node| matches!(node.kind, NodeKind::Shape { .. }))
+            .map(|node| node.id)
+            .collect();
+        shape_ids.sort_by_key(|id| id.0);
+
+        for id in shape_ids {
+            let Some(node) = self.nodes.get(&id) else {
+                continue;
+            };
+            let NodeKind::Shape {
+                shape,
+                stitch,
+                fill,
+                stroke,
+                ..
+            } = &node.kind
+            else {
+                continue;
+            };
+
+            let bbox = shape.bounding_box();
+            if bbox.is_empty() || bbox.width() <= f64::EPSILON || bbox.height() <= f64::EPSILON {
+                diagnostics.push(SceneDiagnostic {
+                    code: "geometry.empty".to_string(),
+                    message: format!("{} has empty geometry and cannot be stitched.", node.name),
+                    severity: DiagnosticSeverity::Error,
+                    node_id: Some(id),
+                });
+                continue;
+            }
+
+            if bbox.width() < 0.4 || bbox.height() < 0.4 {
+                diagnostics.push(SceneDiagnostic {
+                    code: "geometry.tiny_shape".to_string(),
+                    message: format!(
+                        "{} is very small ({:.2}x{:.2}mm) and may stitch poorly.",
+                        node.name,
+                        bbox.width(),
+                        bbox.height()
+                    ),
+                    severity: DiagnosticSeverity::Warning,
+                    node_id: Some(id),
+                });
+            }
+
+            if !stitch.density.is_finite() || stitch.density <= 0.0 {
+                diagnostics.push(SceneDiagnostic {
+                    code: "params.invalid_density".to_string(),
+                    message: format!("{} has invalid stitch density.", node.name),
+                    severity: DiagnosticSeverity::Error,
+                    node_id: Some(id),
+                });
+            }
+
+            if !stitch.angle.is_finite() {
+                diagnostics.push(SceneDiagnostic {
+                    code: "params.invalid_angle".to_string(),
+                    message: format!("{} has invalid stitch angle.", node.name),
+                    severity: DiagnosticSeverity::Error,
+                    node_id: Some(id),
+                });
+            }
+
+            let is_fill_stitch = matches!(
+                stitch.stitch_type,
+                crate::StitchType::Tatami
+                    | crate::StitchType::Contour
+                    | crate::StitchType::Spiral
+                    | crate::StitchType::Motif
+            );
+            if is_fill_stitch && !shape.to_path().is_closed() {
+                diagnostics.push(SceneDiagnostic {
+                    code: "geometry.fill_requires_closed_path".to_string(),
+                    message: format!(
+                        "{} uses a fill stitch type but has an open path.",
+                        node.name
+                    ),
+                    severity: DiagnosticSeverity::Error,
+                    node_id: Some(id),
+                });
+            }
+
+            if stroke.is_none() && fill.is_none() {
+                diagnostics.push(SceneDiagnostic {
+                    code: "params.missing_thread_color".to_string(),
+                    message: format!("{} has no fill/stroke color for thread mapping.", node.name),
+                    severity: DiagnosticSeverity::Warning,
+                    node_id: Some(id),
+                });
+            }
+
+            let overrides = self.object_routing_overrides(id);
+            if matches!(overrides.entry_exit_mode, Some(EntryExitMode::UserAnchor)) {
+                diagnostics.push(SceneDiagnostic {
+                    code: "routing.user_anchor_pending".to_string(),
+                    message: format!(
+                        "{} requests user-anchor entry/exit but anchor editing is not implemented yet.",
+                        node.name
+                    ),
+                    severity: DiagnosticSeverity::Warning,
+                    node_id: Some(id),
+                });
+            }
+        }
+
+        diagnostics.sort_by(|a, b| {
+            severity_rank(a.severity)
+                .cmp(&severity_rank(b.severity))
+                .then_with(|| a.node_id.map(|id| id.0).cmp(&b.node_id.map(|id| id.0)))
+                .then_with(|| a.code.cmp(&b.code))
+        });
+        diagnostics
+    }
+
     /// Re-attach a restored node to its parent at a specific index (for undo).
     pub(crate) fn reattach_node(
         &mut self,
@@ -1249,6 +1389,14 @@ fn point_to_segment_dist_sq(p: crate::Point, a: crate::Point, b: crate::Point) -
     ex * ex + ey * ey
 }
 
+fn severity_rank(severity: DiagnosticSeverity) -> u8 {
+    match severity {
+        DiagnosticSeverity::Error => 0,
+        DiagnosticSeverity::Warning => 1,
+        DiagnosticSeverity::Info => 2,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1320,6 +1468,89 @@ mod tests {
 
         let rect = scene.get_node(rect_id).unwrap();
         assert_eq!(rect.parent, Some(layer_id));
+    }
+
+    #[test]
+    fn test_validation_diagnostics_reports_fill_requires_closed_path() {
+        let mut scene = Scene::new();
+        let layer_id = scene
+            .add_node(
+                "Layer 1",
+                NodeKind::Layer {
+                    name: "Layer 1".to_string(),
+                    visible: true,
+                    locked: false,
+                },
+                None,
+            )
+            .unwrap();
+
+        let mut path = crate::path::VectorPath::new();
+        path.move_to(crate::Point::new(0.0, 0.0));
+        path.line_to(crate::Point::new(10.0, 0.0));
+        path.line_to(crate::Point::new(10.0, 10.0));
+
+        scene
+            .add_node(
+                "Open Tatami",
+                NodeKind::Shape {
+                    shape: ShapeData::Path(path),
+                    fill: Some(Color::new(255, 0, 0, 200)),
+                    stroke: None,
+                    stroke_width: 0.2,
+                    stitch: crate::StitchParams {
+                        stitch_type: crate::StitchType::Tatami,
+                        ..crate::StitchParams::default()
+                    },
+                },
+                Some(layer_id),
+            )
+            .unwrap();
+
+        let diagnostics = scene.validation_diagnostics();
+        assert!(
+            diagnostics
+                .iter()
+                .any(|d| d.code == "geometry.fill_requires_closed_path")
+        );
+    }
+
+    #[test]
+    fn test_validation_diagnostics_reports_tiny_shape_warning() {
+        let mut scene = Scene::new();
+        let layer_id = scene
+            .add_node(
+                "Layer 1",
+                NodeKind::Layer {
+                    name: "Layer 1".to_string(),
+                    visible: true,
+                    locked: false,
+                },
+                None,
+            )
+            .unwrap();
+
+        scene
+            .add_node(
+                "Tiny Rect",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(0.2, 0.2, 0.0)),
+                    fill: Some(Color::new(100, 100, 100, 255)),
+                    stroke: None,
+                    stroke_width: 0.1,
+                    stitch: crate::StitchParams::default(),
+                },
+                Some(layer_id),
+            )
+            .unwrap();
+
+        let diagnostics = scene.validation_diagnostics();
+        assert!(
+            diagnostics
+                .iter()
+                .any(|d| d.code == "geometry.tiny_shape"
+                    && d.severity == DiagnosticSeverity::Warning)
+        );
     }
 
     #[test]

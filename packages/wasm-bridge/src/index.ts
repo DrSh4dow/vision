@@ -12,6 +12,7 @@ import initWasm, {
   engine_default_routing_options,
   engine_default_stitch_params,
   export_dst,
+  export_pec,
   export_pes,
   find_nearest_thread,
   generate_running_stitches,
@@ -50,9 +51,12 @@ import initWasm, {
   scene_set_path_commands,
   scene_set_stroke,
   scene_set_stroke_width,
+  scene_simulation_timeline,
+  scene_simulation_timeline_with_options,
   scene_undo,
   scene_update_kind,
   scene_update_transform,
+  scene_validation_diagnostics,
   StitchType as WasmStitchType,
   version as wasmVersion,
 } from "../pkg/vision_engine.js";
@@ -69,8 +73,10 @@ import {
   RouteMetricsSchema,
   RoutingOptionsSchema,
   SatinResultSchema,
+  SceneDiagnosticSchema,
   SceneNodeInfoSchema,
   SequenceTrackSchema,
+  SimulationTimelineSchema,
   StitchBlockSchema,
   StitchParamsSchema,
   StitchPlanRowSchema,
@@ -91,8 +97,10 @@ import type {
   RouteMetrics,
   RoutingOptions,
   SatinResult,
+  SceneDiagnostic,
   SceneNodeInfo,
   SequenceTrack,
+  SimulationTimeline,
   StitchBlock,
   StitchParams,
   StitchPlanRow,
@@ -117,8 +125,10 @@ export {
   RouteMetricsSchema,
   RoutingOptionsSchema,
   SatinResultSchema,
+  SceneDiagnosticSchema,
   SceneNodeInfoSchema,
   SequenceTrackSchema,
+  SimulationTimelineSchema,
   StitchBlockSchema,
   StitchParamsSchema,
   StitchPlanRowSchema,
@@ -150,9 +160,12 @@ export type {
   RoutingSequenceMode,
   RoutingTieMode,
   SatinResult,
+  SceneDiagnostic,
   SceneNodeInfo,
   SequenceTrack,
   ShapeKindData,
+  SimulationTimeline,
+  SimulationTimelineSegment,
   Stitch,
   StitchBlock,
   StitchParams,
@@ -265,6 +278,11 @@ export async function initEngine(): Promise<VisionEngine> {
         return export_pes(json);
       },
 
+      exportPec: (design: ExportDesign): Uint8Array => {
+        const json = JSON.stringify(design);
+        return export_pec(json);
+      },
+
       sceneExportDesign: (stitchLength: number): ExportDesign => {
         const json = scene_export_design(stitchLength);
         return ExportDesignSchema.parse(JSON.parse(json));
@@ -305,6 +323,20 @@ export async function initEngine(): Promise<VisionEngine> {
         const routing = RoutingOptionsSchema.parse(options);
         const json = scene_quality_metrics_with_options(stitchLength, JSON.stringify(routing));
         return QualityMetricsSchema.parse(JSON.parse(json));
+      },
+
+      sceneSimulationTimeline: (stitchLength: number): SimulationTimeline => {
+        const json = scene_simulation_timeline(stitchLength);
+        return SimulationTimelineSchema.parse(JSON.parse(json));
+      },
+
+      sceneSimulationTimelineWithOptions: (
+        stitchLength: number,
+        options: RoutingOptions,
+      ): SimulationTimeline => {
+        const routing = RoutingOptionsSchema.parse(options);
+        const json = scene_simulation_timeline_with_options(stitchLength, JSON.stringify(routing));
+        return SimulationTimelineSchema.parse(JSON.parse(json));
       },
 
       engineDefaultStitchParams: (): StitchParams => {
@@ -425,6 +457,12 @@ export async function initEngine(): Promise<VisionEngine> {
       sceneGetSequenceTrack: (): SequenceTrack => {
         const json = scene_get_sequence_track();
         return SequenceTrackSchema.parse(JSON.parse(json));
+      },
+
+      sceneValidationDiagnostics: (): SceneDiagnostic[] => {
+        const json = scene_validation_diagnostics();
+        const parsed: unknown = JSON.parse(json);
+        return (parsed as unknown[]).map((item) => SceneDiagnosticSchema.parse(item));
       },
 
       sceneGetRenderList: (): RenderItem[] => {

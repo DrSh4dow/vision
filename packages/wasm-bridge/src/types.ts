@@ -142,6 +142,39 @@ export interface QualityMetrics {
   coverage_error_pct: number;
 }
 
+/** Validation severity level for scene diagnostics. */
+export type DiagnosticSeverity = "info" | "warning" | "error";
+
+/** Deterministic scene validation diagnostic item. */
+export interface SceneDiagnostic {
+  code: string;
+  message: string;
+  severity: DiagnosticSeverity;
+  node_id: number | null;
+}
+
+/** Color segment metadata in simulation timeline output. */
+export interface SimulationTimelineSegment {
+  color_index: number;
+  color: Color;
+  start_stitch_index: number;
+  end_stitch_index: number;
+  stitch_count: number;
+  normal_count: number;
+  jump_count: number;
+  trim_count: number;
+  color_change_count: number;
+}
+
+/** Playback timeline payload used by simulation preview UIs. */
+export interface SimulationTimeline {
+  total_stitches: number;
+  total_steps: number;
+  segments: SimulationTimelineSegment[];
+  stitches: ExportStitch[];
+  colors: Color[];
+}
+
 /** Routing optimization policy. */
 export type RoutingPolicy = "balanced" | "min_travel" | "min_trims";
 /** Entry/exit mode for stitch blocks. */

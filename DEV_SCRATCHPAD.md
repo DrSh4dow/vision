@@ -18,11 +18,14 @@
 - Added Phase 1 dual gate script (`scripts/check-phase1-gate.sh`) to enforce both metric-threshold parity and visual snapshot parity.
 - Added Playwright visual baseline suite (`apps/web/e2e/visual.spec.ts`) with committed snapshots for home and satin-control workspace review.
 - Sequencer block reorder now executes against `SequenceTrack` directly (with metadata sync for compatibility) and is covered by a dedicated engine test.
+- Added deterministic scene diagnostics end-to-end (`Scene::validation_diagnostics` -> wasm -> bridge -> `DiagnosticsPanel`) for geometry/routing preflight visibility.
+- Added simulation timeline APIs (`sceneSimulationTimeline*`) and switched canvas thread preview to timeline-driven playback with `fast` / `quality` mode toggle.
+- Added PEC export end-to-end (`engine.exportPec`, UI action, e2e coverage) and introduced `scripts/check-production-gate.sh` to enforce one-command release gates.
 
 ## Next Priority Queue
-1. Phase 2 remaining: first-class `EmbroideryObject`/`StitchBlock`/`SequenceTrack` model separation.
-2. Deterministic geometry-edit -> stitch-block regen semantics + persistence invariants.
-3. Expand parity corpus beyond smoke fixtures and tune algorithm quality gaps vs `../inkstitch`.
+1. Phase 2 remaining: persist stitch-block command edits independent from source shape regeneration.
+2. Phase 5B: add true 3D thread renderer path (WebGL/WebGPU) behind quality mode.
+3. Phase 6/7: expand import coverage and lettering/monogram workflows with benchmark fixtures vs `../inkstitch`.
 
 ## Bench/Parity Notes
 - Reference source for behavior inspiration: `../inkstitch`.

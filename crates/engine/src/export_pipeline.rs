@@ -75,6 +75,30 @@ pub struct QualityMetrics {
     pub coverage_error_pct: f64,
 }
 
+/// A color segment in simulation playback timeline.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SimulationTimelineSegment {
+    pub color_index: usize,
+    pub color: Color,
+    pub start_stitch_index: usize,
+    pub end_stitch_index: usize,
+    pub stitch_count: usize,
+    pub normal_count: usize,
+    pub jump_count: usize,
+    pub trim_count: usize,
+    pub color_change_count: usize,
+}
+
+/// Simulation timeline metadata derived from an export design.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SimulationTimeline {
+    pub total_stitches: usize,
+    pub total_steps: usize,
+    pub segments: Vec<SimulationTimelineSegment>,
+    pub stitches: Vec<ExportStitch>,
+    pub colors: Vec<Color>,
+}
+
 /// Stitch routing policy for block ordering and travel handling.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -178,6 +202,87 @@ fn default_true() -> bool {
 
 fn default_min_stitch_run_before_trim_mm() -> f64 {
     2.0
+}
+
+/// Build simulation timeline metadata from an export design.
+pub fn build_simulation_timeline(design: &ExportDesign) -> SimulationTimeline {
+    let fallback_color = Color::new(220, 220, 220, 255);
+    let colors = if design.colors.is_empty() {
+        vec![fallback_color]
+    } else {
+        design.colors.clone()
+    };
+
+    if design.stitches.is_empty() {
+        return SimulationTimeline {
+            total_stitches: 0,
+            total_steps: 0,
+            segments: Vec::new(),
+            stitches: Vec::new(),
+            colors,
+        };
+    }
+
+    let mut color_index = 0usize;
+    let mut seg_start = 0usize;
+    let mut normal_count = 0usize;
+    let mut jump_count = 0usize;
+    let mut trim_count = 0usize;
+    let mut color_change_count = 0usize;
+    let mut segments = Vec::new();
+
+    for (index, stitch) in design.stitches.iter().enumerate() {
+        match stitch.stitch_type {
+            ExportStitchType::Normal => normal_count += 1,
+            ExportStitchType::Jump => jump_count += 1,
+            ExportStitchType::Trim => trim_count += 1,
+            ExportStitchType::ColorChange => {
+                color_change_count += 1;
+                segments.push(SimulationTimelineSegment {
+                    color_index,
+                    color: colors[color_index.min(colors.len() - 1)],
+                    start_stitch_index: seg_start,
+                    end_stitch_index: index,
+                    stitch_count: index + 1 - seg_start,
+                    normal_count,
+                    jump_count,
+                    trim_count,
+                    color_change_count,
+                });
+
+                color_index = (color_index + 1).min(colors.len().saturating_sub(1));
+                seg_start = index;
+                normal_count = 0;
+                jump_count = 0;
+                trim_count = 0;
+                color_change_count = 0;
+            }
+            ExportStitchType::End => {}
+        }
+    }
+
+    let last_index = design.stitches.len() - 1;
+    if seg_start <= last_index {
+        segments.push(SimulationTimelineSegment {
+            color_index,
+            color: colors[color_index.min(colors.len() - 1)],
+            start_stitch_index: seg_start,
+            end_stitch_index: last_index,
+            stitch_count: last_index + 1 - seg_start,
+            normal_count,
+            jump_count,
+            trim_count,
+            color_change_count,
+        });
+    }
+
+    SimulationTimeline {
+        total_stitches: design.stitches.len(),
+        total_steps: design.stitches.len(),
+        segments,
+        stitches: design.stitches.clone(),
+        colors,
+    }
 }
 
 /// Convert the current scene graph into an `ExportDesign` ready for file export.
@@ -2388,5 +2493,43 @@ mod tests {
         assert!(metrics.density_error_mm >= 0.0);
         assert!(metrics.angle_error_deg >= 0.0);
         assert!(metrics.coverage_error_pct >= 0.0);
+    }
+
+    #[test]
+    fn test_build_simulation_timeline_splits_color_segments() {
+        let design = ExportDesign {
+            name: "timeline".to_string(),
+            colors: vec![Color::new(255, 0, 0, 255), Color::new(0, 0, 255, 255)],
+            stitches: vec![
+                ExportStitch {
+                    x: 0.0,
+                    y: 0.0,
+                    stitch_type: ExportStitchType::Normal,
+                },
+                ExportStitch {
+                    x: 1.0,
+                    y: 0.0,
+                    stitch_type: ExportStitchType::ColorChange,
+                },
+                ExportStitch {
+                    x: 2.0,
+                    y: 0.0,
+                    stitch_type: ExportStitchType::Normal,
+                },
+                ExportStitch {
+                    x: 2.0,
+                    y: 0.0,
+                    stitch_type: ExportStitchType::End,
+                },
+            ],
+        };
+
+        let timeline = build_simulation_timeline(&design);
+        assert_eq!(timeline.total_stitches, design.stitches.len());
+        assert_eq!(timeline.total_steps, design.stitches.len());
+        assert_eq!(timeline.segments.len(), 2);
+        assert_eq!(timeline.segments[0].color_index, 0);
+        assert_eq!(timeline.segments[1].color_index, 1);
+        assert!(timeline.segments[0].end_stitch_index >= timeline.segments[0].start_stitch_index);
     }
 }

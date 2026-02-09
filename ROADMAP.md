@@ -65,6 +65,9 @@ Mandatory legal boundary:
 1. Phase 0: in progress (quality gates + benchmark harness hardening active).
 2. Phase 1: in progress (direct canvas drag-move shipped; remaining quality tuning active).
 3. Phase 2: in progress (sequencer-first controls + sequence-track-native reorder shipped; deeper routing parity pending).
+4. Phase 4: in progress (deterministic scene diagnostics API + diagnostics panel shipped; auto-repair pipeline pending).
+5. Phase 5: in progress (simulation timeline API + fast/quality preview mode shipped; 3D renderer still pending).
+6. Phase 6: in progress (PEC export wired end-to-end; broader format import/export parity still pending).
 
 ## Phase 0 — Baseline Hardening (Immediate)
 Goal: make current progress stable before deeper parity work.
@@ -293,6 +296,7 @@ Additional parity gates:
 3. Visual regression checks for simulation quality modes
 4. Cross-format import/export regression pack
 5. Phase 1 dual gate command: `scripts/check-phase1-gate.sh` (metric thresholds + Playwright visual snapshots)
+6. Full production gate command: `scripts/check-production-gate.sh` (required checks + dual parity gate + app/visual e2e)
 
 ## 9) Performance Targets
 
@@ -334,6 +338,8 @@ Vision can be considered Hatch-parity for core workflows when all are true:
 6. Stitch blocks are editable first-class entities and not only export-time byproducts
 
 ## Changelog
+- 2026-02-09: Added scene diagnostics (Rust/WASM/bridge/UI) and simulation timeline APIs with fast/quality preview controls for Phase 4/5A parity work.
+- 2026-02-09: Added PEC export support and unified `scripts/check-production-gate.sh` for combined metric-threshold + visual-review release gating.
 - 2026-02-09: Sequencer reorder now uses `SequenceTrack` as source of truth (with compatibility sync), advancing hybrid stitch-block execution semantics.
 - 2026-02-09: Added Phase 1 dual gate (`scripts/check-phase1-gate.sh`) plus Playwright visual baseline suite for screenshot-driven parity checks.
 - 2026-02-09: Added explicit phase execution status tracker; Phase 2 now records sequencer-first controls + hybrid API milestone progress.
