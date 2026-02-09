@@ -138,7 +138,7 @@
         "Create invalid geometry and verify warning/error count appears on right side",
         "Click the warning/error count and verify diagnostics panel opens"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "ui-context-menu",

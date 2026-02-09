@@ -168,6 +168,13 @@ function toTestSlug(value: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
+function formatSewTime(stitchCount: number): string {
+  const totalSeconds = Math.max(0, Math.round((stitchCount / 800) * 60));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
 type SimulationPreviewMode = "fast" | "quality";
 
 function buildStitchOverlays(
@@ -221,6 +228,12 @@ export function App() {
     stitchCount: 0,
     colorCount: 0,
   });
+  const [diagnosticSummary, setDiagnosticSummary] = useState({
+    errors: 0,
+    warnings: 0,
+    infos: 0,
+  });
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const defaultsLoadedRef = useRef(false);
   const menuBarRef = useRef<HTMLElement | null>(null);
   const [openMenu, setOpenMenu] = useState<MenuId | null>(null);
@@ -340,6 +353,52 @@ export function App() {
   useEffect(() => {
     refreshScene();
   }, [refreshScene]);
+
+  useEffect(() => {
+    if (!engine) return;
+
+    const refreshDiagnostics = (): void => {
+      try {
+        const diagnostics = engine.sceneValidationDiagnostics();
+        let errors = 0;
+        let warnings = 0;
+        let infos = 0;
+        for (const diagnostic of diagnostics) {
+          if (diagnostic.severity === "error") errors += 1;
+          else if (diagnostic.severity === "warning") warnings += 1;
+          else infos += 1;
+        }
+        setDiagnosticSummary((previous) =>
+          previous.errors === errors && previous.warnings === warnings && previous.infos === infos
+            ? previous
+            : { errors, warnings, infos },
+        );
+      } catch (_error) {
+        setDiagnosticSummary((previous) =>
+          previous.errors === 0 && previous.warnings === 0 && previous.infos === 0
+            ? previous
+            : { errors: 0, warnings: 0, infos: 0 },
+        );
+      }
+    };
+
+    refreshDiagnostics();
+    const interval = window.setInterval(refreshDiagnostics, 300);
+    return () => window.clearInterval(interval);
+  }, [engine]);
+
+  useEffect(() => {
+    if (!diagnosticsOpen) return;
+
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        setDiagnosticsOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [diagnosticsOpen]);
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent): void => {
@@ -527,6 +586,8 @@ export function App() {
     : loading
       ? "Loading WASM engine..."
       : `Engine v${version}`;
+  const sewTimeEstimate = formatSewTime(statusSummary.stitchCount);
+  const hasDiagnosticIssues = diagnosticSummary.errors + diagnosticSummary.warnings > 0;
 
   return (
     <TooltipProvider>
@@ -788,6 +849,40 @@ export function App() {
               </div>
             </div>
 
+            {engine && (
+              <div
+                className={`absolute inset-x-2 bottom-8 z-20 transition-all duration-200 ease-out ${
+                  diagnosticsOpen
+                    ? "pointer-events-auto translate-y-0 opacity-100"
+                    : "pointer-events-none translate-y-4 opacity-0"
+                }`}
+                data-testid="diagnostics-drawer"
+              >
+                <div className="max-h-64 overflow-y-auto rounded-md border border-border/60 bg-panel/95 shadow-2xl shadow-black/40 backdrop-blur">
+                  <div className="flex items-center justify-between border-b border-border/50 px-2 py-1.5">
+                    <span className="text-[11px] font-semibold text-foreground/90">
+                      Diagnostics
+                    </span>
+                    <button
+                      type="button"
+                      className="rounded px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-accent/40 hover:text-foreground"
+                      onClick={() => setDiagnosticsOpen(false)}
+                      data-testid="diagnostics-drawer-close"
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <div className="p-2">
+                    <DiagnosticsPanel
+                      engine={engine}
+                      selectedIds={selectedIds}
+                      onSelectNode={selectNode}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             <footer
               className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex h-8 items-center justify-between border-t border-border/40 bg-panel/90 px-3 text-[10px] text-muted-foreground backdrop-blur-sm"
               data-testid="status-bar"
@@ -802,10 +897,26 @@ export function App() {
               <div className="flex items-center gap-3" data-testid="status-center">
                 <span data-testid="status-stitches">Stitches {statusSummary.stitchCount}</span>
                 <span data-testid="status-colors">Colors {statusSummary.colorCount}</span>
+                <span data-testid="status-sew-time">Sew {sewTimeEstimate}</span>
               </div>
-              <div className="flex items-center gap-2 text-emerald-400" data-testid="status-right">
-                <span aria-hidden="true">●</span>
-                <span data-testid="status-severity">No diagnostics</span>
+              <div className="pointer-events-auto" data-testid="status-right">
+                <button
+                  type="button"
+                  className={`flex items-center gap-2 rounded px-1 py-0.5 ${
+                    hasDiagnosticIssues
+                      ? "text-amber-300 hover:bg-amber-500/10"
+                      : "text-emerald-400 hover:bg-emerald-500/10"
+                  }`}
+                  onClick={() => setDiagnosticsOpen((previous) => !previous)}
+                  data-testid="status-severity-button"
+                >
+                  <span aria-hidden="true">●</span>
+                  <span data-testid="status-severity">
+                    {hasDiagnosticIssues
+                      ? `${diagnosticSummary.errors} error${diagnosticSummary.errors === 1 ? "" : "s"}, ${diagnosticSummary.warnings} warning${diagnosticSummary.warnings === 1 ? "" : "s"}`
+                      : "No diagnostics"}
+                  </span>
+                </button>
               </div>
             </footer>
           </main>
@@ -836,17 +947,6 @@ export function App() {
                 <SectionHeader>Thread Palette</SectionHeader>
                 <div className="px-3 pb-3">
                   <ThreadPalettePanel engine={engine} />
-                </div>
-
-                <div className="mx-3 border-t border-border/50" />
-
-                <SectionHeader>Diagnostics</SectionHeader>
-                <div className="px-3 pb-3">
-                  <DiagnosticsPanel
-                    engine={engine}
-                    selectedIds={selectedIds}
-                    onSelectNode={selectNode}
-                  />
                 </div>
               </>
             )}

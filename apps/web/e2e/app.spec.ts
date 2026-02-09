@@ -251,6 +251,56 @@ test.describe("Vision App", () => {
     await page.keyboard.press("e");
     await expect(ellipse).toHaveAttribute("aria-pressed", "true");
   });
+
+  test("status bar reports live metrics and opens diagnostics from severity summary", async ({
+    page,
+  }) => {
+    const statusBar = page.getByTestId("status-bar");
+    const canvas = page.getByTestId("design-canvas");
+    await expect(statusBar).toBeVisible();
+    await expect(canvas).toBeVisible();
+
+    const box = await canvas.boundingBox();
+    if (!box) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    await page.mouse.move(cx, cy);
+
+    await expect(page.getByTestId("status-cursor")).toContainText(/mm/);
+    await page.mouse.wheel(0, -200);
+    await expect(page.getByTestId("status-zoom")).toContainText(/Zoom \d+%/);
+
+    await page.getByTestId("tool-rect").click();
+    await page.mouse.move(cx - 35, cy - 35);
+    await page.mouse.down();
+    await page.mouse.move(cx + 35, cy + 35, { steps: 5 });
+    await page.mouse.up();
+
+    await expect(page.getByTestId("status-objects")).not.toHaveText("Objects 0", {
+      timeout: 3_000,
+    });
+    await expect(page.getByTestId("status-stitches")).toContainText(/Stitches \d+/);
+    await expect(page.getByTestId("status-colors")).toContainText(/Colors \d+/);
+    await expect(page.getByTestId("status-sew-time")).toContainText(/Sew \d+:\d{2}/);
+    await expect(page.getByTestId("status-severity")).toContainText("No diagnostics");
+
+    await page.getByTestId("tool-pen").click();
+    await page.mouse.click(cx - 50, cy - 30);
+    await page.mouse.click(cx + 20, cy - 10);
+    await page.mouse.click(cx + 10, cy + 35);
+    await page.keyboard.press("Enter");
+
+    const stitchType = page.getByTestId("prop-stitch-type");
+    await expect(stitchType).toBeVisible();
+    await stitchType.selectOption("tatami");
+
+    await expect(page.getByTestId("status-severity")).toContainText(/error|warning/, {
+      timeout: 4_000,
+    });
+    await page.getByTestId("status-severity-button").click();
+    await expect(page.getByTestId("diagnostics-drawer")).toBeVisible();
+    await expect(page.getByTestId("diagnostics-panel")).toBeVisible();
+  });
 });
 
 test.describe("WASM Engine Integration", () => {
@@ -512,6 +562,8 @@ test.describe("Diagnostics Panel", () => {
     await expect(stitchType).toBeVisible();
     await stitchType.selectOption("tatami");
 
+    await page.getByTestId("status-severity-button").click();
+    await expect(page.getByTestId("diagnostics-drawer")).toBeVisible();
     await expect(page.getByTestId("diagnostics-panel")).toBeVisible();
     await expect(page.getByTestId("diagnostics-count-error")).not.toHaveText("0", {
       timeout: 3_000,
