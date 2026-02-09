@@ -1,11 +1,11 @@
 # AGENTS.md — Vision
 
-Collaborative embroidery design tool (Figma-like). Monorepo: moonrepo + Bun + Rust/WASM + React 19.
-Assume senior-level knowledge. Terse, constraint-first.
+Open-source embroidery-first digitizing platform. Not a vector editor. Stitch objects are first-class citizens.
+Monorepo: moonrepo + Bun + Rust/WASM + React 19. Assume senior-level knowledge. Terse, constraint-first.
 
 ## Architecture
 
-React 19 UI (apps/web) <-> WASM Bridge (packages/wasm-bridge) <-> Rust Engine + Renderer (crates/)
+React 19 UI (apps/web) <-> WASM Bridge (packages/wasm-bridge, Zod v4) <-> Rust Engine + Renderer (crates/)
 
 ## Commands (common)
 
@@ -39,12 +39,14 @@ React 19 UI (apps/web) <-> WASM Bridge (packages/wasm-bridge) <-> Rust Engine + 
 - JS API: `#[wasm_bindgen]`, `Result<T, JsError>`, `unwrap_throw()`/`expect_throw()`
 - Tests in `#[cfg(test)] mod tests` at file end; naming `test_<what>_<scenario>`
 
-## CSS / UI
+## UI / Layout
 
+- Menu bar (File|Edit|View|Design|Routing|Help), canvas center, sequencer left, properties right, status bar bottom
+- Floating toolbar: Select(V), Pen(P), Text(T), Rect(R), Ellipse(E). Power lives in context menus
+- Design Inspector (View menu): quality report + routing settings. Diagnostics: bottom slide-up panel
 - Tailwind v4 utilities only; no custom layout classes
-- Theme tokens in `styles/global.css` (oklch, shadcn)
-- Dark-only app: `<html class="dark">`
-- Use shadcn components for UI; Canvas2D colors live in `useCanvas.ts`
+- Theme tokens in `styles/global.css` (oklch, shadcn); themeable via CSS custom properties
+- Prefer base-ui primitives over Radix; shadcn components for UI; Canvas2D colors in `useCanvas.ts`
 
 ## Constraints
 
@@ -52,6 +54,7 @@ React 19 UI (apps/web) <-> WASM Bridge (packages/wasm-bridge) <-> Rust Engine + 
 - Web imports only from `@vision/wasm-bridge`
 - Bun only; Biome only
 - COOP/COEP headers required (vite.config.ts)
+- Clean-room Rust implementations only; Ink/Stitch as behavior reference, never source copy
 
 ## Testing
 

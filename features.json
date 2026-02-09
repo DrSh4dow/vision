@@ -1,0 +1,1170 @@
+{
+  "features": [
+    {
+      "category": "ui-layout",
+      "description": "Application opens as fullscreen with menu bar, canvas, sequencer, properties, status bar, and floating toolbar",
+      "steps": [
+        "Open Vision in browser",
+        "Verify menu bar at top with File|Edit|View|Design|Routing|Help",
+        "Verify canvas fills center with mm grid and origin crosshairs",
+        "Verify sequencer panel on left",
+        "Verify properties panel on right",
+        "Verify status bar at bottom of canvas",
+        "Verify floating toolbar over canvas center"
+      ],
+      "passes": false
+    },
+    {
+      "category": "ui-menu-bar",
+      "description": "File menu contains New, Open, Import SVG, Import Bitmap, Export submenu, Export Production Worksheet, Save Project, Recent Files",
+      "steps": [
+        "Click File in menu bar",
+        "Verify New item present",
+        "Verify Open item present",
+        "Verify Import SVG item present with keyboard shortcut",
+        "Verify Import Bitmap item present with keyboard shortcut",
+        "Verify Export submenu with DST, PES, PEC, JEF, EXP, VP3, HUS, XXX",
+        "Verify Export Production Worksheet item present",
+        "Verify Save Project item present",
+        "Verify Recent Files item present"
+      ],
+      "passes": false
+    },
+    {
+      "category": "ui-menu-bar",
+      "description": "Edit menu contains Undo, Redo, Cut, Copy, Paste, Duplicate, Delete, Select All with keyboard shortcuts",
+      "steps": [
+        "Click Edit in menu bar",
+        "Verify Undo with Ctrl+Z shortcut listed",
+        "Verify Redo with Ctrl+Shift+Z shortcut listed",
+        "Verify Cut with Ctrl+X shortcut listed",
+        "Verify Copy with Ctrl+C shortcut listed",
+        "Verify Paste with Ctrl+V shortcut listed",
+        "Verify Duplicate item present",
+        "Verify Delete item present",
+        "Verify Select All with Ctrl+A shortcut listed"
+      ],
+      "passes": false
+    },
+    {
+      "category": "ui-menu-bar",
+      "description": "View menu contains zoom controls, toggle grid, toggle snap, toggle stitch preview, simulation mode, toggle diagnostics, toggle design inspector",
+      "steps": [
+        "Click View in menu bar",
+        "Verify Zoom In, Zoom Out, Zoom to Fit, Zoom to Selection items",
+        "Verify Toggle Grid item",
+        "Verify Toggle Snap item",
+        "Verify Toggle Stitch Preview item",
+        "Verify Simulation Mode submenu with Fast and Quality options",
+        "Verify Toggle Diagnostics Panel item",
+        "Verify Toggle Design Inspector item"
+      ],
+      "passes": false
+    },
+    {
+      "category": "ui-menu-bar",
+      "description": "Design menu contains stitch type submenu, assign thread color, auto-digitize selection, validate design, repair geometry",
+      "steps": [
+        "Click Design in menu bar",
+        "Verify Stitch Type submenu with Running, Satin, Tatami, Contour, Spiral, Motif",
+        "Verify Assign Thread Color item",
+        "Verify Auto-Digitize Selection item",
+        "Verify Validate Design item",
+        "Verify Repair Geometry item"
+      ],
+      "passes": false
+    },
+    {
+      "category": "ui-menu-bar",
+      "description": "Routing menu contains routing policy, sequence mode, tie mode, allow reverse, and link to full routing settings",
+      "steps": [
+        "Click Routing in menu bar",
+        "Verify Routing Policy submenu with Balanced, Min Travel, Min Trims",
+        "Verify Sequence Mode submenu with Strict Sequencer, Optimizer",
+        "Verify global Tie Mode option",
+        "Verify Allow Reverse toggle",
+        "Verify link to open full routing settings in Design Inspector"
+      ],
+      "passes": false
+    },
+    {
+      "category": "ui-menu-bar",
+      "description": "Help menu contains Keyboard Shortcuts, Documentation, About Vision",
+      "steps": [
+        "Click Help in menu bar",
+        "Verify Keyboard Shortcuts item opens shortcut reference",
+        "Verify Documentation item present",
+        "Verify About Vision item shows version and project info"
+      ],
+      "passes": false
+    },
+    {
+      "category": "ui-menu-bar",
+      "description": "Every menu item shows its keyboard shortcut inline",
+      "steps": [
+        "Open each menu (File, Edit, View, Design, Routing, Help)",
+        "Verify every actionable item displays its keyboard shortcut to the right of the label",
+        "Verify shortcuts are consistent with actual key bindings"
+      ],
+      "passes": false
+    },
+    {
+      "category": "ui-toolbar",
+      "description": "Floating toolbar shows five tools: Select (V), Pen (P), Text (T), Rectangle (R), Ellipse (E)",
+      "steps": [
+        "Verify frosted-glass floating toolbar at top center of canvas",
+        "Verify Select tool icon present and activates with V key",
+        "Verify Pen tool icon present and activates with P key",
+        "Verify Text tool icon present and activates with T key",
+        "Verify Rectangle tool icon present and activates with R key",
+        "Verify Ellipse tool icon present and activates with E key",
+        "Verify active tool is visually highlighted",
+        "Verify no other tools or controls on the toolbar"
+      ],
+      "passes": false
+    },
+    {
+      "category": "ui-status-bar",
+      "description": "Status bar displays cursor position, zoom, object count, stitch count, color count, sew time estimate, and severity summary",
+      "steps": [
+        "Verify status bar visible at bottom of canvas",
+        "Move cursor over canvas and verify position updates in mm on left side",
+        "Verify zoom level displayed on left side",
+        "Verify object count displayed on left side",
+        "Create objects and verify total stitch count displayed in center",
+        "Verify color count displayed in center",
+        "Verify estimated sew time displayed in center",
+        "Verify green checkmark on right side when no diagnostics",
+        "Create invalid geometry and verify warning/error count appears on right side",
+        "Click the warning/error count and verify diagnostics panel opens"
+      ],
+      "passes": false
+    },
+    {
+      "category": "ui-context-menu",
+      "description": "Right-click canvas object opens context menu with stitch, routing, and object management actions",
+      "steps": [
+        "Create a shape on canvas",
+        "Right-click the shape",
+        "Verify context menu appears with stitch settings section (stitch type, thread color, density, angle, underlay, compensation)",
+        "Verify routing section (routing overrides, trim/tie commands)",
+        "Verify object management section (lock, hide, duplicate, delete)",
+        "Verify menu is organized with stitch settings first, routing second, management last",
+        "Select a menu item and verify it applies to the object"
+      ],
+      "passes": false
+    },
+    {
+      "category": "ui-context-menu",
+      "description": "Right-click canvas background opens workspace context menu",
+      "steps": [
+        "Right-click empty area of canvas",
+        "Verify context menu with Paste, Import, Zoom controls, Grid settings, Snap behavior"
+      ],
+      "passes": false
+    },
+    {
+      "category": "ui-context-menu",
+      "description": "Right-click sequencer row opens sequence-specific context menu",
+      "steps": [
+        "Create multiple stitch objects",
+        "Right-click a row in the sequencer",
+        "Verify context menu with Move to Top, Move to Bottom, Insert Color Change, Group with Adjacent, Duplicate, Remove"
+      ],
+      "passes": false
+    },
+    {
+      "category": "ui-design-inspector",
+      "description": "Design Inspector opens from View menu showing full quality report and routing settings",
+      "steps": [
+        "Open View > Toggle Design Inspector",
+        "Verify dedicated panel appears",
+        "Verify stitch summary section: total stitch count, color count, estimated sew time, design dimensions in mm",
+        "Verify routing metrics section: travel distance, jump count, trim count, color changes, longest travel, route score with labels and units",
+        "Verify quality analysis section: mean/P95 stitch length, density error, angle error, coverage error",
+        "Verify routing settings section with all controls: policy, sequence mode, allow reverse, entry/exit, tie mode, max jump, trim threshold, min run before trim, underpath, color merge, preserve color/layer order",
+        "Change a routing setting and verify metrics update live",
+        "Verify format compatibility section showing which formats support current design without loss",
+        "Close the Design Inspector and verify it disappears"
+      ],
+      "passes": false
+    },
+    {
+      "category": "ui-diagnostics",
+      "description": "Diagnostics panel slides up from bottom of canvas with severity filtering and click-to-select",
+      "steps": [
+        "Open View > Toggle Diagnostics or click severity count in status bar",
+        "Verify panel slides up from bottom of canvas",
+        "Verify errors shown in red, warnings in amber, info in grey",
+        "Verify list is filterable by severity",
+        "Click a diagnostic row and verify the problematic object highlights on canvas and selects in sequencer",
+        "Verify messages are actionable (say what is wrong and how to fix)",
+        "Close panel with click or keypress and verify it disappears",
+        "Verify status bar shows green checkmark when no diagnostics exist"
+      ],
+      "passes": false
+    },
+    {
+      "category": "canvas",
+      "description": "Canvas renders at true embroidery scale in mm with adaptive grid and origin crosshairs",
+      "steps": [
+        "Open Vision and verify canvas background with subtle grid",
+        "Zoom in and verify grid spacing adapts to zoom level",
+        "Zoom out and verify grid remains readable",
+        "Verify origin crosshairs visible at (0,0)",
+        "Verify all measurements and coordinates are in millimeters"
+      ],
+      "passes": false
+    },
+    {
+      "category": "canvas",
+      "description": "Canvas supports pan (middle-click or Alt+drag) and zoom (scroll wheel) at 60fps",
+      "steps": [
+        "Middle-click and drag to pan canvas",
+        "Alt+left-click and drag to pan canvas",
+        "Scroll wheel up to zoom in, verify zoom centered on cursor",
+        "Scroll wheel down to zoom out, verify zoom centered on cursor",
+        "Verify canvas renders smoothly at 60fps during pan/zoom with objects present",
+        "Verify zoom has min and max limits"
+      ],
+      "passes": false
+    },
+    {
+      "category": "canvas",
+      "description": "Canvas renders embroidery objects with assigned thread colors and stitch preview overlay",
+      "steps": [
+        "Create multiple shapes with different thread colors",
+        "Verify shapes render with their assigned fill/stroke colors",
+        "Enable stitch preview from View menu",
+        "Verify stitch paths overlay on shapes in correct thread colors",
+        "Verify every stitch, jump, and trim is visually represented",
+        "Verify overlay updates in real time when changing stitch parameters"
+      ],
+      "passes": false
+    },
+    {
+      "category": "tool-select",
+      "description": "Select tool supports click-to-select, shift-click multi-select, and drag-to-move with undo",
+      "steps": [
+        "Press V to activate Select tool",
+        "Click an object to select it, verify selection highlight",
+        "Click empty canvas to deselect",
+        "Shift-click multiple objects to add to selection",
+        "Drag selected objects and verify all move together",
+        "Release drag and verify stitch plan regenerates",
+        "Ctrl+Z to undo the move, verify objects return to original position",
+        "Ctrl+Shift+Z to redo, verify objects move again",
+        "Verify hit-testing is sub-millisecond precise (no perceptible lag)"
+      ],
+      "passes": false
+    },
+    {
+      "category": "tool-pen",
+      "description": "Pen tool creates bezier paths with click for corners, click-drag for curve handles, live preview",
+      "steps": [
+        "Press P to activate Pen tool",
+        "Click canvas to place a corner point, verify point visible",
+        "Click and drag to place a curve point with bezier handles, verify smooth cubic curve forms live",
+        "Continue placing points mixing corners and curves",
+        "Verify path previews on canvas in real time as each point is added",
+        "Click near first point to close the shape",
+        "Verify closed shape appears in sequencer as stitch object with default parameters"
+      ],
+      "passes": false
+    },
+    {
+      "category": "tool-pen",
+      "description": "Pen tool supports Shift-constrain on handles and Enter/Escape to finish/cancel",
+      "steps": [
+        "Activate Pen tool and click-drag to create a curve handle",
+        "Hold Shift while dragging and verify handle constrains to 45-degree increments",
+        "Place several points and press Enter to finish an open path",
+        "Verify open path appears in sequencer",
+        "Start a new path, place points, press Escape",
+        "Verify path is cancelled and nothing appears in sequencer"
+      ],
+      "passes": false
+    },
+    {
+      "category": "tool-pen",
+      "description": "Bezier curves translate to accurate stitch geometry: smooth curves produce smooth satin rails",
+      "steps": [
+        "Draw a smooth bezier curve with the Pen tool",
+        "Assign satin stitch type to the resulting shape",
+        "Enable stitch preview",
+        "Verify satin stitches follow the smooth curve without angular artifacts",
+        "Draw a path with sharp corners",
+        "Verify stitch transitions are clean at corners"
+      ],
+      "passes": false
+    },
+    {
+      "category": "tool-rect",
+      "description": "Rectangle tool creates shapes with rubber-band preview",
+      "steps": [
+        "Press R to activate Rectangle tool",
+        "Click and drag on canvas, verify rubber-band rectangle preview shows in real time",
+        "Release to commit the shape",
+        "Verify shape appears in sequencer with default stitch parameters",
+        "Verify tool switches back to Select after shape creation"
+      ],
+      "passes": false
+    },
+    {
+      "category": "tool-ellipse",
+      "description": "Ellipse tool creates shapes with rubber-band preview",
+      "steps": [
+        "Press E to activate Ellipse tool",
+        "Click and drag on canvas, verify rubber-band ellipse preview shows in real time",
+        "Release to commit the shape",
+        "Verify shape appears in sequencer with default stitch parameters",
+        "Verify tool switches back to Select after shape creation"
+      ],
+      "passes": false
+    },
+    {
+      "category": "tool-text",
+      "description": "Text tool creates embroidery lettering with satin column glyphs",
+      "steps": [
+        "Press T to activate Text tool",
+        "Click on canvas and verify text input activates",
+        "Type text and verify embroidery-optimized letter forms generate instantly",
+        "Verify each glyph is constructed from satin columns with automatic two-rail generation",
+        "Verify straight segments get clean parallel rails",
+        "Verify curves get smoothly interpolated rails with short-stitch handling",
+        "Verify lettering sews cleanly at 6mm (cap text) and 50mm (jacket back) sizes"
+      ],
+      "passes": false
+    },
+    {
+      "category": "tool-text",
+      "description": "Text tool properties panel shows font, size, kerning, tracking, leading, path text, and stitch parameters",
+      "steps": [
+        "Create lettering with Text tool and select it",
+        "Verify Font selector in properties panel with embroidery font library",
+        "Verify Size control in mm",
+        "Verify Kerning and Tracking controls",
+        "Verify Leading control for multi-line text",
+        "Verify Path Text option to attach text to baseline, circle, arc, or arbitrary vector path",
+        "Verify standard stitch parameters (density, underlay, pull compensation) available",
+        "Change font and verify lettering updates on canvas"
+      ],
+      "passes": false
+    },
+    {
+      "category": "tool-text",
+      "description": "Monogram templates provide one-click layouts for common commercial patterns",
+      "steps": [
+        "Open monogram template selector",
+        "Verify circle monogram template available",
+        "Verify diamond frame template available",
+        "Verify stacked initials template available",
+        "Verify arc layout template available",
+        "Select a template, type initials, verify layout generates with proper spacing and decorative frame",
+        "Adjust size and verify monogram scales correctly",
+        "Verify monogram appears in sequencer as stitch blocks"
+      ],
+      "passes": false
+    },
+    {
+      "category": "tool-text",
+      "description": "Path text flows lettering along arbitrary vector paths",
+      "steps": [
+        "Draw a curved path with the Pen tool",
+        "Create text with the Text tool",
+        "Attach text to the curved path via Path Text property",
+        "Verify letters flow along the curve with automatic spacing adjustment",
+        "Modify the curve and verify text repositions to follow",
+        "Verify stitch preview shows stitches following the curved text path"
+      ],
+      "passes": false
+    },
+    {
+      "category": "tool-text",
+      "description": "Lettering objects integrate into sequencer as individual stitch blocks",
+      "steps": [
+        "Create a word with the Text tool",
+        "Verify each letter/word appears in sequencer as stitch blocks",
+        "Drag-reorder lettering blocks relative to other design objects",
+        "Override routing on a lettering block",
+        "Split a word into individual letter blocks for color changes",
+        "Merge adjacent letter blocks into a single block",
+        "Export design and verify lettering included in stitch output"
+      ],
+      "passes": false
+    },
+    {
+      "category": "import",
+      "description": "SVG import loads vector paths as embroidery objects on canvas",
+      "steps": [
+        "Open File > Import SVG",
+        "Select an SVG file with multiple paths",
+        "Verify each path becomes an embroidery object on canvas",
+        "Verify paths appear in sequencer with default stitch parameters",
+        "Verify SVG path commands (M, L, C, Q, A, Z) are parsed correctly",
+        "Select an imported path and verify properties panel shows shape info"
+      ],
+      "passes": false
+    },
+    {
+      "category": "import",
+      "description": "Bitmap autodigitizer separates colors from PNG/JPEG into distinct layers",
+      "steps": [
+        "Open File > Import Bitmap and select a multi-color PNG or JPEG",
+        "Verify color separation runs: image analyzed into distinct color regions",
+        "Verify noise is eliminated and similar colors are clustered",
+        "Verify clean color-layer stack is presented to user",
+        "Verify each layer maps to a thread color",
+        "Verify user can merge layers, split them, or reassign colors before proceeding"
+      ],
+      "passes": false
+    },
+    {
+      "category": "import",
+      "description": "Bitmap autodigitizer traces boundaries with sub-pixel accuracy and normalized geometry",
+      "steps": [
+        "Import a bitmap with the autodigitizer",
+        "Verify each color region is traced into clean vector boundaries",
+        "Verify small artifacts are filtered automatically",
+        "Verify holes and islands are preserved",
+        "Verify geometry has correct winding order",
+        "Verify no self-intersections in traced boundaries",
+        "Verify no degenerate edges"
+      ],
+      "passes": false
+    },
+    {
+      "category": "import",
+      "description": "Bitmap autodigitizer assigns optimal stitch types based on shape geometry",
+      "steps": [
+        "Import a bitmap containing narrow columns, large filled areas, and thin outlines",
+        "Verify narrow elongated regions are assigned satin columns with appropriate underlay",
+        "Verify large filled areas are assigned tatami fills with sensible density and angle",
+        "Verify thin outlines are assigned running stitches",
+        "Verify density, angle, pull compensation, underlay mode set to production defaults based on shape size/aspect ratio",
+        "Verify all decisions are visible and editable in properties panel"
+      ],
+      "passes": false
+    },
+    {
+      "category": "import",
+      "description": "Bitmap autodigitizer optimizes stitch sequence to minimize jumps and trims",
+      "steps": [
+        "Import a multi-color bitmap with the autodigitizer",
+        "Verify stitch blocks are ordered to minimize jumps, trims, and thread changes",
+        "Verify same-color blocks are grouped",
+        "Verify entry/exit points chosen to reduce travel",
+        "Verify route score and metrics appear in status bar",
+        "Verify sequencer shows the optimized order"
+      ],
+      "passes": false
+    },
+    {
+      "category": "import",
+      "description": "Embroidery format import reads DST, PES, JEF files back into the editor",
+      "steps": [
+        "Open File > Open and select a DST file",
+        "Verify design loads with correct stitch positions and colors",
+        "Open a PES file and verify same",
+        "Open a JEF file and verify same",
+        "Verify imported designs appear in sequencer and are editable"
+      ],
+      "passes": false
+    },
+    {
+      "category": "export",
+      "description": "DST (Tajima) export generates valid machine file client-side",
+      "steps": [
+        "Create a design with multiple stitch objects and colors",
+        "Open File > Export > DST",
+        "Verify binary file downloads instantly (no server round-trip)",
+        "Verify file is valid DST format that machines can read",
+        "Verify stitch positions, jumps, trims, and color changes are encoded correctly"
+      ],
+      "passes": false
+    },
+    {
+      "category": "export",
+      "description": "PES (Brother) export generates valid machine file client-side",
+      "steps": [
+        "Create a design with multiple stitch objects and colors",
+        "Open File > Export > PES",
+        "Verify binary file downloads instantly",
+        "Verify file is valid PES format",
+        "Verify stitch data and color palette are encoded correctly"
+      ],
+      "passes": false
+    },
+    {
+      "category": "export",
+      "description": "PEC (Brother color block) export generates valid machine file client-side",
+      "steps": [
+        "Create a design with multiple colors",
+        "Open File > Export > PEC",
+        "Verify binary file downloads instantly",
+        "Verify file is valid PEC format with color block data"
+      ],
+      "passes": false
+    },
+    {
+      "category": "export",
+      "description": "JEF (Janome) export generates valid machine file client-side",
+      "steps": [
+        "Create a design with multiple stitch objects",
+        "Open File > Export > JEF",
+        "Verify binary file downloads instantly",
+        "Verify file is valid JEF format"
+      ],
+      "passes": false
+    },
+    {
+      "category": "export",
+      "description": "EXP (Melco) export generates valid machine file client-side",
+      "steps": [
+        "Create a design with multiple stitch objects",
+        "Open File > Export > EXP",
+        "Verify binary file downloads instantly",
+        "Verify file is valid EXP format"
+      ],
+      "passes": false
+    },
+    {
+      "category": "export",
+      "description": "VP3 (Husqvarna/Viking/Pfaff) export generates valid machine file client-side",
+      "steps": [
+        "Create a design with multiple stitch objects",
+        "Open File > Export > VP3",
+        "Verify binary file downloads instantly",
+        "Verify file is valid VP3 format"
+      ],
+      "passes": false
+    },
+    {
+      "category": "export",
+      "description": "HUS (Husqvarna) export generates valid machine file client-side",
+      "steps": [
+        "Create a design with multiple stitch objects",
+        "Open File > Export > HUS",
+        "Verify binary file downloads instantly",
+        "Verify file is valid HUS format"
+      ],
+      "passes": false
+    },
+    {
+      "category": "export",
+      "description": "XXX (Singer) export generates valid machine file client-side",
+      "steps": [
+        "Create a design with multiple stitch objects",
+        "Open File > Export > XXX",
+        "Verify binary file downloads instantly",
+        "Verify file is valid XXX format"
+      ],
+      "passes": false
+    },
+    {
+      "category": "export",
+      "description": "Round-trip fidelity: export, re-import, and compare for every supported format",
+      "steps": [
+        "Create a complex design with multiple stitch types and colors",
+        "Export to DST, re-import, compare stitch positions and commands",
+        "Export to PES, re-import, compare",
+        "Export to PEC, re-import, compare",
+        "Repeat for JEF, EXP, VP3, HUS, XXX",
+        "Verify no silent data loss in any round-trip"
+      ],
+      "passes": false
+    },
+    {
+      "category": "export",
+      "description": "Machine constraint checks validate hoop size and format limits before export",
+      "steps": [
+        "Create a design larger than standard hoop size",
+        "Attempt to export",
+        "Verify warning about design exceeding hoop dimensions",
+        "Verify format-specific limits (max stitch count, max dimensions) are checked",
+        "Verify user is informed before file is written"
+      ],
+      "passes": false
+    },
+    {
+      "category": "export",
+      "description": "Production worksheet export generates printable job sheet",
+      "steps": [
+        "Create a complete design",
+        "Open File > Export Production Worksheet",
+        "Verify job sheet includes design dimensions in mm",
+        "Verify stitch count included",
+        "Verify thread order with color codes listed",
+        "Verify trim and stop positions listed",
+        "Verify estimated sew time included",
+        "Verify stitch-out preview thumbnail included",
+        "Verify output is printable (PDF or print-ready format)"
+      ],
+      "passes": false
+    },
+    {
+      "category": "stitch-engine",
+      "description": "Running stitch generates path-following stitches with configurable segment length and path smoothing",
+      "steps": [
+        "Create a path and assign Running stitch type",
+        "Enable stitch preview and verify stitches follow the path",
+        "Change segment length and verify stitch spacing updates",
+        "Verify path smoothing produces even stitch distribution",
+        "Verify min/max segment clamping prevents degenerate stitches"
+      ],
+      "passes": false
+    },
+    {
+      "category": "stitch-engine",
+      "description": "Running stitch bean variant produces triple-run reinforcement",
+      "steps": [
+        "Create a path and assign Running stitch with bean variant enabled",
+        "Enable stitch preview",
+        "Verify each stitch segment is stitched three times (forward-back-forward)",
+        "Export and verify triple-run encoded in output"
+      ],
+      "passes": false
+    },
+    {
+      "category": "stitch-engine",
+      "description": "Running stitch manual placement mode allows user-placed individual stitches",
+      "steps": [
+        "Create a path and assign Running stitch with manual placement mode",
+        "Verify user can place individual stitch points",
+        "Verify stitches only appear where user placed them, not auto-generated"
+      ],
+      "passes": false
+    },
+    {
+      "category": "stitch-engine",
+      "description": "Satin column generates two-rail stitches with automatic rail pairing",
+      "steps": [
+        "Create a shape suitable for satin (narrow elongated region)",
+        "Assign Satin stitch type",
+        "Enable stitch preview",
+        "Verify two rails are automatically generated from shape geometry",
+        "Verify zigzag stitches connect between rails",
+        "Verify width, density, and angle are consistent across full column length"
+      ],
+      "passes": false
+    },
+    {
+      "category": "stitch-engine",
+      "description": "Satin supports all seven underlay modes with correct stitch patterns",
+      "steps": [
+        "Create a satin column object",
+        "Set underlay to Center Walk and verify center-line stitches generated",
+        "Set underlay to Edge Walk and verify edge-following stitches",
+        "Set underlay to Zigzag and verify zigzag underlay pattern",
+        "Set underlay to Center+Edge and verify both patterns combined",
+        "Set underlay to Center+Zigzag and verify combination",
+        "Set underlay to Edge+Zigzag and verify combination",
+        "Set underlay to Full and verify all three patterns combined",
+        "Verify underlay stitches appear below top stitches in preview"
+      ],
+      "passes": false
+    },
+    {
+      "category": "stitch-engine",
+      "description": "Satin pull compensation offsets rails to counteract fabric pull-in",
+      "steps": [
+        "Create a satin column and set pull compensation to 0",
+        "Note the satin width in preview",
+        "Increase pull compensation and verify rails expand outward",
+        "Set compensation mode to Directional and adjust X/Y independently",
+        "Verify per-axis compensation produces asymmetric rail offset",
+        "Verify compensation values are in mm precision"
+      ],
+      "passes": false
+    },
+    {
+      "category": "stitch-engine",
+      "description": "Satin handles short stitches correctly on tight curves",
+      "steps": [
+        "Create a satin column that follows a tight curve",
+        "Enable stitch preview",
+        "Verify inner rail stitches are shortened on curves to prevent bunching",
+        "Verify outer rail stitches maintain proper density",
+        "Verify no stitch overlap or gaps at curve transitions"
+      ],
+      "passes": false
+    },
+    {
+      "category": "stitch-engine",
+      "description": "Tatami fill generates row-scheduled parallel fill with stagger and gap-fill",
+      "steps": [
+        "Create a large shape and assign Tatami stitch type",
+        "Enable stitch preview",
+        "Verify parallel rows fill the shape at the configured angle",
+        "Change angle and verify rows reorient",
+        "Verify stagger offsets between rows create organic texture (no visible columns)",
+        "Verify gap-fill rows eliminate coverage holes at shape edges",
+        "Verify start/end entry strategies work correctly"
+      ],
+      "passes": false
+    },
+    {
+      "category": "stitch-engine",
+      "description": "Tatami fill supports edge-walk boundary rows and overlap controls",
+      "steps": [
+        "Create a tatami fill object",
+        "Enable edge walk toggle",
+        "Verify boundary-following rows appear along shape edges",
+        "Adjust overlap control and verify row overlap changes",
+        "Verify min segment length control prevents degenerate edge stitches"
+      ],
+      "passes": false
+    },
+    {
+      "category": "stitch-engine",
+      "description": "Contour fill generates inner-to-outer, single spiral, and double spiral patterns",
+      "steps": [
+        "Create a shape and assign Contour stitch type",
+        "Enable stitch preview and verify inner-to-outer contour pattern",
+        "Verify contour step size control changes spacing between contour rings",
+        "Verify join style at contour transitions is clean",
+        "Test with shapes containing holes and verify contour handles them"
+      ],
+      "passes": false
+    },
+    {
+      "category": "stitch-engine",
+      "description": "Spiral fill generates center-outward spiral with hole handling and density consistency",
+      "steps": [
+        "Create a shape and assign Spiral stitch type",
+        "Enable stitch preview and verify spiral pattern from center outward",
+        "Verify center-point stability (spiral does not drift)",
+        "Create a shape with a hole and verify spiral handles the hole correctly",
+        "Verify density is consistent across spiral arms"
+      ],
+      "passes": false
+    },
+    {
+      "category": "stitch-engine",
+      "description": "Motif fill generates patterned fill with diamond, wave, triangle patterns",
+      "steps": [
+        "Create a shape and assign Motif stitch type",
+        "Select Diamond pattern and verify diamond motif fills the shape",
+        "Switch to Wave pattern and verify wave motif",
+        "Switch to Triangle pattern and verify triangle motif",
+        "Adjust motif scale and verify pattern scales",
+        "Adjust fill phase and verify pattern shifts",
+        "Verify repeat alignment is consistent across the fill region"
+      ],
+      "passes": false
+    },
+    {
+      "category": "stitch-engine",
+      "description": "Lettering engine decomposes glyphs into satin columns with automatic two-rail generation",
+      "steps": [
+        "Create lettering with the Text tool",
+        "Enable stitch preview",
+        "Verify each glyph produces satin column stitches",
+        "Verify straight letter segments have clean parallel rails",
+        "Verify curved letter segments have smoothly interpolated rails",
+        "Verify serifs and terminals have density-appropriate transitions",
+        "Test at 6mm size and verify clean output",
+        "Test at 50mm size and verify clean output"
+      ],
+      "passes": false
+    },
+    {
+      "category": "stitch-engine",
+      "description": "Auto-routing optimizes travel paths between stitch blocks under selected policy",
+      "steps": [
+        "Create a design with multiple stitch blocks in different positions",
+        "Set routing policy to Balanced and note metrics",
+        "Switch to Min Travel and verify travel distance decreases",
+        "Switch to Min Trims and verify trim count decreases",
+        "Verify blocks can be reversed for optimal entry/exit alignment when Allow Reverse is enabled",
+        "Verify color grouping is respected",
+        "Verify sequencer order is respected in Strict Sequencer mode"
+      ],
+      "passes": false
+    },
+    {
+      "category": "stitch-engine",
+      "description": "Stitch plan assembly produces correct tie-in/tie-off, jump, trim, and color-change commands",
+      "steps": [
+        "Create a multi-color design with multiple stitch blocks",
+        "Enable stitch preview",
+        "Verify tie-in stitches at block starts",
+        "Verify tie-off stitches at block ends",
+        "Verify jumps between nearby blocks",
+        "Verify trims between distant blocks",
+        "Verify color-change commands at thread color transitions",
+        "Verify all commands visible in sequencer",
+        "Verify per-block command overrides (trim before/after, tie in/out) are respected in output"
+      ],
+      "passes": false
+    },
+    {
+      "category": "stitch-engine",
+      "description": "Geometry validation detects invalid shapes and diagnostics are actionable",
+      "steps": [
+        "Create a self-intersecting polygon",
+        "Verify diagnostics panel shows error with clear description",
+        "Create a degenerate tiny shape",
+        "Verify diagnostics shows warning",
+        "Create a shape with invalid winding order",
+        "Verify diagnostics detects it",
+        "Verify each diagnostic message explains what is wrong and how to fix it"
+      ],
+      "passes": false
+    },
+    {
+      "category": "stitch-engine",
+      "description": "Geometry repair automatically fixes common issues during export",
+      "steps": [
+        "Create a shape with incorrect winding order",
+        "Export and verify ring normalization corrects the order",
+        "Create a self-intersecting polygon",
+        "Export and verify self-intersection is resolved",
+        "Create a degenerate tiny shape",
+        "Export and verify tiny-shape fallback policy is applied",
+        "Verify invalid geometry never crashes the export pipeline"
+      ],
+      "passes": false
+    },
+    {
+      "category": "properties",
+      "description": "Properties panel shows contextual controls for selected object: name, transform, shape, fill/stroke, stitch type, density, angle",
+      "steps": [
+        "Select nothing and verify panel reads 'Select an object'",
+        "Select one object and verify Name field editable",
+        "Verify Transform fields: X, Y, rotation, scale with numeric precision",
+        "Verify Shape badge showing type and dimensions in mm",
+        "Verify Fill and Stroke color swatches with hex codes",
+        "Verify Stitch Type dropdown with Running, Satin, Tatami, Contour, Spiral, Motif",
+        "Change stitch type and verify canvas preview updates instantly",
+        "Verify Density and Angle controls always visible",
+        "Select multiple objects and verify panel shows count and shared properties"
+      ],
+      "passes": false
+    },
+    {
+      "category": "properties",
+      "description": "Satin-specific controls appear when Satin stitch type is selected",
+      "steps": [
+        "Select an object and set stitch type to Satin",
+        "Verify underlay mode selector appears with all 7 modes",
+        "Verify pull compensation numeric input appears",
+        "Verify compensation mode dropdown (off, auto, directional) appears",
+        "Select directional compensation and verify independent X/Y controls appear",
+        "Verify underlay spacing input appears when zigzag-based underlay is selected",
+        "Change underlay mode and verify controls update contextually"
+      ],
+      "passes": false
+    },
+    {
+      "category": "properties",
+      "description": "Fill-specific controls appear for Tatami, Contour, Spiral, and Motif stitch types",
+      "steps": [
+        "Set stitch type to Tatami and verify min segment, overlap, start mode, edge walk controls",
+        "Set stitch type to Contour and verify contour step size control appears",
+        "Set stitch type to Spiral and verify fill phase control appears",
+        "Set stitch type to Motif and verify pattern selector (diamond/wave/triangle), motif scale, and fill phase controls appear"
+      ],
+      "passes": false
+    },
+    {
+      "category": "sequencer",
+      "description": "Sequencer shows stitch blocks in machine execution order with type badges, color dots, and visibility/lock",
+      "steps": [
+        "Create multiple stitch objects of different types",
+        "Verify sequencer lists each as a row in execution order",
+        "Verify each row shows: block name, stitch-type badge, thread-color dot, visibility icon, lock icon",
+        "Verify stitch-type badges include Running, Satin, Tatami, Contour, Spiral, Motif, Lettering"
+      ],
+      "passes": false
+    },
+    {
+      "category": "sequencer",
+      "description": "Sequencer supports drag-to-reorder with immediate stitch plan update",
+      "steps": [
+        "Create multiple stitch objects",
+        "Drag a row to a new position in the sequencer",
+        "Verify the row moves and the stitch plan updates immediately",
+        "Enable stitch preview and verify the needle path reflects the new order",
+        "Undo the reorder and verify original order is restored"
+      ],
+      "passes": false
+    },
+    {
+      "category": "sequencer",
+      "description": "Sequencer rows expand to show per-block routing overrides with Inherit defaults",
+      "steps": [
+        "Create a stitch object",
+        "Click the chevron on a sequencer row to expand it",
+        "Verify Allow Reverse control with Inherit/Force On/Force Off options, defaulting to Inherit",
+        "Verify Entry/Exit mode control with Inherit/Auto/Preserve Start/User Anchor options",
+        "Verify Tie Mode control with Inherit/Off/Shape Start End/Color Change options",
+        "Verify Trim Before/After controls with Inherit/Force On/Force Off options",
+        "Verify Tie In/Out controls with Inherit/Force On/Force Off options",
+        "Set an override and verify inline badge appears on the row (REV, TIE, TB, TA, TI, TO)",
+        "Reset to Inherit and verify badge disappears"
+      ],
+      "passes": false
+    },
+    {
+      "category": "sequencer",
+      "description": "Sequencer operates on SequenceTrack independent of visual layer stack",
+      "steps": [
+        "Create objects on different visual layers",
+        "Reorder in the sequencer to a different order than the layer stack",
+        "Enable stitch preview and verify machine execution follows sequencer order, not layer order",
+        "Export and verify output follows sequencer order"
+      ],
+      "passes": false
+    },
+    {
+      "category": "simulation",
+      "description": "2.5D canvas stitch preview renders command-aware thread overlay with correct colors",
+      "steps": [
+        "Create a design with multiple stitch types and colors",
+        "Toggle stitch preview on from View menu",
+        "Verify every stitch is drawn in its assigned thread color",
+        "Verify jumps are visually distinct from stitches",
+        "Verify trims are visually distinct from stitches",
+        "Verify thread thickness and layering approximate real thread",
+        "Verify overlay updates in real time when changing parameters"
+      ],
+      "passes": false
+    },
+    {
+      "category": "simulation",
+      "description": "Fast preview mode shows dots and lines for responsive editing",
+      "steps": [
+        "Enable stitch preview and set simulation mode to Fast via View menu",
+        "Verify stitches render as dots and connecting lines",
+        "Verify rendering is lightweight and responsive during parameter edits",
+        "Verify no perceptible lag when tweaking density, angle, or stitch type"
+      ],
+      "passes": false
+    },
+    {
+      "category": "simulation",
+      "description": "Quality preview mode simulates realistic thread with 0.38mm width, sheen, and layering",
+      "steps": [
+        "Enable stitch preview and set simulation mode to Quality via View menu",
+        "Verify stitches render with realistic thread width (0.38mm)",
+        "Verify thread sheen approximation visible",
+        "Verify stitch layering is correct (later stitches on top)",
+        "Verify the preview is suitable for client proofing"
+      ],
+      "passes": false
+    },
+    {
+      "category": "simulation",
+      "description": "Playback animates stitch-out following sequencer order with scrub control",
+      "steps": [
+        "Enable stitch preview on a multi-color design",
+        "Click Play to start animation",
+        "Verify design builds up stitch by stitch following sequencer order",
+        "Verify color changes, jumps, and trims are visible during playback",
+        "Click Stop to pause animation",
+        "Scrub the timeline to jump to any point in the sequence",
+        "Verify canvas updates to show stitches up to the scrub position"
+      ],
+      "passes": false
+    },
+    {
+      "category": "simulation",
+      "description": "3D GPU simulation renders instanced thread geometry with anisotropic highlights and fabric response",
+      "steps": [
+        "Switch to 3D simulation mode",
+        "Verify instanced thread geometry renders via wgpu",
+        "Verify anisotropic highlight shading produces realistic thread sheen",
+        "Verify density-aware fabric response: puckering, pull-in, texture deformation visible",
+        "Verify proper stitch layering at fiber level",
+        "Load a 100k+ stitch design and verify interactive framerate",
+        "Verify 3D view produces proof-quality renders suitable for client sharing"
+      ],
+      "passes": false
+    },
+    {
+      "category": "thread-palette",
+      "description": "Thread palette offers Madeira, Isacord, Sulky catalogs with nearest-color matching",
+      "steps": [
+        "Open thread palette in properties panel",
+        "Verify Madeira catalog available with color swatches",
+        "Verify Isacord catalog available with color swatches",
+        "Verify Sulky catalog available with color swatches",
+        "Pick an arbitrary color and verify nearest physical thread match is found",
+        "Verify thread color names and codes are displayed"
+      ],
+      "passes": false
+    },
+    {
+      "category": "thread-palette",
+      "description": "Thread assignment carries through to export with exact thread codes on production worksheet",
+      "steps": [
+        "Create a design and assign specific thread colors from palette",
+        "Export to any machine format",
+        "Verify thread colors are encoded in the export file",
+        "Export production worksheet",
+        "Verify exact thread codes, order, and yardage estimates listed",
+        "Verify machine operator can identify exactly which threads to load"
+      ],
+      "passes": false
+    },
+    {
+      "category": "undo-redo",
+      "description": "Every action is undoable: moves, parameter changes, sequencer reorders, imports, deletions",
+      "steps": [
+        "Move an object, Ctrl+Z to undo, verify it returns to original position",
+        "Change stitch type, Ctrl+Z to undo, verify original type restored",
+        "Reorder in sequencer, Ctrl+Z to undo, verify original order restored",
+        "Import an SVG, Ctrl+Z to undo, verify imported objects removed",
+        "Delete an object, Ctrl+Z to undo, verify object restored",
+        "Ctrl+Shift+Z to redo each undone action and verify it reapplies",
+        "Verify undo stack is deep (supports many consecutive undos)",
+        "Verify application never reaches an inconsistent state through undo/redo"
+      ],
+      "passes": false
+    },
+    {
+      "category": "clipboard",
+      "description": "Cut, Copy, Paste, Duplicate, and Select All operations work on embroidery objects",
+      "steps": [
+        "Select an object and Ctrl+C to copy",
+        "Ctrl+V to paste, verify duplicate appears on canvas and in sequencer",
+        "Select an object and Ctrl+X to cut, verify object removed",
+        "Ctrl+V to paste the cut object back",
+        "Use Edit > Duplicate and verify duplicate created at offset",
+        "Use Edit > Select All (Ctrl+A) and verify all objects selected"
+      ],
+      "passes": false
+    },
+    {
+      "category": "navigation",
+      "description": "Zoom to Fit and Zoom to Selection center the viewport on content",
+      "steps": [
+        "Create objects scattered across the canvas",
+        "Use View > Zoom to Fit and verify all objects are visible and centered",
+        "Select a single object",
+        "Use View > Zoom to Selection and verify viewport centers and zooms on the selected object"
+      ],
+      "passes": false
+    },
+    {
+      "category": "navigation",
+      "description": "Snap to grid aligns objects to grid intersections when enabled",
+      "steps": [
+        "Enable snap from View > Toggle Snap",
+        "Drag an object and verify it snaps to grid intersections",
+        "Verify pen tool points snap to grid when placing",
+        "Disable snap and verify objects move freely"
+      ],
+      "passes": false
+    },
+    {
+      "category": "theming",
+      "description": "Dark theme renders with oklch tokens and Inter font, canvas content is visually dominant",
+      "steps": [
+        "Open Vision and verify dark theme applied",
+        "Verify background, foreground, card, panel, surface, accent, muted, border, destructive tokens render correctly",
+        "Verify Inter font stack used at 13px base size",
+        "Verify UI chrome is visually quiet: neutral tones, tight spacing",
+        "Verify canvas content is the visual star, not the UI chrome"
+      ],
+      "passes": false
+    },
+    {
+      "category": "theming",
+      "description": "Theme switching supports multiple themes including light, high contrast, and community themes",
+      "steps": [
+        "Open theme selector",
+        "Switch to light theme and verify all tokens adapt correctly",
+        "Switch to high contrast theme and verify accessibility",
+        "Load a community theme CSS file and verify application adapts",
+        "Verify theme change is instant (no page reload)"
+      ],
+      "passes": false
+    },
+    {
+      "category": "collaboration",
+      "description": "Multiple users edit the same design simultaneously with live cursors and presence",
+      "steps": [
+        "Open the same design in two browser windows",
+        "Verify both users see live cursors and presence avatars",
+        "Make an edit in window A and verify it appears in window B in real time",
+        "Make a conflicting edit in both windows simultaneously",
+        "Verify edits merge deterministically with no conflict dialog"
+      ],
+      "passes": false
+    },
+    {
+      "category": "collaboration",
+      "description": "Version history supports branching, comparing, and merging design variants",
+      "steps": [
+        "Open a design and make several edits",
+        "Branch the design to explore a variant",
+        "Make changes on the branch",
+        "Compare branch and original side by side",
+        "Merge the branch back",
+        "Verify complete version history is preserved"
+      ],
+      "passes": false
+    },
+    {
+      "category": "collaboration",
+      "description": "Team libraries share thread palettes, stitch presets, motif collections, and font packs",
+      "steps": [
+        "Create a shared team library",
+        "Add thread palette to the library",
+        "Add stitch presets to the library",
+        "Add motif collection to the library",
+        "Add embroidery font pack to the library",
+        "Verify another team member can access and use all shared items"
+      ],
+      "passes": false
+    },
+    {
+      "category": "performance",
+      "description": "50k-stitch regeneration completes in under 100ms median, 200ms P95",
+      "steps": [
+        "Create or import a design generating approximately 50k stitches",
+        "Change a stitch parameter and measure regeneration time",
+        "Repeat 20 times and compute median and P95",
+        "Verify median < 100ms",
+        "Verify P95 < 200ms"
+      ],
+      "passes": false
+    },
+    {
+      "category": "performance",
+      "description": "100k-stitch simulation maintains interactive framerate in fast mode",
+      "steps": [
+        "Create or import a design generating approximately 100k stitches",
+        "Enable stitch preview in fast mode",
+        "Pan and zoom the canvas",
+        "Verify framerate stays interactive (no visible stuttering)",
+        "Verify parameter edits still update the preview responsively"
+      ],
+      "passes": false
+    },
+    {
+      "category": "performance",
+      "description": "Import/export operations are non-blocking, cancellable, and instant for typical designs",
+      "steps": [
+        "Import a typical SVG file and verify UI remains responsive during import",
+        "Export to DST and verify UI does not freeze",
+        "Verify export completes instantly for a typical design",
+        "Start a large export and verify it can be cancelled"
+      ],
+      "passes": false
+    },
+    {
+      "category": "performance",
+      "description": "Canvas interaction maintains 60fps pan/zoom/drag at any design complexity",
+      "steps": [
+        "Load a complex design with many objects and stitch overlays",
+        "Pan the canvas and verify 60fps rendering",
+        "Zoom in and out rapidly and verify 60fps",
+        "Drag-move objects and verify 60fps during drag"
+      ],
+      "passes": false
+    }
+  ]
+}
