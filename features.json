@@ -993,7 +993,7 @@
         "Pick an arbitrary color and verify nearest physical thread match is found",
         "Verify thread color names and codes are displayed"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "thread-palette",
