@@ -1,6 +1,8 @@
 import type {
   NodeKindData,
+  QualityMetrics,
   RenderItem,
+  RouteMetrics,
   RoutingOptions,
   SimulationTimeline,
   StitchParams,
@@ -256,6 +258,30 @@ function buildMenuShortcutCommands(): Record<string, MenuShortcutCommand> {
 
 const MENU_SHORTCUT_COMMANDS = buildMenuShortcutCommands();
 
+const EMPTY_ROUTE_METRICS: RouteMetrics = {
+  jump_count: 0,
+  trim_count: 0,
+  color_change_count: 0,
+  travel_distance_mm: 0,
+  longest_travel_mm: 0,
+  route_score: 0,
+};
+
+const EMPTY_QUALITY_METRICS: QualityMetrics = {
+  stitch_count: 0,
+  jump_count: 0,
+  trim_count: 0,
+  color_change_count: 0,
+  travel_distance_mm: 0,
+  longest_travel_mm: 0,
+  route_score: 0,
+  mean_stitch_length_mm: 0,
+  stitch_length_p95_mm: 0,
+  density_error_mm: 0,
+  angle_error_deg: 0,
+  coverage_error_pct: 0,
+};
+
 type SimulationPreviewMode = "fast" | "quality";
 type CanvasContextMenuKind = "object" | "background";
 
@@ -323,6 +349,13 @@ export function App() {
     infos: 0,
   });
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
+  const [designInspectorOpen, setDesignInspectorOpen] = useState(false);
+  const [inspectorRouteMetrics, setInspectorRouteMetrics] =
+    useState<RouteMetrics>(EMPTY_ROUTE_METRICS);
+  const [inspectorQualityMetrics, setInspectorQualityMetrics] =
+    useState<QualityMetrics>(EMPTY_QUALITY_METRICS);
+  const [inspectorDimensionsMm, setInspectorDimensionsMm] = useState({ width: 0, height: 0 });
+  const [inspectorColorCount, setInspectorColorCount] = useState(0);
   const [canvasContextMenu, setCanvasContextMenu] = useState<CanvasContextMenuState | null>(null);
   const [lastMenuCommand, setLastMenuCommand] = useState("Idle");
   const defaultsLoadedRef = useRef(false);
@@ -423,11 +456,17 @@ export function App() {
         case "view/toggle-diagnostics-panel":
           setDiagnosticsOpen((previous) => !previous);
           break;
+        case "view/toggle-design-inspector":
+          setDesignInspectorOpen((previous) => !previous);
+          break;
         case "routing/allow-reverse":
           setRoutingOptions((previous) => ({
             ...previous,
             allow_reverse: !previous.allow_reverse,
           }));
+          break;
+        case "routing/open-full-routing-settings":
+          setDesignInspectorOpen(true);
           break;
       }
 
@@ -527,6 +566,53 @@ export function App() {
     const interval = window.setInterval(refreshDiagnostics, 300);
     return () => window.clearInterval(interval);
   }, [engine]);
+
+  useEffect(() => {
+    if (!engine) return;
+
+    const refreshInspector = (): void => {
+      try {
+        const route = engine.sceneRouteMetricsWithOptions(DEFAULT_STITCH_LENGTH, routingOptions);
+        const quality = engine.sceneQualityMetricsWithOptions(
+          DEFAULT_STITCH_LENGTH,
+          routingOptions,
+        );
+        const design = engine.sceneExportDesignWithOptions(DEFAULT_STITCH_LENGTH, routingOptions);
+
+        setInspectorRouteMetrics(route);
+        setInspectorQualityMetrics(quality);
+        setInspectorColorCount(design.colors.length);
+
+        if (design.stitches.length === 0) {
+          setInspectorDimensionsMm({ width: 0, height: 0 });
+        } else {
+          let minX = Number.POSITIVE_INFINITY;
+          let minY = Number.POSITIVE_INFINITY;
+          let maxX = Number.NEGATIVE_INFINITY;
+          let maxY = Number.NEGATIVE_INFINITY;
+          for (const stitch of design.stitches) {
+            minX = Math.min(minX, stitch.x);
+            minY = Math.min(minY, stitch.y);
+            maxX = Math.max(maxX, stitch.x);
+            maxY = Math.max(maxY, stitch.y);
+          }
+          setInspectorDimensionsMm({
+            width: Math.max(0, maxX - minX),
+            height: Math.max(0, maxY - minY),
+          });
+        }
+      } catch (_error) {
+        setInspectorRouteMetrics(EMPTY_ROUTE_METRICS);
+        setInspectorQualityMetrics(EMPTY_QUALITY_METRICS);
+        setInspectorDimensionsMm({ width: 0, height: 0 });
+        setInspectorColorCount(0);
+      }
+    };
+
+    refreshInspector();
+    const interval = window.setInterval(refreshInspector, 300);
+    return () => window.clearInterval(interval);
+  }, [engine, routingOptions]);
 
   useEffect(() => {
     if (!diagnosticsOpen) return;
@@ -826,6 +912,7 @@ export function App() {
       ? "Loading WASM engine..."
       : `Engine v${version}`;
   const sewTimeEstimate = formatSewTime(statusSummary.stitchCount);
+  const inspectorSewTimeEstimate = formatSewTime(inspectorQualityMetrics.stitch_count);
   const hasDiagnosticIssues = diagnosticSummary.errors + diagnosticSummary.warnings > 0;
 
   return (
@@ -1270,6 +1357,302 @@ export function App() {
                 >
                   Snap Behavior
                 </button>
+              </div>
+            )}
+
+            {engine && designInspectorOpen && (
+              <div
+                className="absolute top-10 right-3 z-30 max-h-[70vh] w-[360px] overflow-y-auto rounded-md border border-border/60 bg-panel/95 p-3 shadow-2xl shadow-black/40 backdrop-blur"
+                data-testid="design-inspector-panel"
+              >
+                <div className="mb-2 flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-foreground">Design Inspector</h2>
+                  <button
+                    type="button"
+                    className="rounded px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-accent/40 hover:text-foreground"
+                    onClick={() => setDesignInspectorOpen(false)}
+                    data-testid="design-inspector-close"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                <section
+                  className="mb-3 space-y-1.5 text-xs"
+                  data-testid="design-inspector-summary"
+                >
+                  <h3 className="text-[10px] font-semibold uppercase text-muted-foreground">
+                    Stitch Summary
+                  </h3>
+                  <div data-testid="inspector-summary-stitches">
+                    Stitches: {inspectorQualityMetrics.stitch_count}
+                  </div>
+                  <div data-testid="inspector-summary-colors">Colors: {inspectorColorCount}</div>
+                  <div data-testid="inspector-summary-sew-time">
+                    Sew Time: {inspectorSewTimeEstimate}
+                  </div>
+                  <div data-testid="inspector-summary-dimensions">
+                    Dimensions: {inspectorDimensionsMm.width.toFixed(1)}mm x{" "}
+                    {inspectorDimensionsMm.height.toFixed(1)}mm
+                  </div>
+                </section>
+
+                <section
+                  className="mb-3 space-y-1.5 text-xs"
+                  data-testid="design-inspector-routing-metrics"
+                >
+                  <h3 className="text-[10px] font-semibold uppercase text-muted-foreground">
+                    Routing Metrics
+                  </h3>
+                  <div data-testid="inspector-routing-travel">
+                    Travel: {inspectorRouteMetrics.travel_distance_mm.toFixed(2)} mm
+                  </div>
+                  <div data-testid="inspector-routing-jumps">
+                    Jumps: {inspectorRouteMetrics.jump_count}
+                  </div>
+                  <div data-testid="inspector-routing-trims">
+                    Trims: {inspectorRouteMetrics.trim_count}
+                  </div>
+                  <div data-testid="inspector-routing-colors">
+                    Color Changes: {inspectorRouteMetrics.color_change_count}
+                  </div>
+                  <div data-testid="inspector-routing-longest">
+                    Longest Travel: {inspectorRouteMetrics.longest_travel_mm.toFixed(2)} mm
+                  </div>
+                  <div data-testid="inspector-routing-score">
+                    Route Score ({routingOptions.policy}):{" "}
+                    {inspectorRouteMetrics.route_score.toFixed(2)}
+                  </div>
+                </section>
+
+                <section
+                  className="mb-3 space-y-1.5 text-xs"
+                  data-testid="design-inspector-quality-metrics"
+                >
+                  <h3 className="text-[10px] font-semibold uppercase text-muted-foreground">
+                    Quality Analysis
+                  </h3>
+                  <div data-testid="inspector-quality-mean">
+                    Mean Stitch: {inspectorQualityMetrics.mean_stitch_length_mm.toFixed(2)} mm
+                  </div>
+                  <div data-testid="inspector-quality-p95">
+                    P95 Stitch: {inspectorQualityMetrics.stitch_length_p95_mm.toFixed(2)} mm
+                  </div>
+                  <div data-testid="inspector-quality-density">
+                    Density Error: {inspectorQualityMetrics.density_error_mm.toFixed(2)} mm
+                  </div>
+                  <div data-testid="inspector-quality-angle">
+                    Angle Error: {inspectorQualityMetrics.angle_error_deg.toFixed(2)} deg
+                  </div>
+                  <div data-testid="inspector-quality-coverage">
+                    Coverage Error: {inspectorQualityMetrics.coverage_error_pct.toFixed(2)}%
+                  </div>
+                </section>
+
+                <section
+                  className="mb-3 space-y-1.5 text-xs"
+                  data-testid="design-inspector-routing-settings"
+                >
+                  <h3 className="text-[10px] font-semibold uppercase text-muted-foreground">
+                    Routing Settings
+                  </h3>
+                  <label className="flex flex-col gap-1">
+                    Policy
+                    <select
+                      value={routingOptions.policy}
+                      onChange={(event) =>
+                        setRoutingOptions((previous) => ({
+                          ...previous,
+                          policy: event.target.value as RoutingOptions["policy"],
+                        }))
+                      }
+                      data-testid="inspector-setting-policy"
+                    >
+                      <option value="balanced">Balanced</option>
+                      <option value="min_travel">Min Travel</option>
+                      <option value="min_trims">Min Trims</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    Sequence Mode
+                    <select
+                      value={routingOptions.sequence_mode}
+                      onChange={(event) =>
+                        setRoutingOptions((previous) => ({
+                          ...previous,
+                          sequence_mode: event.target.value as RoutingOptions["sequence_mode"],
+                        }))
+                      }
+                      data-testid="inspector-setting-sequence-mode"
+                    >
+                      <option value="strict_sequencer">Strict Sequencer</option>
+                      <option value="optimizer">Optimizer</option>
+                    </select>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={routingOptions.allow_reverse}
+                      onChange={(event) =>
+                        setRoutingOptions((previous) => ({
+                          ...previous,
+                          allow_reverse: event.target.checked,
+                        }))
+                      }
+                      data-testid="inspector-setting-allow-reverse"
+                    />
+                    Allow Reverse
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    Entry / Exit
+                    <select
+                      value={routingOptions.entry_exit_mode}
+                      onChange={(event) =>
+                        setRoutingOptions((previous) => ({
+                          ...previous,
+                          entry_exit_mode: event.target.value as RoutingOptions["entry_exit_mode"],
+                        }))
+                      }
+                      data-testid="inspector-setting-entry-exit"
+                    >
+                      <option value="auto">Auto</option>
+                      <option value="preserve_shape_start">Preserve Start</option>
+                      <option value="user_anchor">User Anchor</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    Tie Mode
+                    <select
+                      value={routingOptions.tie_mode}
+                      onChange={(event) =>
+                        setRoutingOptions((previous) => ({
+                          ...previous,
+                          tie_mode: event.target.value as RoutingOptions["tie_mode"],
+                        }))
+                      }
+                      data-testid="inspector-setting-tie-mode"
+                    >
+                      <option value="off">Off</option>
+                      <option value="shape_start_end">Shape Start/End</option>
+                      <option value="color_change">Color Change</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    Max Jump (mm)
+                    <input
+                      type="number"
+                      value={routingOptions.max_jump_mm}
+                      onChange={(event) =>
+                        setRoutingOptions((previous) => ({
+                          ...previous,
+                          max_jump_mm: Number(event.target.value),
+                        }))
+                      }
+                      data-testid="inspector-setting-max-jump"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    Trim Threshold (mm)
+                    <input
+                      type="number"
+                      value={routingOptions.trim_threshold_mm}
+                      onChange={(event) =>
+                        setRoutingOptions((previous) => ({
+                          ...previous,
+                          trim_threshold_mm: Number(event.target.value),
+                        }))
+                      }
+                      data-testid="inspector-setting-trim-threshold"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    Min Run Before Trim (mm)
+                    <input
+                      type="number"
+                      value={routingOptions.min_stitch_run_before_trim_mm}
+                      onChange={(event) =>
+                        setRoutingOptions((previous) => ({
+                          ...previous,
+                          min_stitch_run_before_trim_mm: Number(event.target.value),
+                        }))
+                      }
+                      data-testid="inspector-setting-min-run-before-trim"
+                    />
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={routingOptions.allow_underpath}
+                      onChange={(event) =>
+                        setRoutingOptions((previous) => ({
+                          ...previous,
+                          allow_underpath: event.target.checked,
+                        }))
+                      }
+                      data-testid="inspector-setting-underpath"
+                    />
+                    Allow Underpath
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={routingOptions.allow_color_merge}
+                      onChange={(event) =>
+                        setRoutingOptions((previous) => ({
+                          ...previous,
+                          allow_color_merge: event.target.checked,
+                        }))
+                      }
+                      data-testid="inspector-setting-color-merge"
+                    />
+                    Allow Color Merge
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={routingOptions.preserve_color_order}
+                      onChange={(event) =>
+                        setRoutingOptions((previous) => ({
+                          ...previous,
+                          preserve_color_order: event.target.checked,
+                        }))
+                      }
+                      data-testid="inspector-setting-preserve-color-order"
+                    />
+                    Preserve Color Order
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={routingOptions.preserve_layer_order}
+                      onChange={(event) =>
+                        setRoutingOptions((previous) => ({
+                          ...previous,
+                          preserve_layer_order: event.target.checked,
+                        }))
+                      }
+                      data-testid="inspector-setting-preserve-layer-order"
+                    />
+                    Preserve Layer Order
+                  </label>
+                </section>
+
+                <section
+                  className="space-y-1.5 text-xs"
+                  data-testid="design-inspector-format-compatibility"
+                >
+                  <h3 className="text-[10px] font-semibold uppercase text-muted-foreground">
+                    Format Compatibility
+                  </h3>
+                  <div>DST: Lossless</div>
+                  <div>PES: Lossless</div>
+                  <div>PEC: Lossless</div>
+                  <div>JEF: Simplification Needed</div>
+                  <div>EXP: Simplification Needed</div>
+                  <div>VP3: Simplification Needed</div>
+                  <div>HUS: Simplification Needed</div>
+                  <div>XXX: Simplification Needed</div>
+                </section>
               </div>
             )}
 

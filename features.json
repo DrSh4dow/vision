@@ -187,7 +187,7 @@
         "Verify format compatibility section showing which formats support current design without loss",
         "Close the Design Inspector and verify it disappears"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "ui-diagnostics",

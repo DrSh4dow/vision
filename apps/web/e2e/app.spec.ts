@@ -477,6 +477,75 @@ test.describe("Vision App", () => {
     await expect(page.getByTestId("sequencer-context-duplicate")).toBeVisible();
     await expect(page.getByTestId("sequencer-context-remove")).toBeVisible();
   });
+
+  test("design inspector opens from view menu with metrics, routing settings, and compatibility", async ({
+    page,
+  }) => {
+    const canvas = page.getByTestId("design-canvas");
+    const box = await canvas.boundingBox();
+    if (!box) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+
+    await page.getByTestId("tool-rect").click();
+    await page.mouse.move(cx - 30, cy - 30);
+    await page.mouse.down();
+    await page.mouse.move(cx + 30, cy + 30, { steps: 5 });
+    await page.mouse.up();
+
+    await page.getByTestId("menu-view").click();
+    await page.getByTestId("menu-view-item-toggle-design-inspector").click();
+
+    const inspector = page.getByTestId("design-inspector-panel");
+    await expect(inspector).toBeVisible();
+    await expect(page.getByTestId("design-inspector-summary")).toBeVisible();
+    await expect(page.getByTestId("inspector-summary-stitches")).toBeVisible();
+    await expect(page.getByTestId("inspector-summary-colors")).toBeVisible();
+    await expect(page.getByTestId("inspector-summary-sew-time")).toBeVisible();
+    await expect(page.getByTestId("inspector-summary-dimensions")).toContainText("mm");
+
+    await expect(page.getByTestId("design-inspector-routing-metrics")).toBeVisible();
+    await expect(page.getByTestId("inspector-routing-travel")).toContainText("mm");
+    await expect(page.getByTestId("inspector-routing-jumps")).toBeVisible();
+    await expect(page.getByTestId("inspector-routing-trims")).toBeVisible();
+    await expect(page.getByTestId("inspector-routing-colors")).toBeVisible();
+    await expect(page.getByTestId("inspector-routing-longest")).toContainText("mm");
+    await expect(page.getByTestId("inspector-routing-score")).toBeVisible();
+
+    await expect(page.getByTestId("design-inspector-quality-metrics")).toBeVisible();
+    await expect(page.getByTestId("inspector-quality-mean")).toContainText("mm");
+    await expect(page.getByTestId("inspector-quality-p95")).toContainText("mm");
+    await expect(page.getByTestId("inspector-quality-density")).toContainText("mm");
+    await expect(page.getByTestId("inspector-quality-angle")).toContainText("deg");
+    await expect(page.getByTestId("inspector-quality-coverage")).toContainText("%");
+
+    await expect(page.getByTestId("inspector-setting-policy")).toBeVisible();
+    await expect(page.getByTestId("inspector-setting-sequence-mode")).toBeVisible();
+    await expect(page.getByTestId("inspector-setting-allow-reverse")).toBeVisible();
+    await expect(page.getByTestId("inspector-setting-entry-exit")).toBeVisible();
+    await expect(page.getByTestId("inspector-setting-tie-mode")).toBeVisible();
+    await expect(page.getByTestId("inspector-setting-max-jump")).toBeVisible();
+    await expect(page.getByTestId("inspector-setting-trim-threshold")).toBeVisible();
+    await expect(page.getByTestId("inspector-setting-min-run-before-trim")).toBeVisible();
+    await expect(page.getByTestId("inspector-setting-underpath")).toBeVisible();
+    await expect(page.getByTestId("inspector-setting-color-merge")).toBeVisible();
+    await expect(page.getByTestId("inspector-setting-preserve-color-order")).toBeVisible();
+    await expect(page.getByTestId("inspector-setting-preserve-layer-order")).toBeVisible();
+
+    const routeScoreBefore = await page.getByTestId("inspector-routing-score").textContent();
+    await page.getByTestId("inspector-setting-policy").selectOption("min_travel");
+    await expect(page.getByTestId("inspector-routing-score")).not.toHaveText(
+      routeScoreBefore ?? "",
+      {
+        timeout: 3_000,
+      },
+    );
+
+    await expect(page.getByTestId("design-inspector-format-compatibility")).toBeVisible();
+
+    await page.getByTestId("design-inspector-close").click();
+    await expect(inspector).toBeHidden();
+  });
 });
 
 test.describe("WASM Engine Integration", () => {
