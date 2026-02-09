@@ -12,7 +12,7 @@ We stand on the shoulders of the incredible work done by the Ink/Stitch communit
 
 ## What the user sees
 
-Vision opens as a fullscreen application with three areas and a floating toolbar. There is no sidebar toggle, no collapsing panels, no mode switcher. The layout is fixed and intentional: everything a digitizer needs is visible, and nothing else is.
+Vision opens as a fullscreen application. A menu bar at the top, a canvas in the center, the sequencer on the left, properties on the right, a status bar at the bottom, and a floating toolbar over the canvas. There is no sidebar toggle, no collapsing panels, no mode switcher. The layout is fixed and intentional: everything a digitizer needs is visible, and nothing else is.
 
 ### The canvas
 
@@ -22,7 +22,7 @@ Objects on the canvas are not vector art. They are embroidery objects. Every sha
 
 ### The sequencer
 
-The left panel is the sequencer. It represents the machine's execution order: the exact sequence of stitch blocks, top to bottom, that the needle will follow. Each row shows the block name, a stitch-type badge (Running, Satin, Tatami, Contour, Spiral, Motif), a thread-color dot, and visibility/lock icons.
+The left panel is the sequencer. It represents the machine's execution order: the exact sequence of stitch blocks, top to bottom, that the needle will follow. Each row shows the block name, a stitch-type badge (Running, Satin, Tatami, Contour, Spiral, Motif, Lettering), a thread-color dot, and visibility/lock icons.
 
 This is not a layer panel. Layers describe how a design looks on screen. The sequencer describes how a design is sewn. You drag rows to reorder them and the stitch plan updates instantly. Expand any row with its chevron to reveal per-block routing controls: tie mode, trim behavior, entry/exit strategy, reverse direction -- all defaulting to "Inherit Global" so you only override when you need to. Small badges (REV, TIE, TB, TA, TI, TO) appear inline when overrides are active, so you can scan the sequence at a glance and know exactly which blocks have custom behavior.
 
@@ -32,15 +32,41 @@ The sequencer is the single source of truth for machine output.
 
 The right panel is entirely contextual. When nothing is selected, it reads "Select an object." When one object is selected, it shows every parameter that controls how that object becomes thread on fabric. When multiple objects are selected, it shows the count and shared properties.
 
-Below the properties sits the thread palette -- professional catalogs from Madeira, Isacord, and Sulky with nearest-color matching. Below that sits the diagnostics panel, a live preflight check that flags geometry errors, missing guide rails, and suspicious parameter combinations before you ever hit export.
+Below the properties sits the thread palette -- professional catalogs from Madeira, Isacord, and Sulky with nearest-color matching. The right panel is dedicated to properties and thread -- nothing else competes for its space.
+
+### The menu bar
+
+The top of the window is a native-feeling menu bar in the macOS tradition: **File | Edit | View | Design | Routing | Help**. Every command in Vision is discoverable here, with keyboard shortcuts listed next to each item. This is how a new user explores the application -- by reading the menus.
+
+**File** -- New, Open, Import SVG, Import Bitmap, Export (with a submenu for every machine format: DST, PES, PEC, JEF, EXP, VP3, HUS, XXX), Export Production Worksheet, Save Project, Recent Files.
+
+**Edit** -- Undo, Redo, Cut, Copy, Paste, Duplicate, Delete, Select All. The familiar foundation that makes Vision feel like software you already know.
+
+**View** -- Zoom In, Zoom Out, Zoom to Fit, Zoom to Selection, Toggle Grid, Toggle Snap, Toggle Stitch Preview, Simulation Mode (Fast / Quality), Toggle Diagnostics Panel, Toggle Design Inspector. This is where you control what you see without hunting for tiny icon buttons.
+
+**Design** -- Stitch Type submenu (Running, Satin, Tatami, Contour, Spiral, Motif), Assign Thread Color, Auto-Digitize Selection, Validate Design, Repair Geometry. The menu-bar path to operations that also live in the context menu -- because discoverability matters more than minimalism.
+
+**Routing** -- Routing Policy (Balanced, Min Travel, Min Trims), Sequence Mode (Strict Sequencer, Optimizer), global tie mode, allow reverse, and a link to open the full routing settings. These are the same controls that live in the Design Inspector, surfaced here so they are one click away from the top level.
+
+**Help** -- Keyboard Shortcuts, Documentation, About Vision.
+
+A professional never opens the menus. They know the shortcuts, they live in the context menus, they have muscle memory for every operation. But the menus are there for everyone else -- and they make Vision feel like a real application, not a tech demo with icon buttons.
 
 ### The floating toolbar
 
-A small, frosted-glass toolbar floats at the top center of the canvas. Four tools: Select (V), Pen (P), Rectangle (R), Ellipse (E). That is the entire surface-level toolset. Everything else -- stitch assignment, routing, underlay, compensation, export options -- lives in the context menu and property panel. The toolbar is deliberately minimal so the canvas dominates the experience.
+A small, frosted-glass toolbar floats at the top center of the canvas. Five tools: Select (V), Pen (P), Text (T), Rectangle (R), Ellipse (E). That is the entire drawing toolset on the canvas surface. Everything else -- stitch assignment, routing, underlay, compensation, export -- lives in the menu bar, context menus, and property panel. The toolbar is deliberately minimal so the canvas dominates the experience.
 
-### The top bar
+### The status bar
 
-A slim 36px header carries the Vision brand, import/export actions, routing policy selector, simulation toggles (Thread On/Off, Play/Stop, Fast/Quality), and live quality metrics. At any moment you can read the jump count, travel distance, route score, density error, and angle error without opening a panel. The top bar is an information radiator, not a toolbar.
+At the bottom of the canvas sits a quiet, information-dense status bar. It is always visible and never demands attention -- but when you glance at it, you know the health of your design at a glance:
+
+**Left side** -- cursor position in mm, zoom level, object count. The spatial awareness a digitizer needs while working.
+
+**Center** -- a compact design summary: total stitch count, color count, estimated sew time. The numbers that matter for quoting a job.
+
+**Right side** -- a severity summary: a green checkmark when the design is clean, or a warning/error count (e.g., "2 warnings") that you can click to open the diagnostics panel. This is the only persistent quality indicator on the screen. It is enough to tell you whether something needs attention, without showing you the details until you ask.
+
+The status bar is calm, readable, and gives every important number in a format a beginner can understand without a legend.
 
 ### Context menus: where the power lives
 
@@ -58,15 +84,15 @@ The context menu is the secret handshake between Vision's simple surface and its
 
 ### Opening Vision for the first time
 
-You navigate to Vision in your browser. The engine initializes instantly. A dark canvas appears with a soft millimeter grid, origin crosshairs, and the floating toolbar. The sequencer reads "No stitch objects yet." The properties panel reads "Select an object." The top bar shows the engine version and a quiet status indicator.
+You navigate to Vision in your browser. The engine initializes instantly. A dark canvas appears with a soft millimeter grid, origin crosshairs, and the floating toolbar. A clean menu bar sits at the top. The sequencer on the left reads "No stitch objects yet." The properties panel on the right reads "Select an object." The status bar at the bottom shows the zoom level and a green checkmark -- nothing to worry about.
 
-There is nothing to configure. No project setup. No wizard. You look at four tool icons and you understand.
+There is nothing to configure. No project setup. No wizard. You see five tool icons on the canvas and a menu bar you can explore. You understand.
 
 ### Importing artwork: the bitmap autodigitizer
 
 Most users arrive with a logo -- a PNG or JPEG that a client sent with "can you put this on a polo shirt?"
 
-You click Import in the top bar and select the image file. Vision's autodigitizer takes over:
+You open File > Import Bitmap and select the image. Vision's autodigitizer takes over:
 
 1. **Color separation.** The bitmap is analyzed into distinct color regions. The algorithm clusters similar colors, eliminates noise, and presents a clean color-layer stack. Each layer maps to a thread color. You can merge layers, split them, or reassign colors before proceeding.
 
@@ -74,7 +100,7 @@ You click Import in the top bar and select the image file. Vision's autodigitize
 
 3. **Automatic stitch assignment.** Vision classifies each shape by its geometry and assigns the optimal stitch type. Narrow elongated regions become satin columns with appropriate underlay. Large filled areas become tatami fills with sensible density and angle. Thin outlines become running stitches. Every parameter -- density, angle, pull compensation, underlay mode -- is set to production defaults based on the shape's size and aspect ratio.
 
-4. **Sequence optimization.** The routing engine orders the stitch blocks to minimize jumps, trims, and thread changes. Same-color blocks are grouped. Entry and exit points are chosen to reduce travel. The result is scored and the metrics appear in the top bar.
+4. **Sequence optimization.** The routing engine orders the stitch blocks to minimize jumps, trims, and thread changes. Same-color blocks are grouped. Entry and exit points are chosen to reduce travel. The result is scored and the metrics appear in the status bar.
 
 You go from a client's JPEG to an embroidery-ready stitch plan in seconds. And nothing is hidden: every decision the autodigitizer made is visible in the sequencer and editable in the properties panel. Select any object, change its stitch type, tweak its density, drag it to a different position in the sequence. The autodigitizer is a starting point you can trust and a foundation you can refine.
 
@@ -82,7 +108,13 @@ For users who already have vector artwork, Vision imports SVG files. Each path b
 
 ### Drawing from scratch
 
-Pick the Pen tool (P). Click points on the canvas to place a path. Press Enter to close it. The shape appears instantly in the sequencer with a default stitch type assigned. Pick Rectangle (R) or Ellipse (E) and click-drag on the canvas. The rubber-band preview shows you the shape in real time; release to commit it.
+Pick the Pen tool (P) and you have a full bezier path editor. Click to place a corner point. Click and drag to pull out curve handles -- the path bends into a smooth cubic bezier, and you see the curve form live as you move the mouse. Release, click the next point, drag again. You are sculpting the exact boundary that stitches will follow, and the feedback is immediate: the path previews on canvas as you build it, point by point, curve by curve.
+
+Hold Shift while dragging a handle to constrain it to 45-degree increments -- useful for precise symmetry. Click back on the first point to close the shape, or press Enter to finish an open path. Press Escape to cancel. The moment the path is committed, it appears in the sequencer as a stitch object with default parameters assigned.
+
+The bezier tool is how you trace complex shapes by hand: the curve of a letter, the outline of a mascot's head, the contour of a leaf. The curves you draw are not approximations -- they are the exact geometry the stitch engine will follow. A smooth bezier produces smooth satin rails. A sharp corner produces a clean stitch transition. What you draw is what you sew.
+
+For simpler shapes, pick Rectangle (R) or Ellipse (E) and click-drag on the canvas. The rubber-band preview shows the shape in real time; release to commit it.
 
 Every shape you create is an embroidery object from the moment it exists. There is no "convert to embroidery" step, no separate digitizing mode, no export pipeline to trigger. Vision is embroidery-first. Shapes exist to hold stitch parameters. The canvas is not a drawing surface that happens to export stitches -- it is a digitizing surface that happens to look like a drawing tool.
 
@@ -136,19 +168,27 @@ The sequencer operates on the `SequenceTrack` -- a dedicated ordering that is in
 
 ### Adding lettering
 
-Click the Text tool or use the lettering shortcut. Type your text and Vision generates embroidery-ready letter forms:
+Lettering is half the embroidery business. Names on uniforms, monograms on towels, slogans on caps -- if a digitizing tool cannot do text well, it cannot do production work. Vision treats lettering as a first-class workflow, not an afterthought bolted onto a shape editor.
 
-- Each glyph is built from satin columns with automatic two-rail generation.
-- Kerning, tracking, and leading are adjustable.
-- Text follows a baseline, a curve, or an arbitrary vector path.
-- Monogram templates provide quick presets: circle, diamond, stacked, and arc layouts for the monogramming jobs that are the bread and butter of commercial embroidery.
-- A curated embroidery font library ships with Vision, optimized for stitch output rather than screen rendering -- proper stroke widths, clean corners, consistent density.
+Press T for the Text tool. Click on the canvas and a text input activates. Type your text. Vision generates embroidery-optimized letter forms instantly -- not screen fonts rasterized into stitches, but purpose-built glyph outlines designed from the start for needle and thread.
 
-Lettering objects appear in the sequencer like any other stitch block. You can reorder them, override their routing, adjust their stitch parameters, and export them alongside the rest of the design.
+Each glyph is constructed from satin columns with automatic two-rail generation. The engine analyzes the stroke geometry of every letter: straight segments get clean parallel rails, curves get smoothly interpolated rails with proper short-stitch handling, serifs and terminals get density-appropriate transitions. The result is lettering that sews cleanly at any size, from 6mm cap text to 50mm jacket backs.
+
+The properties panel shows lettering-specific controls:
+- **Font** -- a curated embroidery font library ships with Vision. These are not desktop fonts converted to outlines. They are fonts designed for stitch output: consistent stroke widths, clean corners, proper spacing at embroidery scales.
+- **Size** -- in millimeters, because that is what the machine cares about.
+- **Kerning and tracking** -- adjust letter spacing globally or between specific pairs.
+- **Leading** -- line spacing for multi-line text.
+- **Path text** -- attach the text to a baseline, a circle, an arc, or any arbitrary vector path drawn with the Pen tool. The letters flow along the curve with automatic spacing adjustment.
+- **Stitch parameters** -- density, underlay, pull compensation. All the same controls available on any satin object, because lettering glyphs are satin objects.
+
+Monogram templates provide one-click layouts for the jobs digitizers do every day: three-letter circle monograms, diamond frames, stacked initials, arc layouts for caps. Pick a template, type the initials, adjust the size, and the monogram is ready to sew. The template handles the layout, the spacing, and the decorative frame. You handle the thread color.
+
+Every letter, every word, every monogram appears in the sequencer as individual stitch blocks. You can reorder them relative to the rest of the design, override their routing, split a word into individual letters for color changes, or merge adjacent letters into a single block for fewer trims. Lettering is not a special mode -- it is just another way to create embroidery objects that live in the same sequence, the same stitch plan, the same export pipeline as everything else.
 
 ### Previewing the stitch-out
 
-Toggle "Thread On" in the top bar. The canvas overlays a full stitch simulation: every stitch drawn in its assigned thread color, following the exact needle path.
+Toggle the stitch preview from the View menu (or its shortcut). The canvas overlays a full stitch simulation: every stitch drawn in its assigned thread color, following the exact needle path.
 
 Two rendering modes:
 - **Fast** -- dots and lines. Lightweight, responsive, designed for editing. You tweak a parameter and see the result without lag.
@@ -158,43 +198,38 @@ Hit **Play** to animate the stitch-out. The playback follows the sequencer order
 
 The 3D GPU simulation takes this further: instanced thread geometry rendered through wgpu with anisotropic highlights for realistic thread sheen and density-aware fabric response -- puckering, pull-in, and texture. The 3D view stays interactive at 100k+ stitches and produces proof-quality renders you can share with clients as-is.
 
-### Checking quality
+### The Design Inspector
 
-The top bar is a live quality dashboard:
-- **T** -- total travel distance in mm. Lower is better.
-- **J** -- jump count. Fewer jumps = cleaner production.
-- **R** -- aggregate route score.
-- **QD** -- density error. How far actual stitch density deviates from your targets.
-- **QA** -- angle error. How far stitch angles deviate from your requested angles.
+Open the Design Inspector from the View menu (or its keyboard shortcut) and a dedicated panel appears with the full quality report for your design. This is not a cryptic line of abbreviations -- it is a proper, readable analysis:
 
-Open the advanced routing panel for the full picture: stitch count, mean and P95 stitch length, trim count, color change count, longest single travel move, and coverage error percentage. These metrics update live as you edit.
+- **Stitch summary** -- total stitch count, color count, estimated sew time, design dimensions in mm.
+- **Routing metrics** -- total travel distance, jump count, trim count, color change count, longest single travel move, aggregate route score. Each metric has a label, a value, and a unit. No guessing what "T:12.4" means.
+- **Quality analysis** -- mean and P95 stitch length, density error (how far actual density deviates from targets), angle error (how far stitch angles deviate from requested angles), coverage error percentage.
+- **Routing settings** -- the full routing configuration in one place:
+  - Policy: Balanced, Min Travel, or Min Trims.
+  - Sequence Mode: Strict Sequencer (your manual order, exactly) or Optimizer (the engine reorders for efficiency).
+  - Allow Reverse, Entry/Exit mode, Tie Mode.
+  - Max Jump and Trim Threshold distances.
+  - Min Run Before Trim.
+  - Allow Underpath, Color Merge, Preserve Color Order, Preserve Layer Order.
 
-### Routing controls
+Every setting has sensible defaults. Most users never change them. Professionals open the Design Inspector per-job, dial the routing policy, and watch the metrics update live as the engine re-scores the result.
 
-Global routing settings sit in the top bar and the advanced routing panel:
-
-- **Policy** -- Balanced, Min Travel, or Min Trims.
-- **Sequence Mode** -- Strict Sequencer (your manual order, exactly) or Optimizer (the engine reorders for efficiency).
-- **Allow Reverse** -- the engine can flip block stitch direction for better transitions.
-- **Entry/Exit** -- auto, preserve shape start, or user-defined anchors.
-- **Tie Mode** -- off, at shape boundaries, or at color changes.
-- **Max Jump / Trim Threshold** -- distance thresholds controlling when a jump becomes a trim.
-- **Min Run Before Trim** -- minimum stitch distance before the engine inserts a trim.
-- **Allow Underpath / Color Merge / Preserve Color Order / Preserve Layer Order** -- advanced toggles for fine-grained control.
-
-Defaults are tuned for production quality. Most users never change them. Professionals dial them per-job.
+The Design Inspector is also where you see format compatibility at a glance: which export formats can represent your design without loss, and which will require simplification. You know before you export, not after.
 
 ### Diagnostics
 
-The diagnostics panel runs a live preflight check on the design:
+Click the warning/error count in the status bar -- or open View > Diagnostics -- and a panel slides up from the bottom of the canvas, like a terminal in a code editor. This is the diagnostics panel: a live preflight check on the entire design.
 
 - **Errors** (red) -- geometry problems that will produce bad stitches. Self-intersecting polygons, degenerate shapes, invalid winding order.
 - **Warnings** (amber) -- potential issues. Disjoint fill components, missing guide rails, narrow shapes assigned to fill types, suspicious parameter combinations.
-- **Info** (grey) -- observations. Stitch count estimates, format compatibility notes.
+- **Info** (grey) -- observations. Stitch count estimates, format notes, optimization suggestions.
 
-Click any diagnostic row and the problematic object highlights on the canvas. Every message is actionable -- it says what is wrong and what to do about it.
+The list is filterable by severity. Click any row and the problematic object highlights on the canvas and selects in the sequencer. Every message is actionable -- it says what is wrong and what to do about it, not just that something failed.
 
-Vision automatically repairs common geometry issues during the export pipeline: ring normalization, self-intersection resolution, tiny-shape fallback. Invalid geometry never crashes an export. The worst case is a warning you can inspect and fix.
+Vision automatically repairs common geometry issues during export: ring normalization, self-intersection resolution, tiny-shape fallback. Invalid geometry never crashes an export. The worst case is a warning you can inspect and fix.
+
+The diagnostics panel closes with a click or a keypress. When the design is clean, the status bar shows a green checkmark and the panel has nothing to show. It exists for the moments you need it and vanishes when you do not.
 
 ### Choosing thread colors
 
@@ -202,7 +237,7 @@ The thread palette panel offers three professional catalogs: Madeira, Isacord, a
 
 ### Exporting for production
 
-The top bar has dedicated export buttons. One click, instant download:
+Open File > Export and pick your format. One click, instant download:
 
 - **DST** (Tajima) -- the universal commercial format.
 - **PES** (Brother) -- for Brother home and semi-pro machines.
@@ -229,13 +264,14 @@ Every action in Vision is undoable. Move, resize, rotate, reparent, reorder, cha
 
 All embroidery computation runs in a Rust engine compiled to WebAssembly. The engine is the core of Vision -- it generates stitches, validates geometry, routes stitch blocks, encodes machine formats, and assembles simulation timelines. Everything runs client-side. Nothing touches a server.
 
-**Six stitch types, production-grade:**
+**Six stitch types plus a dedicated lettering engine, production-grade:**
 - **Running stitch** -- path-following stitches with configurable segment length, path smoothing, min/max segment clamping, bean stitch (triple-run reinforcement), and manual stitch placement.
 - **Satin columns** -- two-rail satin with automatic rail pairing and seven underlay modes (center walk, edge walk, zigzag, and all combinations). Pull compensation with per-axis directional control. Short-stitch handling on tight curves. Width, density, and angle consistency across the full column length.
 - **Tatami fill** -- row-scheduled parallel fill with configurable angle, stagger offsets between rows for organic texture, gap-fill rows to eliminate coverage holes, start/end entry strategies, edge-walk boundary rows, and precise overlap control.
 - **Contour fill** -- inner-to-outer, single spiral, and double spiral strategies with join style controls at contour transitions.
 - **Spiral fill** -- center-point stability, hole handling within fill regions, and density consistency across spiral arms.
 - **Motif fill** -- extensible pattern library (diamond, wave, triangle, and more) with repeat alignment, scaling, phase, and rotation controls.
+- **Lettering engine** -- glyph decomposition into satin columns with automatic two-rail generation, embroidery-optimized font library, kerning/tracking/leading controls, path text along arbitrary curves, and monogram template system.
 
 **Auto-routing** -- travel path optimization between stitch blocks. The engine scores routes by jump count, trim count, and travel distance under the selected policy. Blocks can be reversed for optimal entry/exit alignment. Color grouping and sequencer order are respected.
 
