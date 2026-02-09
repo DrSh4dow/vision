@@ -404,7 +404,7 @@
         "Verify SVG path commands (M, L, C, Q, A, Z) are parsed correctly",
         "Select an imported path and verify properties panel shows shape info"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "import",
