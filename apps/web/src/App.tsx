@@ -5,7 +5,7 @@ import type {
   SimulationTimeline,
   StitchParams,
 } from "@vision/wasm-bridge";
-import { Circle, MousePointer2, PenTool, Square } from "lucide-react";
+import { Circle, MousePointer2, PenTool, Square, Type } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { DiagnosticsPanel } from "@/components/DiagnosticsPanel";
@@ -46,6 +46,8 @@ const FALLBACK_ROUTING_OPTIONS: RoutingOptions = {
 const PREVIEW_ROUTING_OVERRIDES: Pick<RoutingOptions, "sequence_mode"> = {
   sequence_mode: "strict_sequencer",
 };
+
+const MENU_BAR_ITEMS = ["File", "Edit", "View", "Design", "Routing", "Help"] as const;
 
 function colorToCss(color: { r: number; g: number; b: number }): string {
   return `rgb(${color.r}, ${color.g}, ${color.b})`;
@@ -97,6 +99,13 @@ export function App() {
   const [routingOptions, setRoutingOptions] = useState<RoutingOptions>(FALLBACK_ROUTING_OPTIONS);
   const [defaultStitchParams, setDefaultStitchParams] =
     useState<StitchParams>(DEFAULT_STITCH_PARAMS);
+  const [cursorPositionMm, setCursorPositionMm] = useState<DesignPoint>({ x: 0, y: 0 });
+  const [canvasZoom, setCanvasZoom] = useState(1);
+  const [statusSummary, setStatusSummary] = useState({
+    objectCount: 0,
+    stitchCount: 0,
+    colorCount: 0,
+  });
   const defaultsLoadedRef = useRef(false);
 
   // Canvas data: scene render items + stitch overlays
@@ -132,6 +141,19 @@ export function App() {
       renderItems: items,
       stitchOverlays,
     };
+
+    const nextSummary = {
+      objectCount: items.length,
+      stitchCount: stitchOverlays.reduce((total, overlay) => total + overlay.points.length, 0),
+      colorCount: new Set(stitchOverlays.map((overlay) => overlay.color)).size,
+    };
+    setStatusSummary((prev) =>
+      prev.objectCount === nextSummary.objectCount &&
+      prev.stitchCount === nextSummary.stitchCount &&
+      prev.colorCount === nextSummary.colorCount
+        ? prev
+        : nextSummary,
+    );
   }, [engine, playbackEnabled, playbackTick, routingOptions, showThreadPreview, simulationMode]);
 
   const { selectedIds, selectNode, deselectAll } = useSelection(engine, refreshScene);
@@ -331,6 +353,8 @@ export function App() {
     onSelectionDragCommit: handleSelectionDragCommit,
     onShapeDragEnd: handleShapeDragEnd,
     onPenClick: handlePenClick,
+    onCursorMove: setCursorPositionMm,
+    onCameraChange: (camera) => setCanvasZoom(camera.zoom),
     penPoints: penState.points,
   });
 
@@ -357,7 +381,32 @@ export function App() {
   return (
     <TooltipProvider>
       <div className="flex h-full flex-col bg-background">
-        {/* Top bar */}
+        {/* Top menu bar */}
+        <header
+          className="flex h-8 shrink-0 items-center border-b border-border/40 bg-panel px-3"
+          data-testid="menu-bar"
+        >
+          <nav className="flex items-center text-[12px] font-medium text-foreground/90" aria-label="Main menu">
+            {MENU_BAR_ITEMS.map((item, index) => (
+              <div key={item} className="flex items-center">
+                <button
+                  type="button"
+                  className="rounded-sm px-2 py-1 hover:bg-accent/40"
+                  data-testid={`menu-${item.toLowerCase()}`}
+                >
+                  {item}
+                </button>
+                {index < MENU_BAR_ITEMS.length - 1 && (
+                  <span className="px-0.5 text-muted-foreground/70" aria-hidden="true">
+                    |
+                  </span>
+                )}
+              </div>
+            ))}
+          </nav>
+        </header>
+
+        {/* Utility bar */}
         <header className="flex h-9 shrink-0 items-center justify-between border-b border-border/40 bg-panel px-3">
           <div className="flex items-center gap-2.5">
             <span
@@ -471,6 +520,14 @@ export function App() {
                 />
                 {/* !size-[15px]: overrides Button's [&_svg]:size-4 default */}
                 <ToolButton
+                  icon={<Type className="!size-[15px]" />}
+                  label="Text"
+                  shortcut="T"
+                  active={activeTool === "text"}
+                  onClick={() => setActiveTool("text")}
+                />
+                {/* !size-[15px]: overrides Button's [&_svg]:size-4 default */}
+                <ToolButton
                   icon={<Square className="!size-[15px]" />}
                   label="Rect"
                   shortcut="R"
@@ -487,6 +544,28 @@ export function App() {
                 />
               </div>
             </div>
+
+            <footer
+              className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex h-8 items-center justify-between border-t border-border/40 bg-panel/90 px-3 text-[10px] text-muted-foreground backdrop-blur-sm"
+              data-testid="status-bar"
+              aria-label="Status bar"
+            >
+              <div className="flex items-center gap-3" data-testid="status-left">
+                <span data-testid="status-cursor">
+                  {cursorPositionMm.x.toFixed(1)}mm, {cursorPositionMm.y.toFixed(1)}mm
+                </span>
+                <span data-testid="status-zoom">Zoom {Math.round(canvasZoom * 100)}%</span>
+                <span data-testid="status-objects">Objects {statusSummary.objectCount}</span>
+              </div>
+              <div className="flex items-center gap-3" data-testid="status-center">
+                <span data-testid="status-stitches">Stitches {statusSummary.stitchCount}</span>
+                <span data-testid="status-colors">Colors {statusSummary.colorCount}</span>
+              </div>
+              <div className="flex items-center gap-2 text-emerald-400" data-testid="status-right">
+                <span aria-hidden="true">●</span>
+                <span data-testid="status-severity">No diagnostics</span>
+              </div>
+            </footer>
           </main>
 
           {/* Right panel — Properties + Thread Palette */}

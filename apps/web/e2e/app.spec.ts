@@ -50,6 +50,36 @@ test.describe("Vision App", () => {
     await expect(leftPanel).toBeVisible();
     await expect(rightPanel).toBeVisible();
   });
+
+  test("workspace shell layout matches core regions", async ({ page }) => {
+    const menuBar = page.getByTestId("menu-bar");
+    await expect(menuBar).toBeVisible();
+
+    for (const menu of ["file", "edit", "view", "design", "routing", "help"]) {
+      await expect(page.getByTestId(`menu-${menu}`)).toBeVisible();
+    }
+
+    const leftPanel = page.getByTestId("panel-left");
+    const canvas = page.getByTestId("design-canvas");
+    const rightPanel = page.getByTestId("panel-right");
+    const statusBar = page.getByTestId("status-bar");
+    const toolbar = page.getByRole("toolbar", { name: "Drawing tools" });
+
+    await expect(leftPanel).toBeVisible();
+    await expect(canvas).toBeVisible();
+    await expect(rightPanel).toBeVisible();
+    await expect(statusBar).toBeVisible();
+    await expect(toolbar).toBeVisible();
+
+    const canvasBox = await canvas.boundingBox();
+    const statusBox = await statusBar.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    expect(statusBox).toBeTruthy();
+    if (!canvasBox || !statusBox) return;
+
+    // Status bar should be anchored to bottom of the canvas region.
+    expect(statusBox.y).toBeGreaterThan(canvasBox.y + canvasBox.height - statusBox.height - 4);
+  });
 });
 
 test.describe("WASM Engine Integration", () => {

@@ -45,6 +45,10 @@ interface UseCanvasOptions {
   onSelectionDragCommit?: (nodeIds: number[], deltaMm: DesignPoint) => void;
   /** Current pen tool points (for live preview). */
   penPoints?: DesignPoint[];
+  /** Reports current cursor position in world-space millimeters. */
+  onCursorMove?: (pointMm: DesignPoint) => void;
+  /** Reports camera changes (zoom/pan). */
+  onCameraChange?: (camera: Camera) => void;
 }
 
 /**
@@ -68,6 +72,8 @@ export function useCanvas({
   onPenClick,
   onSelectionDragCommit,
   penPoints,
+  onCursorMove,
+  onCameraChange,
 }: UseCanvasOptions): React.RefObject<HTMLCanvasElement | null> {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cameraRef = useRef<Camera>({ x: 0, y: 0, zoom: 1 });
@@ -235,6 +241,7 @@ export function useCanvas({
       cam.zoom = newZoom;
       cam.x = worldX - (mouseX - rect.width / 2) / newZoom;
       cam.y = worldY - (mouseY - rect.height / 2) / newZoom;
+      onCameraChange?.({ ...cam });
     };
 
     const onMouseDown = (e: MouseEvent): void => {
@@ -311,6 +318,8 @@ export function useCanvas({
     };
 
     const onMouseMove = (e: MouseEvent): void => {
+      onCursorMove?.(screenToWorld(e.clientX, e.clientY));
+
       if (isDragging.current) {
         const cam = cameraRef.current;
         const dx = e.clientX - lastMouse.current.x;
@@ -318,6 +327,7 @@ export function useCanvas({
         cam.x -= dx / cam.zoom;
         cam.y -= dy / cam.zoom;
         lastMouse.current = { x: e.clientX, y: e.clientY };
+        onCameraChange?.({ ...cam });
         return;
       }
 
@@ -405,6 +415,7 @@ export function useCanvas({
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
     window.addEventListener("keydown", onKeyDown);
+    onCameraChange?.({ ...cameraRef.current });
 
     return () => {
       el.removeEventListener("wheel", onWheel);
@@ -422,6 +433,8 @@ export function useCanvas({
     onShapeDragEnd,
     onPenClick,
     onSelectionDragCommit,
+    onCameraChange,
+    onCursorMove,
     screenToWorld,
   ]);
 

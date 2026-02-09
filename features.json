@@ -12,7 +12,7 @@
         "Verify status bar at bottom of canvas",
         "Verify floating toolbar over canvas center"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "ui-menu-bar",
