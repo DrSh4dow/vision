@@ -72,7 +72,7 @@
         "Verify Validate Design item",
         "Verify Repair Geometry item"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "ui-menu-bar",

@@ -154,6 +154,26 @@ test.describe("Vision App", () => {
     await expect(page.getByTestId("menu-view-item-toggle-diagnostics-panel")).toBeVisible();
     await expect(page.getByTestId("menu-view-item-toggle-design-inspector")).toBeVisible();
   });
+
+  test("design menu contains stitch type and design operations", async ({ page }) => {
+    await page.getByTestId("menu-design").click();
+    await expect(page.getByTestId("menu-design-panel")).toBeVisible();
+
+    const stitchType = page.getByTestId("menu-design-item-stitch-type");
+    await expect(stitchType).toBeVisible();
+    await stitchType.hover();
+    await expect(page.getByTestId("menu-design-submenu-stitch-type")).toBeVisible();
+    for (const stitchTypeName of ["running", "satin", "tatami", "contour", "spiral", "motif"]) {
+      await expect(
+        page.getByTestId(`menu-design-submenu-stitch-type-item-${stitchTypeName}`),
+      ).toBeVisible();
+    }
+
+    await expect(page.getByTestId("menu-design-item-assign-thread-color")).toBeVisible();
+    await expect(page.getByTestId("menu-design-item-auto-digitize-selection")).toBeVisible();
+    await expect(page.getByTestId("menu-design-item-validate-design")).toBeVisible();
+    await expect(page.getByTestId("menu-design-item-repair-geometry")).toBeVisible();
+  });
 });
 
 test.describe("WASM Engine Integration", () => {
