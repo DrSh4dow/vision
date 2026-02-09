@@ -186,6 +186,13 @@ export const ObjectRoutingOverridesSchema = z.object({
   tie_mode: RoutingTieModeSchema.nullable().default(null),
 });
 
+export const StitchBlockCommandOverridesSchema = z.object({
+  trim_before: z.boolean().nullable().default(null),
+  trim_after: z.boolean().nullable().default(null),
+  tie_in: z.boolean().nullable().default(null),
+  tie_out: z.boolean().nullable().default(null),
+});
+
 export const EmbroideryObjectSchema = z.object({
   id: z.number(),
   source_node_id: z.number(),
@@ -202,6 +209,7 @@ export const StitchBlockSchema = z.object({
   stitch_type: StitchTypeSchema,
   color: ColorSchema.nullable(),
   routing_overrides: ObjectRoutingOverridesSchema,
+  command_overrides: StitchBlockCommandOverridesSchema,
 });
 
 export const SequenceTrackSchema = z.object({
@@ -342,6 +350,7 @@ export const StitchPlanRowSchema = z.object({
   locked: z.boolean(),
   sequence_index: z.number(),
   overrides: ObjectRoutingOverridesSchema,
+  command_overrides: StitchBlockCommandOverridesSchema,
 });
 
 export const BoundingBoxSchema = z.object({

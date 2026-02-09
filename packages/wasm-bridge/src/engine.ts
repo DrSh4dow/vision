@@ -24,6 +24,7 @@ import type {
   SequenceTrack,
   SimulationTimeline,
   StitchBlock,
+  StitchBlockCommandOverrides,
   StitchParams,
   StitchPlanRow,
   ThreadBrand,
@@ -156,6 +157,12 @@ export interface VisionEngine {
 
   /** Set object-level routing overrides for a stitch block. */
   sceneSetObjectRoutingOverrides(blockId: number, overrides: ObjectRoutingOverrides): void;
+
+  /** Set per-block command overrides for trim/tie behavior. */
+  sceneSetStitchBlockCommandOverrides(
+    blockId: number,
+    overrides: StitchBlockCommandOverrides,
+  ): void;
 
   /** Get the full scene tree (for sequencer/panel UI). */
   sceneGetTree(): TreeNode[];

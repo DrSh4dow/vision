@@ -588,6 +588,35 @@ pub fn scene_set_object_routing_overrides(
     execute_command(cmd).map_err(|e| JsError::new(&e))
 }
 
+/// Set stitch-block command overrides for a block.
+#[wasm_bindgen]
+pub fn scene_set_stitch_block_command_overrides(
+    block_id: i64,
+    overrides_json: &str,
+) -> Result<(), JsError> {
+    let id = NodeId(block_id as u64);
+    let new: scene::StitchBlockCommandOverrides = if overrides_json.trim().is_empty() {
+        scene::StitchBlockCommandOverrides::default()
+    } else {
+        serde_json::from_str(overrides_json)
+            .map_err(|e| JsError::new(&format!("Invalid block command overrides JSON: {e}")))?
+    };
+
+    let old = with_scene(|s| {
+        let node = s
+            .get_node(id)
+            .ok_or_else(|| format!("Node {id:?} not found"))?;
+        if !matches!(node.kind, scene::NodeKind::Shape { .. }) {
+            return Err(format!("Node {id:?} is not a Shape"));
+        }
+        Ok(s.stitch_block_command_overrides(id))
+    })
+    .map_err(|e| JsError::new(&e))?;
+
+    let cmd = SceneCommand::SetStitchBlockCommandOverrides { id, old, new };
+    execute_command(cmd).map_err(|e| JsError::new(&e))
+}
+
 /// Get stitch-plan rows in sequencer order as JSON.
 #[wasm_bindgen]
 pub fn scene_get_stitch_plan() -> Result<String, JsError> {

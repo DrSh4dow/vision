@@ -11,7 +11,7 @@ use crate::Point;
 use crate::StitchType;
 use crate::constants::{DEFAULT_FLATTEN_TOLERANCE, DEFAULT_STITCH_LENGTH};
 use crate::format::{ExportDesign, ExportStitch, ExportStitchType};
-use crate::scene::{NodeKind, ObjectRoutingOverrides, Scene};
+use crate::scene::{NodeKind, ObjectRoutingOverrides, Scene, StitchBlockCommandOverrides};
 use crate::stitch::fill::{
     generate_contour_fill, generate_motif_fill, generate_spiral_fill, generate_tatami_fill,
 };
@@ -30,6 +30,7 @@ struct ShapeStitchBlock {
     stitches: Vec<crate::Stitch>,
     source_order: usize,
     routing_overrides: ObjectRoutingOverrides,
+    command_overrides: StitchBlockCommandOverrides,
 }
 
 impl ShapeStitchBlock {
@@ -542,11 +543,25 @@ pub fn scene_to_export_design_with_routing(
             continue;
         }
 
+        let (routing_overrides, command_overrides) =
+            if let Some(block) = scene.stitch_block(item.id) {
+                (
+                    block.routing_overrides.clone(),
+                    block.command_overrides.clone(),
+                )
+            } else {
+                (
+                    scene.object_routing_overrides(item.id),
+                    StitchBlockCommandOverrides::default(),
+                )
+            };
+
         blocks.push(ShapeStitchBlock {
             color,
             stitches: shape_stitches,
             source_order,
-            routing_overrides: scene.object_routing_overrides(item.id),
+            routing_overrides,
+            command_overrides,
         });
     }
 
@@ -565,6 +580,7 @@ pub fn scene_to_export_design_with_routing(
 
     for block in blocks {
         let block_routing = routing_with_overrides(routing, &block.routing_overrides);
+        let command_overrides = block.command_overrides.clone();
         let color = block.color;
         let shape_stitches = block.stitches;
         let start_point = shape_stitches[0].position;
@@ -615,12 +631,29 @@ pub fn scene_to_export_design_with_routing(
 
         // Move to the start of this shape (if not the first shape).
         if let Some(prev) = current_position {
+            if should_force_trim_before(&command_overrides)
+                && stitches
+                    .last()
+                    .is_some_and(|s| s.stitch_type != ExportStitchType::Trim)
+            {
+                stitches.push(ExportStitch {
+                    x: prev.x,
+                    y: prev.y,
+                    stitch_type: ExportStitchType::Trim,
+                });
+                run_since_trim_mm = 0.0;
+            }
+
             let travel = distance(prev, start_point);
             if travel > f64::EPSILON {
-                if should_insert_trim(block_routing, travel, run_since_trim_mm)
-                    && stitches
-                        .last()
-                        .is_some_and(|s| s.stitch_type != ExportStitchType::Trim)
+                if should_insert_trim_with_override(
+                    block_routing,
+                    travel,
+                    run_since_trim_mm,
+                    &command_overrides,
+                ) && stitches
+                    .last()
+                    .is_some_and(|s| s.stitch_type != ExportStitchType::Trim)
                 {
                     stitches.push(ExportStitch {
                         x: prev.x,
@@ -639,7 +672,7 @@ pub fn scene_to_export_design_with_routing(
             }
         }
 
-        if matches!(block_routing.tie_mode, TieMode::ShapeStartEnd) {
+        if should_emit_tie_in(block_routing, &command_overrides) {
             emit_tie_sequence(
                 &mut stitches,
                 start_point,
@@ -673,7 +706,7 @@ pub fn scene_to_export_design_with_routing(
             current_position = Some(stitch.position);
         }
 
-        if matches!(block_routing.tie_mode, TieMode::ShapeStartEnd)
+        if should_emit_tie_out(block_routing, &command_overrides)
             && let Some(anchor) = current_position
         {
             emit_tie_sequence(
@@ -682,6 +715,20 @@ pub fn scene_to_export_design_with_routing(
                 &mut current_position,
                 &mut run_since_trim_mm,
             );
+        }
+
+        if command_overrides.trim_after == Some(true)
+            && let Some(anchor) = current_position
+            && stitches
+                .last()
+                .is_some_and(|s| s.stitch_type != ExportStitchType::Trim)
+        {
+            stitches.push(ExportStitch {
+                x: anchor.x,
+                y: anchor.y,
+                stitch_type: ExportStitchType::Trim,
+            });
+            run_since_trim_mm = 0.0;
         }
     }
 
@@ -906,6 +953,22 @@ fn emit_tie_sequence(
     }
 }
 
+fn should_force_trim_before(overrides: &StitchBlockCommandOverrides) -> bool {
+    overrides.trim_before == Some(true)
+}
+
+fn should_emit_tie_in(routing: RoutingOptions, overrides: &StitchBlockCommandOverrides) -> bool {
+    overrides
+        .tie_in
+        .unwrap_or(matches!(routing.tie_mode, TieMode::ShapeStartEnd))
+}
+
+fn should_emit_tie_out(routing: RoutingOptions, overrides: &StitchBlockCommandOverrides) -> bool {
+    overrides
+        .tie_out
+        .unwrap_or(matches!(routing.tie_mode, TieMode::ShapeStartEnd))
+}
+
 fn should_insert_trim(routing: RoutingOptions, travel_mm: f64, run_since_trim_mm: f64) -> bool {
     if travel_mm < routing.trim_threshold_mm {
         return false;
@@ -923,6 +986,18 @@ fn should_insert_trim(routing: RoutingOptions, travel_mm: f64, run_since_trim_mm
         routing.policy,
         RoutingPolicy::Balanced | RoutingPolicy::MinTrims
     )
+}
+
+fn should_insert_trim_with_override(
+    routing: RoutingOptions,
+    travel_mm: f64,
+    run_since_trim_mm: f64,
+    overrides: &StitchBlockCommandOverrides,
+) -> bool {
+    if let Some(force_trim) = overrides.trim_before {
+        return force_trim;
+    }
+    should_insert_trim(routing, travel_mm, run_since_trim_mm)
 }
 
 fn routing_with_overrides(
@@ -2397,6 +2472,109 @@ mod tests {
         .unwrap();
 
         assert!(with_ties.stitches.len() > without_ties.stitches.len());
+    }
+
+    #[test]
+    fn test_route_command_override_trim_before_forces_trim() {
+        let mut scene = Scene::new();
+        let make_rect = || NodeKind::Shape {
+            shape: ShapeData::Rect(RectShape::new(6.0, 6.0, 0.0)),
+            fill: None,
+            stroke: Some(Color::new(0, 0, 0, 255)),
+            stroke_width: 0.4,
+            stitch: crate::StitchParams::default(),
+        };
+
+        let a = scene.add_node("A", make_rect(), None).unwrap();
+        let b = scene.add_node("B", make_rect(), None).unwrap();
+        scene.get_node_mut(a).unwrap().transform.x = 0.0;
+        scene.get_node_mut(b).unwrap().transform.x = 14.0;
+
+        let without_override = scene_to_export_design_with_routing(
+            &scene,
+            2.0,
+            RoutingOptions {
+                trim_threshold_mm: 100.0,
+                min_stitch_run_before_trim_mm: 0.0,
+                ..RoutingOptions::default()
+            },
+        )
+        .unwrap();
+
+        scene
+            .set_stitch_block_command_overrides(
+                b,
+                crate::scene::StitchBlockCommandOverrides {
+                    trim_before: Some(true),
+                    ..crate::scene::StitchBlockCommandOverrides::default()
+                },
+            )
+            .unwrap();
+        let with_override = scene_to_export_design_with_routing(
+            &scene,
+            2.0,
+            RoutingOptions {
+                trim_threshold_mm: 100.0,
+                min_stitch_run_before_trim_mm: 0.0,
+                ..RoutingOptions::default()
+            },
+        )
+        .unwrap();
+
+        let no_override_metrics = compute_route_metrics(&without_override);
+        let with_override_metrics = compute_route_metrics(&with_override);
+        assert!(with_override_metrics.trim_count > no_override_metrics.trim_count);
+    }
+
+    #[test]
+    fn test_route_command_override_tie_flags_disable_shape_ties() {
+        let mut scene = Scene::new();
+        let id = scene
+            .add_node(
+                "Rect",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(8.0, 8.0, 0.0)),
+                    fill: None,
+                    stroke: Some(Color::new(0, 0, 0, 255)),
+                    stroke_width: 0.4,
+                    stitch: crate::StitchParams::default(),
+                },
+                None,
+            )
+            .unwrap();
+
+        let with_default_ties = scene_to_export_design_with_routing(
+            &scene,
+            2.0,
+            RoutingOptions {
+                tie_mode: TieMode::ShapeStartEnd,
+                ..RoutingOptions::default()
+            },
+        )
+        .unwrap();
+
+        scene
+            .set_stitch_block_command_overrides(
+                id,
+                crate::scene::StitchBlockCommandOverrides {
+                    tie_in: Some(false),
+                    tie_out: Some(false),
+                    ..crate::scene::StitchBlockCommandOverrides::default()
+                },
+            )
+            .unwrap();
+
+        let with_ties_disabled = scene_to_export_design_with_routing(
+            &scene,
+            2.0,
+            RoutingOptions {
+                tie_mode: TieMode::ShapeStartEnd,
+                ..RoutingOptions::default()
+            },
+        )
+        .unwrap();
+
+        assert!(with_default_ties.stitches.len() > with_ties_disabled.stitches.len());
     }
 
     #[test]

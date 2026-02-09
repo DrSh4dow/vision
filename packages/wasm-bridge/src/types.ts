@@ -207,6 +207,14 @@ export interface ObjectRoutingOverrides {
   tie_mode: RoutingTieMode | null;
 }
 
+/** Per-block command overrides for trim/tie behavior. */
+export interface StitchBlockCommandOverrides {
+  trim_before: boolean | null;
+  trim_after: boolean | null;
+  tie_in: boolean | null;
+  tie_out: boolean | null;
+}
+
 /** First-class embroidery object derived from scene geometry. */
 export interface EmbroideryObject {
   id: number;
@@ -225,6 +233,7 @@ export interface StitchBlock {
   stitch_type: StitchType;
   color: Color | null;
   routing_overrides: ObjectRoutingOverrides;
+  command_overrides: StitchBlockCommandOverrides;
 }
 
 /** Ordered stitch block execution track. */
@@ -321,6 +330,7 @@ export interface StitchPlanRow {
   locked: boolean;
   sequence_index: number;
   overrides: ObjectRoutingOverrides;
+  command_overrides: StitchBlockCommandOverrides;
 }
 
 /** Axis-aligned bounding box. */

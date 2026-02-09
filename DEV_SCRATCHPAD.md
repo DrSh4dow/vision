@@ -7,6 +7,7 @@
 - Phase 2 sequencer-first controls: per-row `allow_reverse`, `entry_exit_mode`, `tie_mode` in left panel.
 - End-to-end wiring: UI -> wasm-bridge -> engine overrides.
 - Validation status: cargo fmt/clippy/test + biome + tsc + vite build + playwright all green.
+- Added per-block command overrides (`trim_before`, `trim_after`, `tie_in`, `tie_out`) persisted across regeneration with undo/redo and export behavior integration.
 
 ## Current Wave Checkpoint
 - Wave A (hybrid model foundation) in progress.
@@ -21,9 +22,10 @@
 - Added deterministic scene diagnostics end-to-end (`Scene::validation_diagnostics` -> wasm -> bridge -> `DiagnosticsPanel`) for geometry/routing preflight visibility.
 - Added simulation timeline APIs (`sceneSimulationTimeline*`) and switched canvas thread preview to timeline-driven playback with `fast` / `quality` mode toggle.
 - Added PEC export end-to-end (`engine.exportPec`, UI action, e2e coverage) and introduced `scripts/check-production-gate.sh` to enforce one-command release gates.
+- Added stitch-block command override APIs (`scene_set_stitch_block_command_overrides`) and left-panel sequencer controls for trim/tie tuning without raw API usage.
 
 ## Next Priority Queue
-1. Phase 2 remaining: persist stitch-block command edits independent from source shape regeneration.
+1. Phase 2 remaining: improve global route optimizer quality (distance + trim tradeoff) against richer `../inkstitch` corpora.
 2. Phase 5B: add true 3D thread renderer path (WebGL/WebGPU) behind quality mode.
 3. Phase 6/7: expand import coverage and lettering/monogram workflows with benchmark fixtures vs `../inkstitch`.
 

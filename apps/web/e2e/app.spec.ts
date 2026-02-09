@@ -423,14 +423,26 @@ test.describe("Canvas Interaction", () => {
     const allowReverse = page.locator("[data-testid^='sequencer-routing-allow-reverse-']").first();
     const entryExit = page.locator("[data-testid^='sequencer-routing-entry-exit-']").first();
     const tieMode = page.locator("[data-testid^='sequencer-routing-tie-mode-']").first();
+    const trimBefore = page.locator("[data-testid^='sequencer-command-trim-before-']").first();
+    const trimAfter = page.locator("[data-testid^='sequencer-command-trim-after-']").first();
+    const tieIn = page.locator("[data-testid^='sequencer-command-tie-in-']").first();
+    const tieOut = page.locator("[data-testid^='sequencer-command-tie-out-']").first();
 
     await expect(allowReverse).toBeVisible();
     await expect(entryExit).toBeVisible();
     await expect(tieMode).toBeVisible();
+    await expect(trimBefore).toBeVisible();
+    await expect(trimAfter).toBeVisible();
+    await expect(tieIn).toBeVisible();
+    await expect(tieOut).toBeVisible();
 
     await allowReverse.selectOption("force_off");
     await entryExit.selectOption("preserve_shape_start");
     await tieMode.selectOption("color_change");
+    await trimBefore.selectOption("force_on");
+    await trimAfter.selectOption("force_off");
+    await tieIn.selectOption("force_on");
+    await tieOut.selectOption("force_off");
 
     await expect(
       page.locator("[data-testid^='sequencer-routing-badge-rev-']").first(),
@@ -441,20 +453,48 @@ test.describe("Canvas Interaction", () => {
     await expect(
       page.locator("[data-testid^='sequencer-routing-badge-tie-']").first(),
     ).toBeVisible();
+    await expect(
+      page.locator("[data-testid^='sequencer-command-badge-trim-before-']").first(),
+    ).toBeVisible();
+    await expect(
+      page.locator("[data-testid^='sequencer-command-badge-trim-after-']").first(),
+    ).toBeVisible();
+    await expect(
+      page.locator("[data-testid^='sequencer-command-badge-tie-in-']").first(),
+    ).toBeVisible();
+    await expect(
+      page.locator("[data-testid^='sequencer-command-badge-tie-out-']").first(),
+    ).toBeVisible();
 
     // Wait beyond the polling refresh interval to ensure overrides persist in engine state.
     await page.waitForTimeout(700);
     await expect(allowReverse).toHaveValue("force_off");
     await expect(entryExit).toHaveValue("preserve_shape_start");
     await expect(tieMode).toHaveValue("color_change");
+    await expect(trimBefore).toHaveValue("force_on");
+    await expect(trimAfter).toHaveValue("force_off");
+    await expect(tieIn).toHaveValue("force_on");
+    await expect(tieOut).toHaveValue("force_off");
 
     await allowReverse.selectOption("inherit");
     await entryExit.selectOption("inherit");
     await tieMode.selectOption("inherit");
+    await trimBefore.selectOption("inherit");
+    await trimAfter.selectOption("inherit");
+    await tieIn.selectOption("inherit");
+    await tieOut.selectOption("inherit");
 
     await expect(page.locator("[data-testid^='sequencer-routing-badge-rev-']")).toHaveCount(0);
     await expect(page.locator("[data-testid^='sequencer-routing-badge-entry-']")).toHaveCount(0);
     await expect(page.locator("[data-testid^='sequencer-routing-badge-tie-']")).toHaveCount(0);
+    await expect(page.locator("[data-testid^='sequencer-command-badge-trim-before-']")).toHaveCount(
+      0,
+    );
+    await expect(page.locator("[data-testid^='sequencer-command-badge-trim-after-']")).toHaveCount(
+      0,
+    );
+    await expect(page.locator("[data-testid^='sequencer-command-badge-tie-in-']")).toHaveCount(0);
+    await expect(page.locator("[data-testid^='sequencer-command-badge-tie-out-']")).toHaveCount(0);
   });
 
   test("keyboard tool switching", async ({ page }) => {

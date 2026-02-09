@@ -6,7 +6,8 @@
 use crate::Color;
 use crate::path::PathCommand;
 use crate::scene::{
-    Node, NodeId, NodeKind, ObjectRoutingOverrides, Scene, ShapeSequencerMeta, Transform,
+    Node, NodeId, NodeKind, ObjectRoutingOverrides, Scene, ShapeSequencerMeta,
+    StitchBlockCommandOverrides, Transform,
 };
 use crate::shapes::ShapeData;
 
@@ -67,6 +68,12 @@ pub(crate) enum SceneCommand {
         id: NodeId,
         old: ObjectRoutingOverrides,
         new: ObjectRoutingOverrides,
+    },
+    /// Update stitch-block command overrides.
+    SetStitchBlockCommandOverrides {
+        id: NodeId,
+        old: StitchBlockCommandOverrides,
+        new: StitchBlockCommandOverrides,
     },
     /// Update a shape node's path commands.
     SetPathCommands {
@@ -265,6 +272,10 @@ fn apply_command(scene: &mut Scene, cmd: &SceneCommand, reverse: bool) -> Result
         SceneCommand::SetObjectRoutingOverrides { id, old, new } => {
             let overrides = if reverse { old } else { new };
             scene.set_object_routing_overrides(*id, overrides.clone())?;
+        }
+        SceneCommand::SetStitchBlockCommandOverrides { id, old, new } => {
+            let overrides = if reverse { old } else { new };
+            scene.set_stitch_block_command_overrides(*id, overrides.clone())?;
         }
         SceneCommand::SetPathCommands {
             id,
@@ -721,6 +732,44 @@ mod tests {
         } else {
             panic!("Expected path shape");
         }
+    }
+
+    #[test]
+    fn test_command_set_stitch_block_command_overrides() {
+        let mut scene = Scene::new();
+        let id = scene
+            .add_node(
+                "Rect",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(10.0, 5.0, 0.0)),
+                    fill: None,
+                    stroke: Some(Color::new(0, 0, 0, 255)),
+                    stroke_width: 0.4,
+                    stitch: crate::StitchParams::default(),
+                },
+                None,
+            )
+            .unwrap();
+
+        let mut history = CommandHistory::new(100);
+        let cmd = SceneCommand::SetStitchBlockCommandOverrides {
+            id,
+            old: StitchBlockCommandOverrides::default(),
+            new: StitchBlockCommandOverrides {
+                trim_before: Some(true),
+                trim_after: Some(false),
+                tie_in: Some(true),
+                tie_out: Some(false),
+            },
+        };
+        history.execute(&mut scene, cmd).unwrap();
+        let current = scene.stitch_block_command_overrides(id);
+        assert_eq!(current.trim_before, Some(true));
+        assert_eq!(current.tie_in, Some(true));
+
+        history.undo(&mut scene).unwrap();
+        let reverted = scene.stitch_block_command_overrides(id);
+        assert_eq!(reverted, StitchBlockCommandOverrides::default());
     }
 
     #[test]

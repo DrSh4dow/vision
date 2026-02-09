@@ -179,6 +179,19 @@ pub struct ObjectRoutingOverrides {
     pub tie_mode: Option<TieMode>,
 }
 
+/// Editable command overrides for a single stitch block.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
+pub struct StitchBlockCommandOverrides {
+    #[serde(default)]
+    pub trim_before: Option<bool>,
+    #[serde(default)]
+    pub trim_after: Option<bool>,
+    #[serde(default)]
+    pub tie_in: Option<bool>,
+    #[serde(default)]
+    pub tie_out: Option<bool>,
+}
+
 /// First-class embroidery object derived from scene geometry.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct EmbroideryObject {
@@ -211,6 +224,9 @@ pub struct StitchBlock {
     pub color: Option<Color>,
     /// Optional per-block routing overrides.
     pub routing_overrides: ObjectRoutingOverrides,
+    /// Optional per-block command overrides.
+    #[serde(default)]
+    pub command_overrides: StitchBlockCommandOverrides,
 }
 
 /// Ordered stitch block execution track.
@@ -242,6 +258,8 @@ pub struct StitchPlanRow {
     pub sequence_index: u64,
     /// Optional routing overrides.
     pub overrides: ObjectRoutingOverrides,
+    /// Optional command overrides.
+    pub command_overrides: StitchBlockCommandOverrides,
 }
 
 /// Severity level for scene validation diagnostics.
@@ -676,6 +694,11 @@ impl Scene {
         self.embroidery_objects.insert(id, object);
 
         let routing_overrides = self.object_routing_overrides(id);
+        let command_overrides = self
+            .stitch_blocks
+            .get(&id)
+            .map(|block| block.command_overrides.clone())
+            .unwrap_or_default();
         let block = StitchBlock {
             id,
             object_id: id,
@@ -683,6 +706,7 @@ impl Scene {
             stitch_type: stitch.stitch_type,
             color: (*stroke).or(*fill),
             routing_overrides,
+            command_overrides,
         };
         self.stitch_blocks.insert(id, block);
 
@@ -852,6 +876,39 @@ impl Scene {
         ObjectRoutingOverrides::default()
     }
 
+    /// Update command overrides for a stitch block.
+    pub fn set_stitch_block_command_overrides(
+        &mut self,
+        id: NodeId,
+        overrides: StitchBlockCommandOverrides,
+    ) -> Result<(), String> {
+        if !self
+            .nodes
+            .get(&id)
+            .is_some_and(|n| matches!(n.kind, NodeKind::Shape { .. }))
+        {
+            return Err(format!("Node {:?} is not a Shape", id));
+        }
+
+        if !self.stitch_blocks.contains_key(&id) {
+            self.sync_shape_stitch_plan_state(id);
+        }
+
+        let Some(block) = self.stitch_blocks.get_mut(&id) else {
+            return Err(format!("Stitch block {:?} not found", id));
+        };
+        block.command_overrides = overrides;
+        Ok(())
+    }
+
+    /// Get command overrides for a stitch block.
+    pub fn stitch_block_command_overrides(&self, id: NodeId) -> StitchBlockCommandOverrides {
+        self.stitch_blocks
+            .get(&id)
+            .map(|block| block.command_overrides.clone())
+            .unwrap_or_default()
+    }
+
     /// Build stitch-plan rows in sequencer order.
     pub fn get_stitch_plan_rows(&self) -> Vec<StitchPlanRow> {
         let mut rows = Vec::new();
@@ -884,6 +941,7 @@ impl Scene {
                 locked: self.is_in_locked_layer(id),
                 sequence_index,
                 overrides: block.routing_overrides.clone(),
+                command_overrides: block.command_overrides.clone(),
             });
         }
         rows
@@ -2119,6 +2177,88 @@ mod tests {
             .set_object_routing_overrides(id, overrides.clone())
             .unwrap();
         assert_eq!(scene.object_routing_overrides(id), overrides);
+    }
+
+    #[test]
+    fn test_stitch_block_command_overrides_roundtrip() {
+        let mut scene = Scene::new();
+        let id = scene
+            .add_node(
+                "Path",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(8.0, 8.0, 0.0)),
+                    fill: None,
+                    stroke: Some(Color::new(0, 0, 0, 255)),
+                    stroke_width: 0.4,
+                    stitch: crate::StitchParams::default(),
+                },
+                None,
+            )
+            .unwrap();
+
+        let overrides = StitchBlockCommandOverrides {
+            trim_before: Some(true),
+            trim_after: Some(false),
+            tie_in: Some(true),
+            tie_out: Some(false),
+        };
+        scene
+            .set_stitch_block_command_overrides(id, overrides.clone())
+            .unwrap();
+        assert_eq!(scene.stitch_block_command_overrides(id), overrides);
+        assert_eq!(
+            scene
+                .stitch_block(id)
+                .map(|block| block.command_overrides.clone()),
+            Some(overrides),
+        );
+    }
+
+    #[test]
+    fn test_stitch_block_command_overrides_survive_kind_regeneration() {
+        let mut scene = Scene::new();
+        let id = scene
+            .add_node(
+                "Rect",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(8.0, 8.0, 0.0)),
+                    fill: Some(Color::new(255, 0, 0, 255)),
+                    stroke: None,
+                    stroke_width: 0.0,
+                    stitch: crate::StitchParams::default(),
+                },
+                None,
+            )
+            .unwrap();
+
+        scene
+            .set_stitch_block_command_overrides(
+                id,
+                StitchBlockCommandOverrides {
+                    trim_before: Some(true),
+                    trim_after: Some(true),
+                    tie_in: Some(false),
+                    tie_out: Some(false),
+                },
+            )
+            .unwrap();
+
+        let mut updated = scene.get_node(id).expect("node exists").kind.clone();
+        if let NodeKind::Shape {
+            ref mut stroke_width,
+            ..
+        } = updated
+        {
+            *stroke_width = 0.5;
+        }
+        scene.get_node_mut(id).expect("node exists").kind = updated;
+        scene.sync_shape_stitch_plan_state(id);
+
+        let current = scene.stitch_block_command_overrides(id);
+        assert_eq!(current.trim_before, Some(true));
+        assert_eq!(current.trim_after, Some(true));
+        assert_eq!(current.tie_in, Some(false));
+        assert_eq!(current.tie_out, Some(false));
     }
 
     #[test]

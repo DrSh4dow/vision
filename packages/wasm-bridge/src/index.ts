@@ -49,6 +49,7 @@ import initWasm, {
   scene_set_fill,
   scene_set_object_routing_overrides,
   scene_set_path_commands,
+  scene_set_stitch_block_command_overrides,
   scene_set_stroke,
   scene_set_stroke_width,
   scene_simulation_timeline,
@@ -77,6 +78,7 @@ import {
   SceneNodeInfoSchema,
   SequenceTrackSchema,
   SimulationTimelineSchema,
+  StitchBlockCommandOverridesSchema,
   StitchBlockSchema,
   StitchParamsSchema,
   StitchPlanRowSchema,
@@ -102,6 +104,7 @@ import type {
   SequenceTrack,
   SimulationTimeline,
   StitchBlock,
+  StitchBlockCommandOverrides,
   StitchParams,
   StitchPlanRow,
   StitchType,
@@ -129,6 +132,7 @@ export {
   SceneNodeInfoSchema,
   SequenceTrackSchema,
   SimulationTimelineSchema,
+  StitchBlockCommandOverridesSchema,
   StitchBlockSchema,
   StitchParamsSchema,
   StitchPlanRowSchema,
@@ -168,6 +172,7 @@ export type {
   SimulationTimelineSegment,
   Stitch,
   StitchBlock,
+  StitchBlockCommandOverrides,
   StitchParams,
   StitchPlanRow,
   StitchType,
@@ -428,6 +433,14 @@ export async function initEngine(): Promise<VisionEngine> {
       ): void => {
         const parsed = ObjectRoutingOverridesSchema.parse(overrides);
         scene_set_object_routing_overrides(BigInt(blockId), JSON.stringify(parsed));
+      },
+
+      sceneSetStitchBlockCommandOverrides: (
+        blockId: number,
+        overrides: StitchBlockCommandOverrides,
+      ): void => {
+        const parsed = StitchBlockCommandOverridesSchema.parse(overrides);
+        scene_set_stitch_block_command_overrides(BigInt(blockId), JSON.stringify(parsed));
       },
 
       sceneGetTree: (): TreeNode[] => {

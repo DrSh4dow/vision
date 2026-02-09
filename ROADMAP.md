@@ -64,7 +64,7 @@ Mandatory legal boundary:
 
 1. Phase 0: in progress (quality gates + benchmark harness hardening active).
 2. Phase 1: in progress (direct canvas drag-move shipped; remaining quality tuning active).
-3. Phase 2: in progress (sequencer-first controls + sequence-track-native reorder shipped; deeper routing parity pending).
+3. Phase 2: in progress (sequencer-first routing + per-block command overrides shipped; deeper route optimization parity pending).
 4. Phase 4: in progress (deterministic scene diagnostics API + diagnostics panel shipped; auto-repair pipeline pending).
 5. Phase 5: in progress (simulation timeline API + fast/quality preview mode shipped; 3D renderer still pending).
 6. Phase 6: in progress (PEC export wired end-to-end; broader format import/export parity still pending).
@@ -338,6 +338,7 @@ Vision can be considered Hatch-parity for core workflows when all are true:
 6. Stitch blocks are editable first-class entities and not only export-time byproducts
 
 ## Changelog
+- 2026-02-09: Added first-class stitch-block command overrides (`trim_before/after`, `tie_in/out`) with undo/redo, export-pipeline behavior, and sequencer controls in the left panel.
 - 2026-02-09: Added scene diagnostics (Rust/WASM/bridge/UI) and simulation timeline APIs with fast/quality preview controls for Phase 4/5A parity work.
 - 2026-02-09: Added PEC export support and unified `scripts/check-production-gate.sh` for combined metric-threshold + visual-review release gating.
 - 2026-02-09: Sequencer reorder now uses `SequenceTrack` as source of truth (with compatibility sync), advancing hybrid stitch-block execution semantics.
