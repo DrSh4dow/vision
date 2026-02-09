@@ -646,7 +646,7 @@
         "Verify zigzag stitches connect between rails",
         "Verify width, density, and angle are consistent across full column length"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "stitch-engine",
