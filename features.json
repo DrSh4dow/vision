@@ -161,7 +161,7 @@
         "Right-click empty area of canvas",
         "Verify context menu with Paste, Import, Zoom controls, Grid settings, Snap behavior"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "ui-context-menu",
