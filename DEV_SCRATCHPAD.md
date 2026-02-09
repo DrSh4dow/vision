@@ -17,6 +17,7 @@
 - Gate status for this checkpoint: required Rust + web checks all passing (`fmt`, `clippy`, `test`, `biome`, `tsc`, `vite build`, `playwright`).
 - Added Phase 1 dual gate script (`scripts/check-phase1-gate.sh`) to enforce both metric-threshold parity and visual snapshot parity.
 - Added Playwright visual baseline suite (`apps/web/e2e/visual.spec.ts`) with committed snapshots for home and satin-control workspace review.
+- Sequencer block reorder now executes against `SequenceTrack` directly (with metadata sync for compatibility) and is covered by a dedicated engine test.
 
 ## Next Priority Queue
 1. Phase 2 remaining: first-class `EmbroideryObject`/`StitchBlock`/`SequenceTrack` model separation.

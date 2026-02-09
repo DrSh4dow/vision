@@ -501,7 +501,12 @@ pub fn scene_reorder_child(node_id: i64, new_index: u32) -> Result<(), JsError> 
 pub fn scene_reorder_stitch_block(block_id: i64, new_index: u32) -> Result<(), JsError> {
     let id = NodeId(block_id as u64);
     let old_index = with_scene(|s| {
-        s.sequencer_shape_ids()
+        let ordered = if s.sequence_track().ordered_block_ids.is_empty() {
+            s.sequencer_shape_ids()
+        } else {
+            s.sequence_track().ordered_block_ids.clone()
+        };
+        ordered
             .iter()
             .position(|candidate| *candidate == id)
             .ok_or_else(|| format!("Stitch block {id:?} not found"))

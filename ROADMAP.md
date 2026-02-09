@@ -64,7 +64,7 @@ Mandatory legal boundary:
 
 1. Phase 0: in progress (quality gates + benchmark harness hardening active).
 2. Phase 1: in progress (direct canvas drag-move shipped; remaining quality tuning active).
-3. Phase 2: in progress (sequencer-first controls shipped; hybrid model + WASM bridge APIs landed, deeper routing parity pending).
+3. Phase 2: in progress (sequencer-first controls + sequence-track-native reorder shipped; deeper routing parity pending).
 
 ## Phase 0 — Baseline Hardening (Immediate)
 Goal: make current progress stable before deeper parity work.
@@ -334,6 +334,7 @@ Vision can be considered Hatch-parity for core workflows when all are true:
 6. Stitch blocks are editable first-class entities and not only export-time byproducts
 
 ## Changelog
+- 2026-02-09: Sequencer reorder now uses `SequenceTrack` as source of truth (with compatibility sync), advancing hybrid stitch-block execution semantics.
 - 2026-02-09: Added Phase 1 dual gate (`scripts/check-phase1-gate.sh`) plus Playwright visual baseline suite for screenshot-driven parity checks.
 - 2026-02-09: Added explicit phase execution status tracker; Phase 2 now records sequencer-first controls + hybrid API milestone progress.
 - 2026-02-08: Added direct canvas drag-move parity milestone and acceptance criteria.

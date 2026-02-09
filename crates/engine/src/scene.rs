@@ -746,6 +746,11 @@ impl Scene {
 
     /// Reorder a shape within sequencer execution order.
     pub fn reorder_sequencer_shape(&mut self, id: NodeId, new_index: usize) -> Result<(), String> {
+        self.reorder_sequence_block(id, new_index)
+    }
+
+    /// Reorder a stitch block within the sequence track execution order.
+    pub fn reorder_sequence_block(&mut self, id: NodeId, new_index: usize) -> Result<(), String> {
         if !self
             .nodes
             .get(&id)
@@ -754,7 +759,15 @@ impl Scene {
             return Err(format!("Node {:?} is not a Shape", id));
         }
 
-        let mut ordered = self.sequencer_shape_ids();
+        if !self.stitch_blocks.contains_key(&id) {
+            return Err(format!("Stitch block {:?} not found", id));
+        }
+
+        if self.sequence_track.ordered_block_ids.is_empty() {
+            self.sync_sequence_track_from_shape_meta();
+        }
+
+        let mut ordered = self.sequence_track.ordered_block_ids.clone();
         let current_index = ordered
             .iter()
             .position(|candidate| *candidate == id)
@@ -771,7 +784,7 @@ impl Scene {
             meta.sequencer_index = (idx + 1) as u64;
         }
         self.next_sequencer_index = (ordered.len() as u64) + 1;
-        self.sync_sequence_track_from_shape_meta();
+        self.sequence_track.ordered_block_ids = ordered;
         Ok(())
     }
 
@@ -1986,5 +1999,50 @@ mod tests {
                 .map(|block| block.routing_overrides.clone()),
             Some(overrides)
         );
+    }
+
+    #[test]
+    fn test_reorder_sequence_block_updates_track_and_meta() {
+        let mut scene = Scene::new();
+        let a = scene
+            .add_node(
+                "A",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(4.0, 4.0, 0.0)),
+                    fill: Some(Color::new(255, 0, 0, 255)),
+                    stroke: None,
+                    stroke_width: 0.0,
+                    stitch: crate::StitchParams::default(),
+                },
+                None,
+            )
+            .unwrap();
+        let b = scene
+            .add_node(
+                "B",
+                NodeKind::Shape {
+                    shape: ShapeData::Rect(RectShape::new(4.0, 4.0, 0.0)),
+                    fill: Some(Color::new(0, 255, 0, 255)),
+                    stroke: None,
+                    stroke_width: 0.0,
+                    stitch: crate::StitchParams::default(),
+                },
+                None,
+            )
+            .unwrap();
+
+        scene.reorder_sequence_block(b, 0).unwrap();
+
+        assert_eq!(scene.sequence_track().ordered_block_ids, vec![b, a]);
+        let rows = scene.get_stitch_plan_rows();
+        assert_eq!(
+            rows.iter().map(|row| row.block_id).collect::<Vec<_>>(),
+            vec![b, a]
+        );
+
+        let b_index = scene.get_shape_meta(b).map(|meta| meta.sequencer_index);
+        let a_index = scene.get_shape_meta(a).map(|meta| meta.sequencer_index);
+        assert_eq!(b_index, Some(1));
+        assert_eq!(a_index, Some(2));
     }
 }
