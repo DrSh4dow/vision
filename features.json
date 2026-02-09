@@ -481,7 +481,7 @@
         "Verify file is valid DST format that machines can read",
         "Verify stitch positions, jumps, trims, and color changes are encoded correctly"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "export",
