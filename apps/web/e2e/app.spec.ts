@@ -792,6 +792,11 @@ test.describe("Diagnostics Panel", () => {
   });
 
   test("open tatami path appears in diagnostics", async ({ page }) => {
+    await expect(page.getByTestId("status-severity")).toContainText("No diagnostics");
+    await page.getByTestId("menu-view").click();
+    await page.getByTestId("menu-view-item-toggle-diagnostics-panel").click();
+    await expect(page.getByTestId("diagnostics-drawer")).toBeVisible();
+
     const canvas = page.getByTestId("design-canvas");
     await page.getByTestId("tool-pen").click();
     const box = await canvas.boundingBox();
@@ -806,13 +811,29 @@ test.describe("Diagnostics Panel", () => {
     const stitchType = page.getByTestId("prop-stitch-type");
     await expect(stitchType).toBeVisible();
     await stitchType.selectOption("tatami");
-
-    await page.getByTestId("status-severity-button").click();
-    await expect(page.getByTestId("diagnostics-drawer")).toBeVisible();
     await expect(page.getByTestId("diagnostics-panel")).toBeVisible();
     await expect(page.getByTestId("diagnostics-count-error")).not.toHaveText("0", {
       timeout: 3_000,
     });
+
+    await expect(page.getByTestId("diagnostics-filter-all")).toBeVisible();
+    await expect(page.getByTestId("diagnostics-filter-error")).toBeVisible();
+    await expect(page.getByTestId("diagnostics-filter-warning")).toBeVisible();
+    await expect(page.getByTestId("diagnostics-filter-info")).toBeVisible();
+
+    await page.getByTestId("diagnostics-filter-error").click();
+    await expect(page.locator("[data-testid^='diagnostic-row-']").first()).toHaveAttribute(
+      "data-severity",
+      "error",
+    );
+
+    await page.getByTestId("diagnostics-filter-all").click();
+    await page.locator("[data-testid^='diagnostic-row-']").first().click();
+    const selectedSequencerRow = page.locator("[data-testid^='sequencer-row-']").first();
+    await expect(selectedSequencerRow.locator("div").first()).toHaveClass(/bg-accent\/70/);
+
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("diagnostics-drawer")).toBeHidden();
   });
 });
 

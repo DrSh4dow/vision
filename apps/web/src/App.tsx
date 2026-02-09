@@ -1661,7 +1661,7 @@ export function App() {
                 className={`absolute inset-x-2 bottom-8 z-20 transition-all duration-200 ease-out ${
                   diagnosticsOpen
                     ? "pointer-events-auto translate-y-0 opacity-100"
-                    : "pointer-events-none translate-y-4 opacity-0"
+                    : "pointer-events-none invisible translate-y-4 opacity-0"
                 }`}
                 data-testid="diagnostics-drawer"
               >

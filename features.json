@@ -202,7 +202,7 @@
         "Close panel with click or keypress and verify it disappears",
         "Verify status bar shows green checkmark when no diagnostics exist"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "canvas",
