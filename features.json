@@ -840,7 +840,7 @@
         "Verify Density and Angle controls always visible",
         "Select multiple objects and verify panel shows count and shared properties"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "properties",
