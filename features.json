@@ -44,7 +44,7 @@
         "Verify Delete item present",
         "Verify Select All with Ctrl+A shortcut listed"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "ui-menu-bar",

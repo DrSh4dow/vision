@@ -109,6 +109,26 @@ test.describe("Vision App", () => {
     await expect(page.getByTestId("menu-file-item-save-project")).toBeVisible();
     await expect(page.getByTestId("menu-file-item-recent-files")).toBeVisible();
   });
+
+  test("edit menu contains core editing actions with expected shortcuts", async ({ page }) => {
+    await page.getByTestId("menu-edit").click();
+    await expect(page.getByTestId("menu-edit-panel")).toBeVisible();
+
+    await expect(page.getByTestId("menu-edit-item-undo")).toBeVisible();
+    await expect(page.getByTestId("menu-edit-item-undo-shortcut")).toHaveText("Ctrl+Z");
+    await expect(page.getByTestId("menu-edit-item-redo")).toBeVisible();
+    await expect(page.getByTestId("menu-edit-item-redo-shortcut")).toHaveText("Ctrl+Shift+Z");
+    await expect(page.getByTestId("menu-edit-item-cut")).toBeVisible();
+    await expect(page.getByTestId("menu-edit-item-cut-shortcut")).toHaveText("Ctrl+X");
+    await expect(page.getByTestId("menu-edit-item-copy")).toBeVisible();
+    await expect(page.getByTestId("menu-edit-item-copy-shortcut")).toHaveText("Ctrl+C");
+    await expect(page.getByTestId("menu-edit-item-paste")).toBeVisible();
+    await expect(page.getByTestId("menu-edit-item-paste-shortcut")).toHaveText("Ctrl+V");
+    await expect(page.getByTestId("menu-edit-item-duplicate")).toBeVisible();
+    await expect(page.getByTestId("menu-edit-item-delete")).toBeVisible();
+    await expect(page.getByTestId("menu-edit-item-select-all")).toBeVisible();
+    await expect(page.getByTestId("menu-edit-item-select-all-shortcut")).toHaveText("Ctrl+A");
+  });
 });
 
 test.describe("WASM Engine Integration", () => {
