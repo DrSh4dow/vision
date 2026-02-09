@@ -854,7 +854,7 @@
         "Verify underlay spacing input appears when zigzag-based underlay is selected",
         "Change underlay mode and verify controls update contextually"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "properties",
