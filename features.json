@@ -214,7 +214,7 @@
         "Verify origin crosshairs visible at (0,0)",
         "Verify all measurements and coordinates are in millimeters"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "canvas",

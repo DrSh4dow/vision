@@ -872,6 +872,134 @@ test.describe("Canvas Interaction", () => {
     expect(screenshot.byteLength).toBeGreaterThan(500);
   });
 
+  test("canvas grid adapts with zoom, uses mm coordinates, and keeps origin crosshairs visible", async ({
+    page,
+  }) => {
+    const canvas = page.getByTestId("design-canvas");
+    await expect(canvas).toBeVisible();
+    await expect(page.getByTestId("status-cursor")).toContainText("mm");
+
+    const box = await canvas.boundingBox();
+    if (!box) return;
+    const centerX = box.x + box.width / 2;
+    const centerY = box.y + box.height / 2;
+    await page.mouse.move(centerX, centerY);
+
+    const gridProbe = async () =>
+      page.evaluate(() => {
+        const canvasEl = document.querySelector(
+          "[data-testid='design-canvas']",
+        ) as HTMLCanvasElement | null;
+        if (!canvasEl) return null;
+        const ctx = canvasEl.getContext("2d");
+        if (!ctx) return null;
+
+        const { width, height } = canvasEl;
+        const img = ctx.getImageData(0, 0, width, height).data;
+        const sample = (x: number, y: number): [number, number, number] => {
+          const clampedX = Math.max(0, Math.min(width - 1, x));
+          const clampedY = Math.max(0, Math.min(height - 1, y));
+          const i = (clampedY * width + clampedX) * 4;
+          return [img[i], img[i + 1], img[i + 2]];
+        };
+        const diff = (a: [number, number, number], b: [number, number, number]) =>
+          Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
+
+        const background = sample(5, 5);
+        const y = Math.floor(height / 2 + height * 0.1);
+        let transitions = 0;
+        let inGridLine = false;
+        for (let x = 0; x < width; x += 1) {
+          const isLine = diff(sample(x, y), background) > 12;
+          if (isLine && !inGridLine) transitions += 1;
+          inGridLine = isLine;
+          if (!isLine) inGridLine = false;
+        }
+
+        const center = sample(Math.floor(width / 2), Math.floor(height / 2));
+        return {
+          transitions,
+          centerDiff: diff(center, background),
+        };
+      });
+
+    const beforeZoomOut = await gridProbe();
+    expect(beforeZoomOut).toBeTruthy();
+    if (!beforeZoomOut) return;
+    expect(beforeZoomOut.centerDiff).toBeGreaterThan(12);
+
+    await page.mouse.wheel(0, 800);
+    const afterZoomOut = await gridProbe();
+    expect(afterZoomOut).toBeTruthy();
+    if (!afterZoomOut) return;
+    expect(afterZoomOut.transitions).toBeGreaterThan(beforeZoomOut.transitions);
+  });
+
+  test("canvas supports middle/alt pan, cursor-centered zoom, and zoom limits", async ({
+    page,
+  }) => {
+    const canvas = page.getByTestId("design-canvas");
+    await expect(canvas).toBeVisible();
+
+    const box = await canvas.boundingBox();
+    if (!box) return;
+    const centerX = box.x + box.width / 2;
+    const centerY = box.y + box.height / 2;
+
+    const parseCursor = async () => {
+      const text = await page.getByTestId("status-cursor").innerText();
+      const match = text.match(/(-?\d+\.\d+)mm,\s*(-?\d+\.\d+)mm/);
+      expect(match).toBeTruthy();
+      return {
+        x: Number(match?.[1] ?? "0"),
+        y: Number(match?.[2] ?? "0"),
+      };
+    };
+
+    await page.mouse.move(centerX, centerY);
+    const beforeMiddlePan = await parseCursor();
+    await page.mouse.move(centerX, centerY);
+    await page.mouse.down({ button: "middle" });
+    await page.mouse.move(centerX + 140, centerY + 60, { steps: 8 });
+    await page.mouse.up({ button: "middle" });
+    await page.mouse.move(centerX, centerY);
+    const afterMiddlePan = await parseCursor();
+    expect(Math.abs(afterMiddlePan.x - beforeMiddlePan.x)).toBeGreaterThan(0.5);
+
+    const beforeAltPan = await parseCursor();
+    await page.keyboard.down("Alt");
+    await page.mouse.move(centerX, centerY);
+    await page.mouse.down();
+    await page.mouse.move(centerX - 120, centerY - 80, { steps: 8 });
+    await page.mouse.up();
+    await page.keyboard.up("Alt");
+    await page.mouse.move(centerX, centerY);
+    const afterAltPan = await parseCursor();
+    expect(Math.abs(afterAltPan.y - beforeAltPan.y)).toBeGreaterThan(0.5);
+
+    await page.mouse.move(centerX + 80, centerY + 40);
+    const beforeZoom = await parseCursor();
+    await page.mouse.wheel(0, -400);
+    await page.mouse.move(centerX + 80, centerY + 40);
+    const afterZoom = await parseCursor();
+    expect(Math.abs(afterZoom.x - beforeZoom.x)).toBeLessThan(0.6);
+    expect(Math.abs(afterZoom.y - beforeZoom.y)).toBeLessThan(0.6);
+
+    for (let index = 0; index < 45; index += 1) {
+      await page.mouse.wheel(0, 500);
+    }
+    const zoomOutText = await page.getByTestId("status-zoom").innerText();
+    const zoomOutValue = Number((zoomOutText.match(/(\d+)%/) ?? [])[1] ?? "0");
+    expect(zoomOutValue).toBeGreaterThanOrEqual(1);
+
+    for (let index = 0; index < 60; index += 1) {
+      await page.mouse.wheel(0, -500);
+    }
+    const zoomInText = await page.getByTestId("status-zoom").innerText();
+    const zoomInValue = Number((zoomInText.match(/(\d+)%/) ?? [])[1] ?? "0");
+    expect(zoomInValue).toBeLessThanOrEqual(25600);
+  });
+
   test("no console errors on load", async ({ page }) => {
     const errors: string[] = [];
     page.on("pageerror", (err) => errors.push(err.message));
