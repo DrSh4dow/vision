@@ -865,7 +865,7 @@
         "Set stitch type to Spiral and verify fill phase control appears",
         "Set stitch type to Motif and verify pattern selector (diamond/wave/triangle), motif scale, and fill phase controls appear"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "sequencer",
