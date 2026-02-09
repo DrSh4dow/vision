@@ -52,6 +52,28 @@ pub struct RouteMetrics {
     pub route_score: f64,
 }
 
+/// Extended stitch quality metrics for parity benchmarking.
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub struct QualityMetrics {
+    pub stitch_count: usize,
+    pub jump_count: usize,
+    pub trim_count: usize,
+    pub color_change_count: usize,
+    pub travel_distance_mm: f64,
+    pub longest_travel_mm: f64,
+    pub route_score: f64,
+    /// Mean length of normal stitch segments.
+    pub mean_stitch_length_mm: f64,
+    /// 95th percentile normal stitch length.
+    pub stitch_length_p95_mm: f64,
+    /// Median absolute deviation from target stitch length.
+    pub density_error_mm: f64,
+    /// Median absolute angular deviation from dominant segment orientation.
+    pub angle_error_deg: f64,
+    /// Proxy for fill coverage defects (% segments longer than 2x target).
+    pub coverage_error_pct: f64,
+}
+
 /// Stitch routing policy for block ordering and travel handling.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -233,7 +255,10 @@ pub fn scene_to_export_design_with_routing(
 
                 if satin.is_empty() {
                     (
-                        generate_running_stitches(&world_points, stitch_length),
+                        apply_segment_controls(
+                            generate_running_stitches(&world_points, stitch_length),
+                            stitch,
+                        ),
                         color,
                     )
                 } else {
@@ -269,7 +294,10 @@ pub fn scene_to_export_design_with_routing(
                         (None, None) => continue,
                     };
                     (
-                        generate_running_stitches(&world_points, stitch_length),
+                        apply_segment_controls(
+                            generate_running_stitches(&world_points, stitch_length),
+                            stitch,
+                        ),
                         outline_color,
                     )
                 }
@@ -303,7 +331,10 @@ pub fn scene_to_export_design_with_routing(
                         (None, None) => continue,
                     };
                     (
-                        generate_running_stitches(&world_points, stitch_length),
+                        apply_segment_controls(
+                            generate_running_stitches(&world_points, stitch_length),
+                            stitch,
+                        ),
                         outline_color,
                     )
                 }
@@ -337,7 +368,10 @@ pub fn scene_to_export_design_with_routing(
                         (None, None) => continue,
                     };
                     (
-                        generate_running_stitches(&world_points, stitch_length),
+                        apply_segment_controls(
+                            generate_running_stitches(&world_points, stitch_length),
+                            stitch,
+                        ),
                         outline_color,
                     )
                 }
@@ -374,7 +408,10 @@ pub fn scene_to_export_design_with_routing(
                         (None, None) => continue,
                     };
                     (
-                        generate_running_stitches(&world_points, stitch_length),
+                        apply_segment_controls(
+                            generate_running_stitches(&world_points, stitch_length),
+                            stitch,
+                        ),
                         outline_color,
                     )
                 }
@@ -386,7 +423,10 @@ pub fn scene_to_export_design_with_routing(
                     (None, None) => continue,
                 };
                 (
-                    generate_running_stitches(&world_points, stitch_length),
+                    apply_segment_controls(
+                        generate_running_stitches(&world_points, stitch_length),
+                        stitch,
+                    ),
                     color,
                 )
             }
@@ -599,6 +639,134 @@ pub fn compute_route_metrics(design: &ExportDesign) -> RouteMetrics {
         + metrics.color_change_count as f64 * 25.0;
 
     metrics
+}
+
+/// Compute extended quality metrics from a fully assembled export design.
+pub fn compute_quality_metrics(
+    design: &ExportDesign,
+    target_stitch_length_mm: f64,
+) -> QualityMetrics {
+    let route = compute_route_metrics(design);
+    let target = target_stitch_length_mm.max(0.01);
+
+    let mut normal_points: Vec<Point> = Vec::new();
+    for stitch in &design.stitches {
+        if matches!(stitch.stitch_type, ExportStitchType::Normal) {
+            normal_points.push(Point::new(stitch.x, stitch.y));
+        }
+    }
+
+    let mut segment_lengths: Vec<f64> = Vec::new();
+    let mut orientations_rad: Vec<f64> = Vec::new();
+    for pair in normal_points.windows(2) {
+        let from = pair[0];
+        let to = pair[1];
+        let len = distance(from, to);
+        if len <= f64::EPSILON {
+            continue;
+        }
+        segment_lengths.push(len);
+        orientations_rad.push((to.y - from.y).atan2(to.x - from.x));
+    }
+
+    let mean_stitch_length_mm = mean(&segment_lengths);
+    let stitch_length_p95_mm = percentile(&segment_lengths, 95.0);
+
+    let mut abs_density_errors: Vec<f64> = segment_lengths
+        .iter()
+        .map(|len| (len - target).abs())
+        .collect();
+    abs_density_errors.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let density_error_mm = percentile_sorted(&abs_density_errors, 50.0);
+
+    let dominant = dominant_orientation_rad(&orientations_rad);
+    let mut angle_errors: Vec<f64> = orientations_rad
+        .iter()
+        .map(|&angle| orientation_delta_deg(angle, dominant))
+        .collect();
+    angle_errors.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let angle_error_deg = percentile_sorted(&angle_errors, 50.0);
+
+    let long_segments = segment_lengths
+        .iter()
+        .filter(|&&len| len > target * 2.0)
+        .count();
+    let coverage_error_pct = if segment_lengths.is_empty() {
+        0.0
+    } else {
+        long_segments as f64 * 100.0 / segment_lengths.len() as f64
+    };
+
+    QualityMetrics {
+        stitch_count: design.stitches.len(),
+        jump_count: route.jump_count,
+        trim_count: route.trim_count,
+        color_change_count: route.color_change_count,
+        travel_distance_mm: route.travel_distance_mm,
+        longest_travel_mm: route.longest_travel_mm,
+        route_score: route.route_score,
+        mean_stitch_length_mm,
+        stitch_length_p95_mm,
+        density_error_mm,
+        angle_error_deg,
+        coverage_error_pct,
+    }
+}
+
+fn mean(values: &[f64]) -> f64 {
+    if values.is_empty() {
+        return 0.0;
+    }
+    values.iter().sum::<f64>() / values.len() as f64
+}
+
+fn percentile(values: &[f64], pct: f64) -> f64 {
+    if values.is_empty() {
+        return 0.0;
+    }
+    let mut sorted = values.to_vec();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    percentile_sorted(&sorted, pct)
+}
+
+fn percentile_sorted(sorted: &[f64], pct: f64) -> f64 {
+    if sorted.is_empty() {
+        return 0.0;
+    }
+    let clamped = pct.clamp(0.0, 100.0);
+    let pos = (clamped / 100.0) * (sorted.len() as f64 - 1.0);
+    let idx = pos.floor() as usize;
+    let frac = pos - idx as f64;
+    if idx + 1 >= sorted.len() {
+        sorted[idx]
+    } else {
+        sorted[idx] * (1.0 - frac) + sorted[idx + 1] * frac
+    }
+}
+
+fn dominant_orientation_rad(angles: &[f64]) -> f64 {
+    if angles.is_empty() {
+        return 0.0;
+    }
+    // Orientation is pi-periodic, so average the doubled angle.
+    let mut sum_sin = 0.0;
+    let mut sum_cos = 0.0;
+    for angle in angles {
+        let doubled = angle * 2.0;
+        sum_sin += doubled.sin();
+        sum_cos += doubled.cos();
+    }
+    0.5 * sum_sin.atan2(sum_cos)
+}
+
+fn orientation_delta_deg(a: f64, b: f64) -> f64 {
+    let mut delta = (a - b).abs();
+    let period = std::f64::consts::PI;
+    while delta > period {
+        delta -= period;
+    }
+    let wrapped = delta.min(period - delta);
+    wrapped.to_degrees()
 }
 
 fn emit_tie_sequence(
@@ -876,6 +1044,33 @@ fn apply_fill_controls(
         }
     }
 
+    stitches = apply_segment_controls(stitches, stitch);
+
+    if stitch.edge_walk_on_fill
+        && let Some(edge_ring) = dominant_ring(rings)
+    {
+        let edge = generate_running_stitches(&edge_ring, stitch_length.max(0.1));
+        if !edge.is_empty() {
+            if let Some(first) = stitches.first_mut() {
+                first.is_jump = true;
+            }
+            let mut merged = edge;
+            merged.extend(stitches);
+            stitches = merged;
+        }
+    }
+
+    stitches
+}
+
+fn apply_segment_controls(
+    mut stitches: Vec<crate::Stitch>,
+    stitch: &StitchParams,
+) -> Vec<crate::Stitch> {
+    if stitches.is_empty() {
+        return stitches;
+    }
+
     let min_segment = stitch.min_segment_mm.max(0.0);
     if min_segment > 0.0 {
         let mut filtered: Vec<crate::Stitch> = Vec::with_capacity(stitches.len());
@@ -921,20 +1116,6 @@ fn apply_fill_controls(
                 is_jump: false,
                 is_trim: false,
             });
-        }
-    }
-
-    if stitch.edge_walk_on_fill
-        && let Some(edge_ring) = dominant_ring(rings)
-    {
-        let edge = generate_running_stitches(&edge_ring, stitch_length.max(0.1));
-        if !edge.is_empty() {
-            if let Some(first) = stitches.first_mut() {
-                first.is_jump = true;
-            }
-            let mut merged = edge;
-            merged.extend(stitches);
-            stitches = merged;
         }
     }
 
@@ -2046,5 +2227,67 @@ mod tests {
         let metrics = compute_route_metrics(&design);
         assert!(metrics.longest_travel_mm >= 20.0);
         assert!(metrics.route_score > metrics.travel_distance_mm);
+    }
+
+    #[test]
+    fn test_routing_options_default_values() {
+        let defaults = RoutingOptions::default();
+        assert!(matches!(defaults.policy, RoutingPolicy::Balanced));
+        assert_eq!(defaults.max_jump_mm, 25.0);
+        assert_eq!(defaults.trim_threshold_mm, 12.0);
+        assert!(defaults.preserve_color_order);
+        assert!(!defaults.preserve_layer_order);
+        assert!(defaults.allow_reverse);
+        assert!(!defaults.allow_color_merge);
+        assert!(defaults.allow_underpath);
+        assert!(matches!(defaults.entry_exit_mode, EntryExitMode::Auto));
+        assert!(matches!(defaults.tie_mode, TieMode::ShapeStartEnd));
+        assert_eq!(defaults.min_stitch_run_before_trim_mm, 2.0);
+        assert!(matches!(defaults.sequence_mode, SequenceMode::Optimizer));
+    }
+
+    #[test]
+    fn test_compute_quality_metrics_smoke() {
+        let design = ExportDesign {
+            name: "quality-smoke".to_string(),
+            colors: vec![Color::new(255, 255, 255, 255)],
+            stitches: vec![
+                ExportStitch {
+                    x: 0.0,
+                    y: 0.0,
+                    stitch_type: ExportStitchType::Normal,
+                },
+                ExportStitch {
+                    x: 1.0,
+                    y: 0.0,
+                    stitch_type: ExportStitchType::Normal,
+                },
+                ExportStitch {
+                    x: 2.0,
+                    y: 0.0,
+                    stitch_type: ExportStitchType::Jump,
+                },
+                ExportStitch {
+                    x: 3.0,
+                    y: 0.0,
+                    stitch_type: ExportStitchType::Normal,
+                },
+                ExportStitch {
+                    x: 3.0,
+                    y: 0.0,
+                    stitch_type: ExportStitchType::End,
+                },
+            ],
+        };
+
+        let metrics = compute_quality_metrics(&design, 1.0);
+
+        assert_eq!(metrics.stitch_count, 5);
+        assert_eq!(metrics.jump_count, 1);
+        assert!(metrics.mean_stitch_length_mm >= 0.0);
+        assert!(metrics.stitch_length_p95_mm >= 0.0);
+        assert!(metrics.density_error_mm >= 0.0);
+        assert!(metrics.angle_error_deg >= 0.0);
+        assert!(metrics.coverage_error_pct >= 0.0);
     }
 }

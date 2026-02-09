@@ -17,55 +17,155 @@ pub fn generate_running_stitches(points: &[Point], stitch_length: f64) -> Vec<St
         return vec![];
     }
 
-    let mut stitches = Vec::new();
+    let clean = dedupe_consecutive(points);
+    if clean.len() < 2 {
+        return vec![];
+    }
 
-    // First point
-    stitches.push(Stitch {
-        position: points[0],
-        is_jump: false,
-        is_trim: false,
-    });
+    // Split at sharp turns to avoid uneven corner artifacts.
+    let tolerance = (stitch_length * 0.2).clamp(0.05, 1.0);
+    let curves = split_path_to_curves(&clean, tolerance * 2.0);
 
-    let mut remaining = 0.0_f64;
+    let mut out_points: Vec<Point> = vec![clean[0]];
+    for curve in &curves {
+        let mut stitched = stitch_curve_evenly(curve, stitch_length);
+        if let Some(last) = out_points.last().copied() {
+            stitched.retain(|p| !is_same_point(*p, last));
+        }
+        out_points.extend(stitched);
+    }
 
-    for i in 0..(points.len() - 1) {
-        let p0 = points[i];
-        let p1 = points[i + 1];
+    let final_point = clean[clean.len() - 1];
+    if out_points
+        .last()
+        .copied()
+        .is_none_or(|p| !is_same_point(p, final_point))
+    {
+        out_points.push(final_point);
+    }
 
-        let dx = p1.x - p0.x;
-        let dy = p1.y - p0.y;
-        let seg_len = (dx * dx + dy * dy).sqrt();
+    out_points
+        .into_iter()
+        .map(|position| Stitch {
+            position,
+            is_jump: false,
+            is_trim: false,
+        })
+        .collect()
+}
 
-        if seg_len < f64::EPSILON {
+fn dedupe_consecutive(points: &[Point]) -> Vec<Point> {
+    let mut out: Vec<Point> = Vec::with_capacity(points.len());
+    for &p in points {
+        if out
+            .last()
+            .copied()
+            .is_none_or(|last| !is_same_point(last, p))
+        {
+            out.push(p);
+        }
+    }
+    out
+}
+
+fn split_path_to_curves(points: &[Point], min_curve_len: f64) -> Vec<Vec<Point>> {
+    if points.len() < 3 {
+        return vec![points.to_vec()];
+    }
+
+    let mut curves: Vec<Vec<Point>> = Vec::new();
+    let mut start = 0usize;
+    let mut seg_len = distance(points[0], points[1]);
+
+    for i in 1..(points.len() - 1) {
+        let a = vector(points[i - 1], points[i]);
+        let b = vector(points[i], points[i + 1]);
+        let a_norm2 = dot(a, a);
+        let b_norm2 = dot(b, b);
+        let dot_abs = dot(a, b).abs();
+        // Split only on hard corners (about 70deg+ turn). Softer turns are
+        // stitched continuously to avoid over-segmentation and short stitches.
+        let sharp_turn = a_norm2 > f64::EPSILON
+            && b_norm2 > f64::EPSILON
+            && (dot_abs * dot_abs) <= 0.12 * a_norm2 * b_norm2;
+
+        if sharp_turn && seg_len >= min_curve_len {
+            curves.push(points[start..=i].to_vec());
+            start = i;
+            seg_len = 0.0;
+        }
+
+        seg_len += distance(points[i], points[i + 1]);
+    }
+
+    curves.push(points[start..].to_vec());
+    curves
+}
+
+fn stitch_curve_evenly(points: &[Point], stitch_length: f64) -> Vec<Point> {
+    if points.len() < 2 {
+        return vec![];
+    }
+
+    let total = polyline_length(points);
+    if total <= f64::EPSILON {
+        return vec![];
+    }
+
+    let segment_count = (total / stitch_length).ceil().max(1.0) as usize;
+    let effective_step = total / segment_count as f64;
+
+    let mut stitched: Vec<Point> = Vec::with_capacity(segment_count);
+    for k in 1..=segment_count {
+        let target = (k as f64) * effective_step;
+        stitched.push(sample_along_polyline(points, target));
+    }
+    stitched
+}
+
+fn polyline_length(points: &[Point]) -> f64 {
+    points
+        .windows(2)
+        .map(|pair| distance(pair[0], pair[1]))
+        .sum::<f64>()
+}
+
+fn sample_along_polyline(points: &[Point], target_distance: f64) -> Point {
+    let mut traversed = 0.0;
+    for pair in points.windows(2) {
+        let p0 = pair[0];
+        let p1 = pair[1];
+        let seg_len = distance(p0, p1);
+        if seg_len <= f64::EPSILON {
             continue;
         }
 
-        let nx = dx / seg_len;
-        let ny = dy / seg_len;
-
-        let mut dist = stitch_length - remaining;
-
-        while dist <= seg_len {
-            stitches.push(Stitch {
-                position: Point::new(p0.x + nx * dist, p0.y + ny * dist),
-                is_jump: false,
-                is_trim: false,
-            });
-            dist += stitch_length;
+        let next = traversed + seg_len;
+        if target_distance <= next + 1e-9 {
+            let t = ((target_distance - traversed) / seg_len).clamp(0.0, 1.0);
+            return Point::new(p0.x + (p1.x - p0.x) * t, p0.y + (p1.y - p0.y) * t);
         }
-
-        remaining = seg_len - (dist - stitch_length);
+        traversed = next;
     }
+    points[points.len() - 1]
+}
 
-    // Last point
-    let last = points[points.len() - 1];
-    stitches.push(Stitch {
-        position: last,
-        is_jump: false,
-        is_trim: false,
-    });
+fn distance(a: Point, b: Point) -> f64 {
+    let dx = b.x - a.x;
+    let dy = b.y - a.y;
+    (dx * dx + dy * dy).sqrt()
+}
 
-    stitches
+fn vector(a: Point, b: Point) -> (f64, f64) {
+    (b.x - a.x, b.y - a.y)
+}
+
+fn dot(a: (f64, f64), b: (f64, f64)) -> f64 {
+    a.0 * b.0 + a.1 * b.1
+}
+
+fn is_same_point(a: Point, b: Point) -> bool {
+    (a.x - b.x).abs() <= 1e-9 && (a.y - b.y).abs() <= 1e-9
 }
 
 /// Generate running stitches from a flat coordinate array.
@@ -189,5 +289,69 @@ mod tests {
         assert!(stitches.len() >= 2);
         let last = &stitches[stitches.len() - 1];
         assert_eq!(last.position.x, 10.0);
+    }
+
+    #[test]
+    fn test_running_stitches_even_distribution() {
+        let points = vec![Point::new(0.0, 0.0), Point::new(10.0, 0.0)];
+        let stitches = generate_running_stitches(&points, 3.0);
+
+        let mut lengths: Vec<f64> = Vec::new();
+        for pair in stitches.windows(2) {
+            lengths.push(distance(pair[0].position, pair[1].position));
+        }
+        let min = lengths.iter().copied().fold(f64::INFINITY, f64::min);
+        let max = lengths.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+
+        // Even stitching should avoid large tail segments.
+        assert!(
+            (max - min) < 0.2,
+            "segment spread too wide: {min:.3}..{max:.3}"
+        );
+    }
+
+    #[test]
+    fn test_running_stitches_split_sharp_turns() {
+        let points = vec![
+            Point::new(0.0, 0.0),
+            Point::new(6.0, 0.0),
+            Point::new(6.0, 6.0),
+            Point::new(12.0, 6.0),
+        ];
+        let stitches = generate_running_stitches(&points, 2.0);
+        let has_corner = stitches
+            .iter()
+            .any(|s| (s.position.x - 6.0).abs() < 1e-6 && (s.position.y - 0.0).abs() < 1e-6)
+            || stitches
+                .iter()
+                .any(|s| (s.position.x - 6.0).abs() < 1e-6 && (s.position.y - 6.0).abs() < 1e-6);
+
+        assert!(
+            has_corner,
+            "sharp turn corners should be preserved in stitch stream"
+        );
+    }
+
+    #[test]
+    fn test_running_stitches_soft_turns_keep_density() {
+        let points = vec![
+            Point::new(0.0, 0.0),
+            Point::new(8.0, 0.0),
+            Point::new(12.0, 5.0),
+            Point::new(20.0, 5.0),
+            Point::new(24.0, 0.0),
+            Point::new(32.0, 0.0),
+        ];
+        let stitches = generate_running_stitches(&points, 2.5);
+
+        let mut lengths: Vec<f64> = Vec::new();
+        for pair in stitches.windows(2) {
+            lengths.push(distance(pair[0].position, pair[1].position));
+        }
+        let mean = lengths.iter().sum::<f64>() / lengths.len() as f64;
+        assert!(
+            (mean - 2.5).abs() < 0.25,
+            "soft-turn mean stitch length drifted: {mean:.3}"
+        );
     }
 }

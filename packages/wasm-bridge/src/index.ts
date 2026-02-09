@@ -9,6 +9,8 @@
  */
 
 import initWasm, {
+  engine_default_routing_options,
+  engine_default_stitch_params,
   export_dst,
   export_pes,
   find_nearest_thread,
@@ -30,6 +32,8 @@ import initWasm, {
   scene_move_node,
   scene_node_bbox,
   scene_node_count,
+  scene_quality_metrics,
+  scene_quality_metrics_with_options,
   scene_redo,
   scene_remove_node,
   scene_rename_node,
@@ -52,11 +56,13 @@ import {
   BoundingBoxSchema,
   ExportDesignSchema,
   PathDataSchema,
+  QualityMetricsSchema,
   RenderItemSchema,
   RouteMetricsSchema,
   RoutingOptionsSchema,
   SatinResultSchema,
   SceneNodeInfoSchema,
+  StitchParamsSchema,
   ThreadColorSchema,
   TreeNodeSchema,
 } from "./schemas";
@@ -67,11 +73,13 @@ import type {
   NodeKindData,
   PathData,
   Point,
+  QualityMetrics,
   RenderItem,
   RouteMetrics,
   RoutingOptions,
   SatinResult,
   SceneNodeInfo,
+  StitchParams,
   StitchType,
   ThreadBrand,
   ThreadColor,
@@ -86,11 +94,13 @@ export {
   BoundingBoxSchema,
   ExportDesignSchema,
   PathDataSchema,
+  QualityMetricsSchema,
   RenderItemSchema,
   RouteMetricsSchema,
   RoutingOptionsSchema,
   SatinResultSchema,
   SceneNodeInfoSchema,
+  StitchParamsSchema,
   ThreadColorSchema,
   TreeNodeSchema,
 } from "./schemas";
@@ -108,6 +118,7 @@ export type {
   PathCommand,
   PathData,
   Point,
+  QualityMetrics,
   RenderItem,
   RouteMetrics,
   RoutingEntryExitMode,
@@ -254,6 +265,30 @@ export async function initEngine(): Promise<VisionEngine> {
         const routing = RoutingOptionsSchema.parse(options);
         const json = scene_route_metrics_with_options(stitchLength, JSON.stringify(routing));
         return RouteMetricsSchema.parse(JSON.parse(json));
+      },
+
+      sceneQualityMetrics: (stitchLength: number): QualityMetrics => {
+        const json = scene_quality_metrics(stitchLength);
+        return QualityMetricsSchema.parse(JSON.parse(json));
+      },
+
+      sceneQualityMetricsWithOptions: (
+        stitchLength: number,
+        options: RoutingOptions,
+      ): QualityMetrics => {
+        const routing = RoutingOptionsSchema.parse(options);
+        const json = scene_quality_metrics_with_options(stitchLength, JSON.stringify(routing));
+        return QualityMetricsSchema.parse(JSON.parse(json));
+      },
+
+      engineDefaultStitchParams: (): StitchParams => {
+        const json = engine_default_stitch_params();
+        return StitchParamsSchema.parse(JSON.parse(json));
+      },
+
+      engineDefaultRoutingOptions: (): RoutingOptions => {
+        const json = engine_default_routing_options();
+        return RoutingOptionsSchema.parse(JSON.parse(json));
       },
 
       // ====================================================================

@@ -185,3 +185,27 @@ pub struct Stitch {
     pub is_jump: bool,
     pub is_trim: bool,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_stitch_params_values() {
+        let defaults = StitchParams::default();
+
+        assert!(matches!(defaults.stitch_type, StitchType::Running));
+        assert_eq!(defaults.density, crate::constants::DEFAULT_STITCH_DENSITY);
+        assert_eq!(defaults.angle, 0.0);
+        assert!(matches!(defaults.underlay_mode, UnderlayMode::None));
+        assert_eq!(defaults.underlay_spacing_mm, 2.0);
+        assert!(!defaults.underlay_enabled);
+        assert_eq!(defaults.pull_compensation, 0.0);
+        assert!(matches!(defaults.compensation_mode, CompensationMode::Auto));
+        assert_eq!(defaults.min_segment_mm, 0.4);
+        assert!(matches!(defaults.fill_start_mode, FillStartMode::Auto));
+        assert_eq!(defaults.contour_step_mm, 1.2);
+        assert!(matches!(defaults.motif_pattern, MotifPattern::Diamond));
+        assert_eq!(defaults.motif_scale, 1.0);
+    }
+}

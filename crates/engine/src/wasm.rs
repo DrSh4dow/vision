@@ -29,6 +29,26 @@ pub fn version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
+/// Return engine-default stitch params as JSON.
+///
+/// This is the canonical default used by Rust and should be consumed by the
+/// bridge/UI to avoid default drift between layers.
+#[wasm_bindgen]
+pub fn engine_default_stitch_params() -> Result<String, JsError> {
+    let defaults = crate::StitchParams::default();
+    serde_json::to_string(&defaults).map_err(|e| JsError::new(&format!("Serialization error: {e}")))
+}
+
+/// Return engine-default routing options as JSON.
+///
+/// This is the canonical routing default and should be consumed by the
+/// bridge/UI to avoid default drift between layers.
+#[wasm_bindgen]
+pub fn engine_default_routing_options() -> Result<String, JsError> {
+    let defaults = crate::export_pipeline::RoutingOptions::default();
+    serde_json::to_string(&defaults).map_err(|e| JsError::new(&format!("Serialization error: {e}")))
+}
+
 // =============================================================================
 // Helpers
 // =============================================================================
@@ -216,6 +236,36 @@ pub fn scene_route_metrics_with_options(
     })
     .map_err(|e| JsError::new(&e))?;
     let metrics = crate::export_pipeline::compute_route_metrics(&design);
+    serde_json::to_string(&metrics).map_err(|e| JsError::new(&format!("Serialization error: {e}")))
+}
+
+/// Compute extended quality metrics for the current scene export.
+#[wasm_bindgen]
+pub fn scene_quality_metrics(stitch_length: f64) -> Result<String, JsError> {
+    let design = with_scene(|s| crate::export_pipeline::scene_to_export_design(s, stitch_length))
+        .map_err(|e| JsError::new(&e))?;
+    let metrics = crate::export_pipeline::compute_quality_metrics(&design, stitch_length);
+    serde_json::to_string(&metrics).map_err(|e| JsError::new(&format!("Serialization error: {e}")))
+}
+
+/// Compute extended quality metrics for the current scene with explicit routing options.
+#[wasm_bindgen]
+pub fn scene_quality_metrics_with_options(
+    stitch_length: f64,
+    routing_options_json: &str,
+) -> Result<String, JsError> {
+    let routing = if routing_options_json.trim().is_empty() {
+        crate::export_pipeline::RoutingOptions::default()
+    } else {
+        serde_json::from_str::<crate::export_pipeline::RoutingOptions>(routing_options_json)
+            .map_err(|e| JsError::new(&format!("Invalid routing options: {e}")))?
+    };
+
+    let design = with_scene(|s| {
+        crate::export_pipeline::scene_to_export_design_with_routing(s, stitch_length, routing)
+    })
+    .map_err(|e| JsError::new(&e))?;
+    let metrics = crate::export_pipeline::compute_quality_metrics(&design, stitch_length);
     serde_json::to_string(&metrics).map_err(|e| JsError::new(&format!("Serialization error: {e}")))
 }
 

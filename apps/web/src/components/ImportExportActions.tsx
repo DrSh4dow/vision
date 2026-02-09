@@ -1,4 +1,10 @@
-import type { NodeKindData, RouteMetrics, RoutingOptions, VisionEngine } from "@vision/wasm-bridge";
+import type {
+  NodeKindData,
+  QualityMetrics,
+  RouteMetrics,
+  RoutingOptions,
+  VisionEngine,
+} from "@vision/wasm-bridge";
 import { Download, FileUp, SlidersHorizontal } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -26,6 +32,21 @@ const EMPTY_ROUTE_METRICS: RouteMetrics = {
   route_score: 0,
 };
 
+const EMPTY_QUALITY_METRICS: QualityMetrics = {
+  stitch_count: 0,
+  jump_count: 0,
+  trim_count: 0,
+  color_change_count: 0,
+  travel_distance_mm: 0,
+  longest_travel_mm: 0,
+  route_score: 0,
+  mean_stitch_length_mm: 0,
+  stitch_length_p95_mm: 0,
+  density_error_mm: 0,
+  angle_error_deg: 0,
+  coverage_error_pct: 0,
+};
+
 export function ImportExportActions({
   engine,
   refreshScene,
@@ -35,6 +56,7 @@ export function ImportExportActions({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showRoutingPanel, setShowRoutingPanel] = useState(false);
   const [routeMetrics, setRouteMetrics] = useState<RouteMetrics>(EMPTY_ROUTE_METRICS);
+  const [qualityMetrics, setQualityMetrics] = useState<QualityMetrics>(EMPTY_QUALITY_METRICS);
   const isStrictSequencer = routingOptions.sequence_mode === "strict_sequencer";
 
   const setRoutingOption = useCallback(
@@ -49,10 +71,13 @@ export function ImportExportActions({
 
   useEffect(() => {
     try {
-      const metrics = engine.sceneRouteMetricsWithOptions(DEFAULT_STITCH_LENGTH, routingOptions);
-      setRouteMetrics(metrics);
+      const route = engine.sceneRouteMetricsWithOptions(DEFAULT_STITCH_LENGTH, routingOptions);
+      const quality = engine.sceneQualityMetricsWithOptions(DEFAULT_STITCH_LENGTH, routingOptions);
+      setRouteMetrics(route);
+      setQualityMetrics(quality);
     } catch (_err) {
       setRouteMetrics(EMPTY_ROUTE_METRICS);
+      setQualityMetrics(EMPTY_QUALITY_METRICS);
     }
   }, [engine, routingOptions]);
 
@@ -194,6 +219,13 @@ export function ImportExportActions({
       >
         T:{routeMetrics.travel_distance_mm.toFixed(1)} J:{routeMetrics.jump_count} R:
         {routeMetrics.route_score.toFixed(1)}
+      </span>
+      <span
+        className="px-1 text-[10px] text-muted-foreground/80"
+        data-testid="quality-metrics-inline"
+      >
+        QD:{qualityMetrics.density_error_mm.toFixed(2)} QA:
+        {qualityMetrics.angle_error_deg.toFixed(1)}
       </span>
       <Tooltip>
         <TooltipTrigger asChild>
@@ -397,6 +429,21 @@ export function ImportExportActions({
               {routeMetrics.color_change_count}
             </p>
             <p>Route score: {routeMetrics.route_score.toFixed(2)}</p>
+          </div>
+          <div
+            className="mt-2 rounded border border-border/40 bg-card/80 px-2 py-1.5 text-[10px] text-muted-foreground"
+            data-testid="quality-metrics-panel"
+          >
+            <p>Stitches: {qualityMetrics.stitch_count}</p>
+            <p>
+              Mean/P95 length: {qualityMetrics.mean_stitch_length_mm.toFixed(2)} /{" "}
+              {qualityMetrics.stitch_length_p95_mm.toFixed(2)} mm
+            </p>
+            <p>
+              Density error: {qualityMetrics.density_error_mm.toFixed(2)} mm | Angle error:{" "}
+              {qualityMetrics.angle_error_deg.toFixed(1)}°
+            </p>
+            <p>Coverage proxy error: {qualityMetrics.coverage_error_pct.toFixed(2)}%</p>
           </div>
         </div>
       )}

@@ -57,7 +57,7 @@ const UnderlayModeSchema = z.enum([
 const CompensationModeSchema = z.enum(["off", "auto", "directional"]);
 const FillStartModeSchema = z.enum(["auto", "center", "edge"]);
 
-const StitchParamsSchema = z.object({
+export const StitchParamsSchema = z.object({
   type: StitchTypeSchema,
   density: z.number(),
   angle: z.number(),
@@ -114,6 +114,21 @@ export const RouteMetricsSchema = z.object({
   travel_distance_mm: z.number(),
   longest_travel_mm: z.number().default(0),
   route_score: z.number().default(0),
+});
+
+export const QualityMetricsSchema = z.object({
+  stitch_count: z.number(),
+  jump_count: z.number(),
+  trim_count: z.number(),
+  color_change_count: z.number(),
+  travel_distance_mm: z.number(),
+  longest_travel_mm: z.number(),
+  route_score: z.number(),
+  mean_stitch_length_mm: z.number(),
+  stitch_length_p95_mm: z.number(),
+  density_error_mm: z.number(),
+  angle_error_deg: z.number(),
+  coverage_error_pct: z.number(),
 });
 
 const RoutingPolicySchema = z.enum(["balanced", "min_travel", "min_trims"]);

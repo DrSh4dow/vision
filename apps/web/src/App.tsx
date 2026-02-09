@@ -1,4 +1,10 @@
-import type { ExportDesign, NodeKindData, RenderItem, RoutingOptions } from "@vision/wasm-bridge";
+import type {
+  ExportDesign,
+  NodeKindData,
+  RenderItem,
+  RoutingOptions,
+  StitchParams,
+} from "@vision/wasm-bridge";
 import { Circle, MousePointer2, PenTool, Square } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -21,7 +27,7 @@ import { useSelection } from "@/hooks/useSelection";
 import { useTools } from "@/hooks/useTools";
 import type { CanvasData, DesignPoint } from "@/types/design";
 
-const PREVIEW_ROUTING_OPTIONS: RoutingOptions = {
+const FALLBACK_ROUTING_OPTIONS: RoutingOptions = {
   policy: "balanced",
   max_jump_mm: 25,
   trim_threshold_mm: 12,
@@ -33,6 +39,10 @@ const PREVIEW_ROUTING_OPTIONS: RoutingOptions = {
   entry_exit_mode: "auto",
   tie_mode: "shape_start_end",
   min_stitch_run_before_trim_mm: 2,
+  sequence_mode: "strict_sequencer",
+};
+
+const PREVIEW_ROUTING_OVERRIDES: Pick<RoutingOptions, "sequence_mode"> = {
   sequence_mode: "strict_sequencer",
 };
 
@@ -104,7 +114,10 @@ export function App() {
   const [showThreadPreview, setShowThreadPreview] = useState(true);
   const [playbackEnabled, setPlaybackEnabled] = useState(false);
   const [playbackTick, setPlaybackTick] = useState(0);
-  const [routingOptions, setRoutingOptions] = useState<RoutingOptions>(PREVIEW_ROUTING_OPTIONS);
+  const [routingOptions, setRoutingOptions] = useState<RoutingOptions>(FALLBACK_ROUTING_OPTIONS);
+  const [defaultStitchParams, setDefaultStitchParams] =
+    useState<StitchParams>(DEFAULT_STITCH_PARAMS);
+  const defaultsLoadedRef = useRef(false);
 
   // Canvas data: scene render items + stitch overlays
   const canvasDataRef = useRef<CanvasData>({
@@ -144,7 +157,29 @@ export function App() {
     refreshScene,
     selectNode,
     setActiveTool,
+    defaultStitchParams,
   );
+
+  useEffect(() => {
+    if (!engine || defaultsLoadedRef.current) return;
+    defaultsLoadedRef.current = true;
+
+    try {
+      const routingDefaults = engine.engineDefaultRoutingOptions();
+      setRoutingOptions({
+        ...routingDefaults,
+        ...PREVIEW_ROUTING_OVERRIDES,
+      });
+    } catch (err) {
+      console.warn("[vision] Failed to load routing defaults from engine", err);
+    }
+
+    try {
+      setDefaultStitchParams(engine.engineDefaultStitchParams());
+    } catch (err) {
+      console.warn("[vision] Failed to load stitch defaults from engine", err);
+    }
+  }, [engine]);
 
   // Pen tool keyboard handlers (Enter = finish, Escape = cancel)
   useEffect(() => {
@@ -252,7 +287,7 @@ export function App() {
             fill: RECT_FILL,
             stroke: RECT_STROKE,
             stroke_width: 0.15,
-            stitch: { ...DEFAULT_STITCH_PARAMS },
+            stitch: { ...defaultStitchParams },
           },
         };
         name = "Rectangle";
@@ -263,7 +298,7 @@ export function App() {
             fill: ELLIPSE_FILL,
             stroke: ELLIPSE_STROKE,
             stroke_width: 0.15,
-            stitch: { ...DEFAULT_STITCH_PARAMS },
+            stitch: { ...defaultStitchParams },
           },
         };
         name = "Ellipse";
@@ -292,7 +327,7 @@ export function App() {
       selectNode(nodeId);
       setActiveTool("select");
     },
-    [engine, activeTool, refreshScene, selectNode, setActiveTool],
+    [engine, activeTool, refreshScene, selectNode, setActiveTool, defaultStitchParams],
   );
 
   /** Handle pen tool click. */

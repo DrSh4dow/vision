@@ -1,8 +1,7 @@
-import type { NodeKindData, PathCommand, VisionEngine } from "@vision/wasm-bridge";
+import type { NodeKindData, PathCommand, StitchParams, VisionEngine } from "@vision/wasm-bridge";
 import { useCallback, useRef, useState } from "react";
 
 import { PEN_FILL, PEN_STROKE } from "@/constants/colors";
-import { DEFAULT_STITCH_PARAMS } from "@/constants/embroidery";
 import type { DesignPoint } from "@/types/design";
 
 export interface PenToolState {
@@ -30,6 +29,7 @@ export function usePenTool(
   refreshScene: () => void,
   selectNode: (id: number) => void,
   setActiveTool: (tool: "select") => void,
+  defaultStitchParams: StitchParams,
 ): UsePenToolResult {
   const [penState, setPenState] = useState<PenToolState>({
     points: [],
@@ -65,7 +65,7 @@ export function usePenTool(
           fill: closed ? PEN_FILL : null,
           stroke: PEN_STROKE,
           stroke_width: 0.15,
-          stitch: { ...DEFAULT_STITCH_PARAMS },
+          stitch: { ...defaultStitchParams },
         },
       };
 
@@ -74,7 +74,7 @@ export function usePenTool(
       selectNode(nodeId);
       setActiveTool("select");
     },
-    [engine, refreshScene, selectNode, setActiveTool],
+    [engine, refreshScene, selectNode, setActiveTool, defaultStitchParams],
   );
 
   const addPoint = useCallback(

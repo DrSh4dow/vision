@@ -1,0 +1,24 @@
+{
+  "route": {
+    "jump_count": 0,
+    "trim_count": 0,
+    "color_change_count": 0,
+    "travel_distance_mm": 0.0,
+    "longest_travel_mm": 0.0,
+    "route_score": 0.0
+  },
+  "quality": {
+    "stitch_count": 5,
+    "jump_count": 0,
+    "trim_count": 0,
+    "color_change_count": 0,
+    "travel_distance_mm": 0.0,
+    "longest_travel_mm": 0.0,
+    "route_score": 0.0,
+    "mean_stitch_length_mm": 2.5,
+    "stitch_length_p95_mm": 2.5,
+    "density_error_mm": 0.0,
+    "angle_error_deg": 0.0,
+    "coverage_error_pct": 0.0
+  }
+}

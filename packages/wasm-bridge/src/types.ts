@@ -126,6 +126,22 @@ export interface RouteMetrics {
   route_score: number;
 }
 
+/** Extended stitch quality metrics for parity benchmarking. */
+export interface QualityMetrics {
+  stitch_count: number;
+  jump_count: number;
+  trim_count: number;
+  color_change_count: number;
+  travel_distance_mm: number;
+  longest_travel_mm: number;
+  route_score: number;
+  mean_stitch_length_mm: number;
+  stitch_length_p95_mm: number;
+  density_error_mm: number;
+  angle_error_deg: number;
+  coverage_error_pct: number;
+}
+
 /** Routing optimization policy. */
 export type RoutingPolicy = "balanced" | "min_travel" | "min_trims";
 /** Entry/exit mode for stitch blocks. */

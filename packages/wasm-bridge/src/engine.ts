@@ -12,11 +12,13 @@ import type {
   NodeKindData,
   PathData,
   Point,
+  QualityMetrics,
   RenderItem,
   RouteMetrics,
   RoutingOptions,
   SatinResult,
   SceneNodeInfo,
+  StitchParams,
   ThreadBrand,
   ThreadColor,
   TransformData,
@@ -81,6 +83,18 @@ export interface VisionEngine {
 
   /** Compute route metrics with explicit routing options. */
   sceneRouteMetricsWithOptions(stitchLength: number, options: RoutingOptions): RouteMetrics;
+
+  /** Compute extended quality metrics for the current scene export. */
+  sceneQualityMetrics(stitchLength: number): QualityMetrics;
+
+  /** Compute extended quality metrics with explicit routing options. */
+  sceneQualityMetricsWithOptions(stitchLength: number, options: RoutingOptions): QualityMetrics;
+
+  /** Return canonical engine defaults for stitch params. */
+  engineDefaultStitchParams(): StitchParams;
+
+  /** Return canonical engine defaults for routing options. */
+  engineDefaultRoutingOptions(): RoutingOptions;
 
   // ==========================================================================
   // Scene Graph API
