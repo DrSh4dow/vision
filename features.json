@@ -256,7 +256,7 @@
         "Ctrl+Shift+Z to redo, verify objects move again",
         "Verify hit-testing is sub-millisecond precise (no perceptible lag)"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "tool-pen",
