@@ -493,7 +493,7 @@
         "Verify file is valid PES format",
         "Verify stitch data and color palette are encoded correctly"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "export",
