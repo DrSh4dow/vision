@@ -96,7 +96,7 @@
         "Verify Documentation item present",
         "Verify About Vision item shows version and project info"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "category": "ui-menu-bar",

@@ -210,6 +210,14 @@ test.describe("Vision App", () => {
     await expect(page.getByTestId("menu-routing-item-allow-reverse")).toBeVisible();
     await expect(page.getByTestId("menu-routing-item-open-full-routing-settings")).toBeVisible();
   });
+
+  test("help menu contains keyboard shortcuts, documentation, and about", async ({ page }) => {
+    await page.getByTestId("menu-help").click();
+    await expect(page.getByTestId("menu-help-panel")).toBeVisible();
+    await expect(page.getByTestId("menu-help-item-keyboard-shortcuts")).toBeVisible();
+    await expect(page.getByTestId("menu-help-item-documentation")).toBeVisible();
+    await expect(page.getByTestId("menu-help-item-about-vision")).toBeVisible();
+  });
 });
 
 test.describe("WASM Engine Integration", () => {
