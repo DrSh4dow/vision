@@ -4,16 +4,17 @@
 	"scripts": {
 		"build": "turbo run build",
 		"dev": "turbo run dev",
-		"lint": "turbo run lint",
-		"format": "biome format --write .",
-		"format:check": "biome format .",
-		"check-types": "turbo run check-types"
+		"check": "turbo run check",
+		"check:fix": "biome check --write .",
+		"test": "turbo run test",
+		"typecheck": "turbo run typecheck"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.3.15",
 		"shadcn": "^3.8.4",
 		"turbo": "^2.8.9",
-		"typescript": "5.9.2"
+		"typescript": "5.9.2",
+		"vitest": "^3.2.4"
 	},
 	"engines": {
 		"node": ">=18"
@@ -22,6 +23,7 @@
 	"workspaces": [
 		"apps/*",
 		"packages/*",
+		"crates/*",
 		"plugins/*"
 	]
 }
