@@ -27,6 +27,7 @@
 - If you need to use webfetch, try to look for llms.txt in the page's root first for structured data.
 - If you are unsure how to do something, use `gh_grep` to search code examples from GitHub.
 - Always check with the `playwright` tool after making changes to ensure the app still works and looks as expected.
+- When there are more than 1 package using the same dependency use a catalog dependency in the root `package.json` to ensure all workspaces use the same version.
 
 ## Workspace Commands
 
