@@ -1,0 +1,17 @@
+{
+	"name": "@vision/engine",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"exports": "./src/index.ts",
+	"scripts": {
+		"build": "tsc -p tsconfig.json",
+		"check": "biome check .",
+		"test": "vitest run --passWithNoTests",
+		"typecheck": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"@vision/typescript-config": "*",
+		"typescript": "5.9.2"
+	}
+}

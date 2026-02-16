@@ -74,8 +74,8 @@ bun run dev
 bun run dev          # dev server for the web app
 bun run build        # build everything (via turbo)
 bun run test         # run tests
-bun run lint         # biome lint
-bun run format       # biome format
+bun run check        # biome checks (lint + format)
+bun run check:fix    # biome check with writes
 bun run typecheck    # tsc across packages
 bun run wasm:build   # build Rust/WASM (if configured)
 ```
@@ -119,9 +119,9 @@ Plugins run in a **Web Worker** sandbox where possible, and request explicit cap
 2. Ensure formatting/lint passes:
 
    ```bash
-   bun run format
-   bun run lint
+   bun run check
    bun run test
+   bun run typecheck
    ```
 
 3. Keep package boundaries clean:

@@ -6,9 +6,11 @@
 		"./*": "./src/*.tsx"
 	},
 	"scripts": {
-		"lint": "biome lint .",
+		"build": "tsc -p tsconfig.json",
+		"check": "biome check .",
+		"test": "vitest run --passWithNoTests",
 		"generate:component": "turbo gen react-component",
-		"check-types": "tsc --noEmit"
+		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
 		"@vision/typescript-config": "*",

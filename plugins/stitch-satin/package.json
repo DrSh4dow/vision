@@ -1,0 +1,20 @@
+{
+	"name": "@vision/plugin-stitch-satin",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"exports": "./src/index.ts",
+	"scripts": {
+		"build": "tsc -p tsconfig.json",
+		"check": "biome check .",
+		"test": "vitest run --passWithNoTests",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@vision/plugin-sdk": "*"
+	},
+	"devDependencies": {
+		"@vision/typescript-config": "*",
+		"typescript": "5.9.2"
+	}
+}
