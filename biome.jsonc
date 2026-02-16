@@ -1,0 +1,77 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.3.15/schema.json",
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true
+	},
+	"files": {
+		"ignoreUnknown": false,
+		"includes": ["**"]
+	},
+	"formatter": {
+		"enabled": true
+	},
+	"assist": {
+		"actions": {
+			"source": {
+				"organizeImports": "on"
+			}
+		}
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"recommended": true,
+			"nursery": {
+				"useSortedClasses": {
+					"level": "warn",
+					"fix": "safe",
+					"options": {
+						"functions": ["clsx", "cva", "cn"]
+					}
+				}
+			},
+			"suspicious": {
+				"noImplicitAnyLet": "off",
+				"noArrayIndexKey": "off",
+				"noConsole": {
+					"level": "error",
+					"options": {
+						"allow": [
+							"assert",
+							"error",
+							"info",
+							"warn",
+							"dir",
+							"time",
+							"timeEnd"
+						]
+					}
+				}
+			},
+			"complexity": {
+				"useLiteralKeys": "off",
+				"noStaticOnlyClass": "off",
+				"noExtraBooleanCast": "off"
+			}
+		}
+	},
+	// Override settings for test files
+	"overrides": [
+		{
+			"includes": [
+				"__tests__/**",
+				"**/*.test.{js,jsx,ts,tsx}",
+				"**/*.spec.{js,jsx,ts,tsx}"
+			],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noExplicitAny": "off"
+					}
+				}
+			}
+		}
+	]
+}
