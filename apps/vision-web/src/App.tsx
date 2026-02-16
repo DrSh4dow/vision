@@ -54,7 +54,7 @@ import {
 	ZoomIn,
 	ZoomOut,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 
 type Mode = "objects" | "sequencer" | "preview";
@@ -85,6 +85,14 @@ interface SequencerRow {
 interface PluginTab {
 	id: "thread" | "density" | "colors";
 	label: string;
+}
+
+type HeaderMenuId = "file" | "edit" | "plugins";
+
+interface HeaderMenuAction {
+	label: string;
+	shortcut?: string;
+	divider?: boolean;
 }
 
 const LAYOUT_KEY = "vision.layout.v1";
@@ -209,6 +217,25 @@ const pluginTabs: PluginTab[] = [
 const subtleInputClass =
 	"border-[color:var(--border-subtle)] bg-[color:color-mix(in_srgb,var(--surface-elevated)_76%,transparent)] focus-visible:border-[color:var(--ring)]";
 
+const fileMenuActions: HeaderMenuAction[] = [
+	{ label: "New" },
+	{ label: "Open" },
+	{ label: "Save", shortcut: "Ctrl+S" },
+	{ label: "Save As...", divider: true },
+	{ label: "Import" },
+	{ label: "Export" },
+];
+
+const editMenuActions: HeaderMenuAction[] = [
+	{ label: "Undo", shortcut: "Ctrl+Z" },
+	{ label: "Redo", shortcut: "Ctrl+Shift+Z", divider: true },
+	{ label: "Cut", shortcut: "Ctrl+X" },
+	{ label: "Copy", shortcut: "Ctrl+C" },
+	{ label: "Paste", shortcut: "Ctrl+V" },
+	{ label: "Duplicate", shortcut: "Ctrl+D", divider: true },
+	{ label: "Delete", shortcut: "Del" },
+];
+
 function clampPanel(width: number) {
 	return Math.max(
 		visionLayoutDefaults.minPanelWidth,
@@ -275,11 +302,13 @@ export function App() {
 	);
 	const [badgeOpen, setBadgeOpen] = useState(true);
 	const [pluginTab, setPluginTab] = useState<PluginTab["id"]>("thread");
-	const [pluginsOpen, setPluginsOpen] = useState(false);
+	const [openMenu, setOpenMenu] = useState<HeaderMenuId | null>(null);
 	const [exportOpen, setExportOpen] = useState(() =>
 		hasStateFlag("export-open"),
 	);
 	const [format, setFormat] = useState(".DST");
+	const fileMenuRef = useRef<HTMLDivElement | null>(null);
+	const editMenuRef = useRef<HTMLDivElement | null>(null);
 	const pluginMenuRef = useRef<HTMLDivElement | null>(null);
 
 	useEffect(() => {
@@ -304,16 +333,29 @@ export function App() {
 
 	useEffect(() => {
 		const onPointerDown = (event: PointerEvent) => {
-			if (!pluginsOpen || !pluginMenuRef.current) {
+			if (openMenu === null) {
 				return;
 			}
-			if (!pluginMenuRef.current.contains(event.target as Node)) {
-				setPluginsOpen(false);
+
+			const target = event.target as Node;
+			const menuRefs: Record<HeaderMenuId, RefObject<HTMLDivElement | null>> = {
+				file: fileMenuRef,
+				edit: editMenuRef,
+				plugins: pluginMenuRef,
+			};
+
+			const activeMenuRef = menuRefs[openMenu];
+			if (activeMenuRef.current && !activeMenuRef.current.contains(target)) {
+				setOpenMenu(null);
 			}
 		};
 		globalThis.addEventListener("pointerdown", onPointerDown);
 		return () => globalThis.removeEventListener("pointerdown", onPointerDown);
-	}, [pluginsOpen]);
+	}, [openMenu]);
+
+	const toggleMenu = (menu: HeaderMenuId) => {
+		setOpenMenu((current) => (current === menu ? null : menu));
+	};
 
 	const leftWidth = layout.leftCollapsed ? 56 : layout.leftPanelWidth;
 	const rightWidth = layout.rightCollapsed ? 56 : layout.rightPanelWidth;
@@ -364,8 +406,8 @@ export function App() {
 	};
 
 	return (
-		<div className="grid h-full grid-rows-[48px_1fr_24px] overflow-hidden bg-[color:var(--background)] text-[color:var(--foreground)]">
-			<header className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-4 border-[color:var(--toolbar-border)] border-b bg-[color:var(--toolbar)] px-3 backdrop-blur-xl max-md:grid-cols-[1fr_auto] max-md:gap-2 max-md:px-2">
+		<div className="grid h-full grid-rows-[48px_1fr_24px] overflow-x-hidden bg-[color:var(--background)] text-[color:var(--foreground)]">
+			<header className="relative z-30 grid grid-cols-[auto_auto_1fr_auto] items-center gap-4 border-[color:var(--toolbar-border)] border-b bg-[color:var(--toolbar)] px-3 backdrop-blur-xl max-md:grid-cols-[1fr_auto] max-md:gap-2 max-md:px-2">
 				<div className="flex items-center gap-3 max-md:gap-2">
 					<div className="grid h-7 w-7 place-items-center rounded-lg bg-[color:var(--primary)] shadow-[0_8px_24px_color-mix(in_srgb,var(--primary)_35%,transparent)]">
 						<Layers className="h-4 w-4 text-[color:var(--primary-foreground)]" />
@@ -375,20 +417,43 @@ export function App() {
 					</p>
 					<nav
 						aria-label="Application"
-						className="flex items-center gap-1 max-md:hidden"
+						className="relative flex items-center gap-1 max-md:hidden"
 					>
-						<MenuGhostButton label="File" />
-						<MenuGhostButton label="Edit" />
+						<HeaderMenu
+							label="File"
+							menuId="file"
+							openMenu={openMenu}
+							onToggle={toggleMenu}
+							menuRef={fileMenuRef}
+							actions={fileMenuActions}
+						/>
+						<HeaderMenu
+							label="Edit"
+							menuId="edit"
+							openMenu={openMenu}
+							onToggle={toggleMenu}
+							menuRef={editMenuRef}
+							actions={editMenuActions}
+						/>
 						<div className="relative" ref={pluginMenuRef}>
 							<button
 								type="button"
-								onClick={() => setPluginsOpen((open) => !open)}
-								className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-[12px] text-[color:var(--text-muted)] transition-colors hover:bg-[color:var(--hover-bg)] hover:text-[color:var(--text-primary)]"
+								onClick={() => toggleMenu("plugins")}
+								aria-haspopup="menu"
+								aria-expanded={openMenu === "plugins"}
+								className={cn(
+									"inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-[12px] text-[color:var(--text-muted)] transition-colors hover:bg-[color:var(--hover-bg)] hover:text-[color:var(--text-primary)]",
+									openMenu === "plugins" &&
+										"bg-[color:var(--active-bg)] text-[color:var(--text-primary)]",
+								)}
 							>
 								Plugins <Badge>4</Badge>
 							</button>
-							{pluginsOpen ? (
-								<div className="absolute top-[calc(100%+4px)] left-0 z-40 w-60 rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface)] p-1.5 shadow-2xl">
+							{openMenu === "plugins" ? (
+								<div
+									role="menu"
+									className="absolute top-[calc(100%+4px)] left-0 z-50 w-60 rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface)] p-1.5 shadow-2xl"
+								>
 									<PluginMenuItem
 										icon={<Settings2 className="h-3.5 w-3.5" />}
 										label="Manage Plugins"
@@ -429,6 +494,7 @@ export function App() {
 						label="Mode"
 						value={mode}
 						onChange={(next) => setMode(next as Mode)}
+						variant="mode"
 						className="max-md:hidden"
 						options={[
 							{ value: "objects", label: "Objects" },
@@ -443,7 +509,7 @@ export function App() {
 						<Input
 							placeholder="Search commands... ⌘K"
 							aria-label="Command search"
-							className="h-8 border-[color:var(--border-subtle)] bg-[color:color-mix(in_srgb,var(--surface-elevated)_72%,transparent)] pl-8 text-[12px] placeholder:text-[color:var(--text-ghost)]"
+							className="h-8 border-[color:var(--border-subtle)] bg-[color:var(--input)] pl-8 text-[12px] placeholder:text-[color:var(--text-ghost)]"
 						/>
 					</div>
 				</div>
@@ -452,6 +518,7 @@ export function App() {
 						label="Mode"
 						value={mode}
 						onChange={(next) => setMode(next as Mode)}
+						variant="mode"
 						options={[
 							{ value: "objects", label: "Objects" },
 							{ value: "sequencer", label: "Sequencer" },
@@ -1355,14 +1422,65 @@ function StatsGrid({ stats }: { stats: [string, string][] }) {
 	);
 }
 
-function MenuGhostButton({ label }: { label: string }) {
+function HeaderMenu({
+	label,
+	menuId,
+	openMenu,
+	onToggle,
+	menuRef,
+	actions,
+}: {
+	label: string;
+	menuId: HeaderMenuId;
+	openMenu: HeaderMenuId | null;
+	onToggle: (menu: HeaderMenuId) => void;
+	menuRef: RefObject<HTMLDivElement | null>;
+	actions: HeaderMenuAction[];
+}) {
+	const isOpen = openMenu === menuId;
+
 	return (
-		<button
-			type="button"
-			className="rounded-md px-2.5 py-1.5 text-[12px] text-[color:var(--text-muted)] transition-colors hover:bg-[color:var(--hover-bg)] hover:text-[color:var(--text-primary)]"
-		>
-			{label}
-		</button>
+		<div className="relative" ref={menuRef}>
+			<button
+				type="button"
+				onClick={() => onToggle(menuId)}
+				aria-haspopup="menu"
+				aria-expanded={isOpen}
+				className={cn(
+					"rounded-md px-2.5 py-1.5 text-[12px] text-[color:var(--text-muted)] transition-colors hover:bg-[color:var(--hover-bg)] hover:text-[color:var(--text-primary)]",
+					isOpen &&
+						"bg-[color:var(--active-bg)] text-[color:var(--text-primary)]",
+				)}
+			>
+				{label}
+			</button>
+			{isOpen ? (
+				<div
+					role="menu"
+					className="absolute top-[calc(100%+4px)] left-0 z-50 min-w-44 rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface)] p-1.5 shadow-2xl"
+				>
+					{actions.map((action) => (
+						<div key={action.label}>
+							<button
+								type="button"
+								role="menuitem"
+								className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left text-[12px] text-[color:var(--text-muted)] transition-colors hover:bg-[color:var(--active-bg)] hover:text-[color:var(--text-primary)]"
+							>
+								<span className="flex-1">{action.label}</span>
+								{action.shortcut ? (
+									<span className="font-mono text-[10px] text-[color:var(--text-ghost)]">
+										{action.shortcut}
+									</span>
+								) : null}
+							</button>
+							{action.divider ? (
+								<div className="my-1 h-px bg-[color:var(--border-subtle)]" />
+							) : null}
+						</div>
+					))}
+				</div>
+			) : null}
+		</div>
 	);
 }
 

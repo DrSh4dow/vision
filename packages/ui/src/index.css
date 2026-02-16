@@ -68,7 +68,7 @@
 	--accent-foreground: #ffffff;
 	--destructive: oklch(0.704 0.191 22.216);
 	--border: oklch(1 0 0 / 8%);
-	--input: oklch(1 0 0 / 5%);
+	--input: #1f1a26;
 	--ring: color-mix(in srgb, #8c2bee 52%, transparent);
 	--surface: #1a1522;
 	--surface-elevated: #211b2b;
@@ -85,7 +85,7 @@
 	--text-ghost: oklch(1 0 0 / 24%);
 	--text-label: oklch(1 0 0 / 30%);
 	--border-subtle: oklch(1 0 0 / 4%);
-	--border-default: oklch(1 0 0 / 6%);
+	--border-default: #2c2732;
 	--border-strong: oklch(1 0 0 / 10%);
 	--selected-bg: color-mix(in srgb, #8c2bee 14%, transparent);
 	--selected-border: color-mix(in srgb, #8c2bee 34%, transparent);
