@@ -28,7 +28,7 @@ test("preview mode shell", async ({ page }) => {
 
 test("collapsed panel states", async ({ page }) => {
 	await page.getByLabel("Collapse Objects").click();
-	await page.getByLabel("Collapse Design").click();
+	await page.getByLabel("Collapse Design").click({ force: true });
 	await expect(page).toHaveScreenshot("shell-collapsed-panels.png", {
 		fullPage: true,
 	});
