@@ -15,6 +15,7 @@
 	"dependencies": {
 		"@vision/runtime": "*",
 		"@vision/ui": "*",
+		"lucide-react": "^0.556.0",
 		"react": "^19.2.0",
 		"react-dom": "^19.2.0"
 	},

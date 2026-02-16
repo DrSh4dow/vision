@@ -26,6 +26,13 @@ test("preview mode shell", async ({ page }) => {
 	await expect(page).toHaveScreenshot("shell-preview.png", { fullPage: true });
 });
 
+test("export modal", async ({ page }) => {
+	await page.getByRole("button", { name: "Export" }).click();
+	await expect(page).toHaveScreenshot("shell-export-modal.png", {
+		fullPage: true,
+	});
+});
+
 test("collapsed panel states", async ({ page }) => {
 	await page.getByLabel("Collapse Objects").click();
 	await page.getByLabel("Collapse Design").click({ force: true });
@@ -52,5 +59,15 @@ test("reduced motion state", async ({ page }) => {
 	await page.getByRole("tab", { name: "Preview" }).click();
 	await expect(page).toHaveScreenshot("shell-reduced-motion.png", {
 		fullPage: true,
+	});
+});
+
+test.describe("mobile", () => {
+	test.use({ viewport: { width: 375, height: 812 } });
+
+	test("objects mode under sm", async ({ page }) => {
+		await expect(page).toHaveScreenshot("shell-mobile-objects.png", {
+			fullPage: true,
+		});
 	});
 });

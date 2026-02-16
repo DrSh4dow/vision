@@ -12,8 +12,50 @@ import {
 	Toggle,
 	visionLayoutDefaults,
 } from "@vision/ui";
+import {
+	AlignCenter,
+	AlignHorizontalDistributeCenter,
+	AlignHorizontalDistributeEnd,
+	AlignHorizontalDistributeStart,
+	AlignVerticalDistributeCenter,
+	AlignVerticalDistributeEnd,
+	AlignVerticalDistributeStart,
+	Bolt,
+	Circle,
+	CircleDot,
+	Crop,
+	Diamond,
+	Download,
+	Eye,
+	FileImage,
+	Folder,
+	GripVertical,
+	Image,
+	Layers,
+	Lock,
+	MousePointer2,
+	MoveHorizontal,
+	MoveVertical,
+	PaintBucket,
+	PenTool,
+	Plus,
+	RectangleHorizontal,
+	RotateCw,
+	Scan,
+	Search,
+	Send,
+	Settings2,
+	Share2,
+	Sparkles,
+	Square,
+	Star,
+	Type,
+	WandSparkles,
+	ZoomIn,
+	ZoomOut,
+} from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Mode = "objects" | "sequencer" | "preview";
 type PanelSide = "left" | "right";
@@ -25,6 +67,26 @@ interface LayoutState {
 	rightCollapsed: boolean;
 }
 
+interface ObjectItem {
+	id: string;
+	name: string;
+	meta: string;
+	type: "vector" | "image";
+	icon: ReactNode;
+}
+
+interface SequencerRow {
+	id: string;
+	name: string;
+	meta: string;
+	color: string;
+}
+
+interface PluginTab {
+	id: "thread" | "density" | "colors";
+	label: string;
+}
+
 const LAYOUT_KEY = "vision.layout.v1";
 const REDUCED_MOTION_KEY = "vision.reduced-motion";
 
@@ -34,6 +96,99 @@ const defaultLayout: LayoutState = {
 	leftCollapsed: false,
 	rightCollapsed: false,
 };
+
+const objects: ObjectItem[] = [
+	{
+		id: "circle",
+		name: "Circle - Outline",
+		meta: "Vector - Closed",
+		type: "vector",
+		icon: <Circle className="h-4 w-4" />,
+	},
+	{
+		id: "star",
+		name: "Star Shape",
+		meta: "Vector - Closed",
+		type: "vector",
+		icon: <Star className="h-4 w-4" />,
+	},
+	{
+		id: "triangle",
+		name: "Triangle",
+		meta: "Vector - Closed",
+		type: "vector",
+		icon: <Diamond className="h-4 w-4" />,
+	},
+	{
+		id: "badge",
+		name: "Badge Logo",
+		meta: "SVG - 5 paths",
+		type: "vector",
+		icon: <Folder className="h-4 w-4" />,
+	},
+	{
+		id: "image",
+		name: "logo.png",
+		meta: "Image - 320x240",
+		type: "image",
+		icon: <Image className="h-4 w-4" />,
+	},
+];
+
+const sequencerBaseRows: SequencerRow[] = [
+	{
+		id: "seq-1",
+		name: "Circle - Outline",
+		meta: "3,240 st - Satin",
+		color: "#ef4444",
+	},
+	{
+		id: "seq-2",
+		name: "Star Shape",
+		meta: "12,800 st - Fill",
+		color: "#ef4444",
+	},
+	{
+		id: "seq-3",
+		name: "Triangle",
+		meta: "4,600 st - Running",
+		color: "#60a5fa",
+	},
+];
+
+const sequencerGroupedRows: SequencerRow[] = [
+	{
+		id: "grp-1",
+		name: "Shield Outline",
+		meta: "4,100 st - Satin",
+		color: "#fbbf24",
+	},
+	{
+		id: "grp-2",
+		name: "Shield Fill",
+		meta: "8,400 st - Fill",
+		color: "#fbbf24",
+	},
+	{ id: "grp-3", name: "Banner", meta: "2,600 st - Satin", color: "#ef4444" },
+	{
+		id: "grp-4",
+		name: 'Text - "CLUB"',
+		meta: "1,800 st - Satin",
+		color: "#ffffff",
+	},
+	{
+		id: "grp-5",
+		name: "Star Emblem",
+		meta: "1,300 st - Fill",
+		color: "#ffffff",
+	},
+];
+
+const pluginTabs: PluginTab[] = [
+	{ id: "thread", label: "Thread" },
+	{ id: "density", label: "Density" },
+	{ id: "colors", label: "Colors" },
+];
 
 function clampPanel(width: number) {
 	return Math.max(
@@ -90,7 +245,21 @@ export function App() {
 	});
 	const [objectsLoading, setObjectsLoading] = useState(false);
 	const [sequencerLoading, setSequencerLoading] = useState(false);
-	const [isNarrow, setIsNarrow] = useState(() => globalThis.innerWidth <= 1080);
+	const [isMobile, setIsMobile] = useState(
+		() => globalThis.matchMedia("(max-width: 639px)").matches,
+	);
+	const [selectedObjectId, setSelectedObjectId] = useState(
+		objects[0]?.id ?? "circle",
+	);
+	const [selectedSequencerId, setSelectedSequencerId] = useState(
+		sequencerBaseRows[0]?.id ?? "seq-1",
+	);
+	const [badgeOpen, setBadgeOpen] = useState(true);
+	const [pluginTab, setPluginTab] = useState<PluginTab["id"]>("thread");
+	const [pluginsOpen, setPluginsOpen] = useState(false);
+	const [exportOpen, setExportOpen] = useState(false);
+	const [format, setFormat] = useState(".DST");
+	const pluginMenuRef = useRef<HTMLDivElement | null>(null);
 
 	useEffect(() => {
 		globalThis.localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout));
@@ -105,26 +274,37 @@ export function App() {
 	}, [reducedMotion]);
 
 	useEffect(() => {
-		const media = globalThis.matchMedia("(max-width: 1080px)");
-		const handleChange = () => setIsNarrow(media.matches);
+		const media = globalThis.matchMedia("(max-width: 639px)");
+		const handleChange = () => setIsMobile(media.matches);
 		handleChange();
 		media.addEventListener("change", handleChange);
 		return () => media.removeEventListener("change", handleChange);
 	}, []);
 
+	useEffect(() => {
+		const onPointerDown = (event: PointerEvent) => {
+			if (!pluginsOpen || !pluginMenuRef.current) {
+				return;
+			}
+			if (!pluginMenuRef.current.contains(event.target as Node)) {
+				setPluginsOpen(false);
+			}
+		};
+		globalThis.addEventListener("pointerdown", onPointerDown);
+		return () => globalThis.removeEventListener("pointerdown", onPointerDown);
+	}, [pluginsOpen]);
+
 	const leftWidth = layout.leftCollapsed ? 56 : layout.leftPanelWidth;
 	const rightWidth = layout.rightCollapsed ? 56 : layout.rightPanelWidth;
 
-	const modeStatus = useMemo(() => {
-		switch (mode) {
-			case "objects":
-				return "Objects mode active";
-			case "sequencer":
-				return "Sequencer mode active";
-			case "preview":
-				return "Preview mode active";
-		}
-	}, [mode]);
+	const selectedObject =
+		objects.find((item) => item.id === selectedObjectId) ?? objects[0];
+	const selectedType = selectedObject?.type ?? "vector";
+	const selectedName =
+		mode === "sequencer"
+			? (sequencerBaseRows.find((row) => row.id === selectedSequencerId)
+					?.name ?? "Circle - Outline")
+			: (selectedObject?.name ?? "Circle - Outline");
 
 	const startResize = (
 		side: PanelSide,
@@ -163,184 +343,488 @@ export function App() {
 	};
 
 	return (
-		<div className="grid h-full grid-rows-[56px_1fr_24px] overflow-hidden bg-[color:var(--background)] text-[color:var(--foreground)]">
-			<header className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-4 border-[color:var(--toolbar-border)] border-b bg-[color:var(--toolbar)]/90 px-3 backdrop-blur-md max-[1080px]:grid-cols-1 max-[1080px]:py-2">
-				<div className="inline-flex items-center gap-3">
-					<div className="grid h-7 w-7 place-items-center rounded-md bg-[color:var(--primary)] font-bold text-[color:var(--primary-foreground)] text-xs">
-						V
+		<div className="grid h-full grid-rows-[48px_1fr_24px] overflow-hidden bg-[color:var(--background)] text-[color:var(--foreground)]">
+			<header className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-4 border-[color:var(--toolbar-border)] border-b bg-[color:var(--toolbar)] px-3 backdrop-blur-xl max-sm:grid-cols-[1fr_auto] max-sm:gap-2 max-sm:px-2">
+				<div className="flex items-center gap-3 max-sm:gap-2">
+					<div className="grid h-7 w-7 place-items-center rounded-lg bg-[color:var(--primary)] shadow-[0_8px_24px_color-mix(in_srgb,var(--primary)_35%,transparent)]">
+						<Layers className="h-4 w-4 text-[color:var(--primary-foreground)]" />
 					</div>
-					<p className="m-0 font-semibold text-xl tracking-tight">Vision</p>
-					<nav className="inline-flex items-center gap-1" aria-label="App menu">
-						{["File", "Edit", "Plugins"].map((menu) => (
+					<p className="m-0 font-extrabold text-[15px] tracking-tight">
+						Vision
+					</p>
+					<nav
+						aria-label="Application"
+						className="flex items-center gap-1 max-sm:hidden"
+					>
+						<MenuGhostButton label="File" />
+						<MenuGhostButton label="Edit" />
+						<div className="relative" ref={pluginMenuRef}>
 							<button
-								key={menu}
 								type="button"
-								className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[color:var(--text-muted)] text-sm transition-colors hover:bg-[color:var(--hover-bg)] hover:text-[color:var(--text-primary)]"
+								onClick={() => setPluginsOpen((open) => !open)}
+								className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-[12px] text-[color:var(--text-muted)] transition-colors hover:bg-[color:var(--hover-bg)] hover:text-[color:var(--text-primary)]"
 							>
-								{menu}
-								{menu === "Plugins" ? <Badge>4</Badge> : null}
+								Plugins <Badge>4</Badge>
 							</button>
-						))}
+							{pluginsOpen ? (
+								<div className="absolute top-[calc(100%+4px)] left-0 z-40 w-60 rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface)] p-1.5 shadow-2xl">
+									<PluginMenuItem
+										icon={<Settings2 className="h-3.5 w-3.5" />}
+										label="Manage Plugins"
+									/>
+									<PluginMenuItem
+										icon={<Sparkles className="h-3.5 w-3.5" />}
+										label="Marketplace"
+									/>
+									<PluginMenuItem
+										icon={<RotateCw className="h-3.5 w-3.5" />}
+										label="Check Updates"
+									/>
+									<div className="my-1 h-px bg-[color:var(--border-subtle)]" />
+									<p className="m-0 px-2.5 py-1 font-bold text-[9px] text-[color:var(--text-ghost)] uppercase tracking-[0.12em]">
+										Active
+									</p>
+									{[
+										"Thread Calculator",
+										"Density Map",
+										"Auto Underlay",
+										"Color Matcher",
+									].map((label) => (
+										<PluginMenuItem
+											key={label}
+											icon={
+												<WandSparkles className="h-3.5 w-3.5 text-[color:var(--primary)]" />
+											}
+											label={label}
+											status
+										/>
+									))}
+								</div>
+							) : null}
+						</div>
 					</nav>
-				</div>
-				<Tabs
-					label="Mode"
-					value={mode}
-					onChange={(next) => setMode(next as Mode)}
-					options={[
-						{ value: "objects", label: "Objects" },
-						{ value: "sequencer", label: "Sequencer" },
-						{ value: "preview", label: "Preview" },
-					]}
-				/>
-				<div className="mx-auto w-full max-w-[430px]">
-					<Input
-						placeholder="Search commands... ⌘K"
-						aria-label="Command search"
+					<div className="h-5 w-px bg-[color:var(--border-subtle)] max-sm:hidden" />
+					<Tabs
+						label="Mode"
+						value={mode}
+						onChange={(next) => setMode(next as Mode)}
+						className="max-sm:hidden"
+						options={[
+							{ value: "objects", label: "Objects" },
+							{ value: "sequencer", label: "Sequencer" },
+							{ value: "preview", label: "Preview" },
+						]}
 					/>
 				</div>
-				<div className="inline-flex gap-2 justify-self-end">
-					<Button variant="ghost" disabled>
-						Share
+				<div className="mx-auto w-full max-w-[420px] max-sm:hidden">
+					<div className="relative">
+						<Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-[color:var(--text-ghost)]" />
+						<Input
+							placeholder="Search commands... ⌘K"
+							aria-label="Command search"
+							className="h-8 border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] pl-8 text-[12px] placeholder:text-[color:var(--text-ghost)]"
+						/>
+					</div>
+				</div>
+				<div className="flex justify-center max-sm:order-last max-sm:col-span-2 sm:hidden">
+					<Tabs
+						label="Mode"
+						value={mode}
+						onChange={(next) => setMode(next as Mode)}
+						options={[
+							{ value: "objects", label: "Objects" },
+							{ value: "sequencer", label: "Sequencer" },
+							{ value: "preview", label: "Preview" },
+						]}
+					/>
+				</div>
+				<div className="inline-flex items-center gap-2 justify-self-end">
+					<Button variant="ghost" size="sm" className="max-sm:px-2">
+						<Share2 className="h-3.5 w-3.5" />
+						<span className="max-sm:hidden">Share</span>
 					</Button>
-					<Button variant="primary">Export</Button>
+					<Button
+						variant="primary"
+						size="sm"
+						onClick={() => setExportOpen(true)}
+					>
+						<Download className="h-3.5 w-3.5" />
+						Export
+					</Button>
 				</div>
 			</header>
 
 			<main
-				className="grid min-h-0 bg-[linear-gradient(180deg,color-mix(in_srgb,var(--background)_95%,black_5%),var(--background))] max-[1080px]:grid-cols-1"
+				className="grid min-h-0"
 				style={{
-					gridTemplateColumns: isNarrow
-						? "1fr"
-						: `${leftWidth}px 8px minmax(0,1fr) 8px ${rightWidth}px`,
+					gridTemplateColumns:
+						isMobile || (layout.leftCollapsed && layout.rightCollapsed)
+							? "minmax(0,1fr)"
+							: layout.leftCollapsed
+								? `56px 8px minmax(0,1fr) 8px ${rightWidth}px`
+								: layout.rightCollapsed
+									? `${leftWidth}px 8px minmax(0,1fr) 8px 56px`
+									: `${leftWidth}px 8px minmax(0,1fr) 8px ${rightWidth}px`,
 				}}
 			>
-				<PanelColumn
-					title={sectionTitle(mode, "left")}
-					collapsed={layout.leftCollapsed}
-					onToggle={() =>
-						setLayout((current) => ({
-							...current,
-							leftCollapsed: !current.leftCollapsed,
-						}))
-					}
-					toggleIcon={layout.leftCollapsed ? ">" : "<"}
-				>
-					{renderLeftPanel(mode, objectsLoading, sequencerLoading)}
-				</PanelColumn>
+				{isMobile ? null : (
+					<PanelColumn
+						title={sectionTitle(mode, "left")}
+						collapsed={layout.leftCollapsed}
+						onToggle={() =>
+							setLayout((current) => ({
+								...current,
+								leftCollapsed: !current.leftCollapsed,
+							}))
+						}
+						labelPrefix="Objects"
+						toggleIcon={layout.leftCollapsed ? ">" : "<"}
+					>
+						{renderLeftPanel({
+							mode,
+							objectsLoading,
+							sequencerLoading,
+							selectedObjectId,
+							setSelectedObjectId,
+							selectedSequencerId,
+							setSelectedSequencerId,
+							badgeOpen,
+							setBadgeOpen,
+						})}
+					</PanelColumn>
+				)}
 
-				<ResizeHandle
-					label="Resize left panel"
-					onPointerDown={(event) => startResize("left", event)}
-					onArrowLeft={() =>
-						setLayout((current) => ({
-							...current,
-							leftPanelWidth: clampPanel(current.leftPanelWidth - 16),
-						}))
-					}
-					onArrowRight={() =>
-						setLayout((current) => ({
-							...current,
-							leftPanelWidth: clampPanel(current.leftPanelWidth + 16),
-						}))
-					}
-				/>
+				{isMobile ? null : (
+					<ResizeHandle
+						label="Resize left panel"
+						onPointerDown={(event) => startResize("left", event)}
+						onArrowLeft={() =>
+							setLayout((current) => ({
+								...current,
+								leftPanelWidth: clampPanel(current.leftPanelWidth - 16),
+							}))
+						}
+						onArrowRight={() =>
+							setLayout((current) => ({
+								...current,
+								leftPanelWidth: clampPanel(current.leftPanelWidth + 16),
+							}))
+						}
+					/>
+				)}
 
-				<section className="relative grid min-w-0 grid-rows-[auto_1fr_auto] gap-3 p-3">
-					<div className="mx-auto inline-flex gap-2 rounded-xl border border-[color:var(--toolbar-border)] bg-[color:var(--toolbar)] px-2 py-2 backdrop-blur-md">
-						{["S", "P", "C", "O", "Q", "T"].map((tool, index) => (
-							<IconButton
-								key={tool}
-								label={`Tool ${tool}`}
-								icon={tool}
-								active={index === 0}
-							/>
-						))}
+				<section className="relative grid min-w-0 grid-rows-[auto_1fr_auto] gap-3 overflow-hidden bg-[linear-gradient(180deg,color-mix(in_srgb,var(--background)_90%,black_10%),var(--background))] px-2 py-3 sm:px-3">
+					{mode !== "preview" ? (
+						<div className="pointer-events-none absolute top-3 left-1/2 z-20 -translate-x-1/2 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface)]/90 p-1.5 shadow-2xl backdrop-blur-lg">
+							<div className="pointer-events-auto flex items-center gap-1">
+								<ToolButton
+									icon={<MousePointer2 className="h-4 w-4" />}
+									active
+									label="Select tool"
+								/>
+								<MiniSeparator />
+								<ToolButton
+									icon={<PenTool className="h-4 w-4" />}
+									label="Pen tool"
+								/>
+								<ToolButton
+									icon={<WandSparkles className="h-4 w-4" />}
+									label="Freehand tool"
+								/>
+								<MiniSeparator />
+								<ToolButton
+									icon={<Circle className="h-4 w-4" />}
+									label="Ellipse tool"
+								/>
+								<ToolButton
+									icon={<Square className="h-4 w-4" />}
+									label="Rectangle tool"
+								/>
+								<MiniSeparator />
+								<ToolButton
+									icon={<Type className="h-4 w-4" />}
+									label="Text tool"
+								/>
+							</div>
+						</div>
+					) : null}
+					<div className="absolute top-4 right-4 font-medium text-[9px] text-[color:var(--text-ghost)]">
+						RENDER_ENGINE v2.1
 					</div>
-					<div className="grid place-items-center overflow-hidden rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--canvas)] bg-[radial-gradient(circle,color-mix(in_srgb,var(--primary)_8%,transparent)_1px,transparent_1px)] bg-[size:24px_24px]">
-						<div className="grid h-[min(55vh,55vw)] max-h-[540px] w-[min(55vh,55vw)] max-w-[540px] place-items-center border border-[color:var(--primary-faint)]">
-							<div className="relative aspect-square w-1/2">
-								<div className="absolute inset-0 rounded-full border-2 border-[color:var(--primary)]/80" />
-								<div className="absolute top-[12%] left-1/2 h-0 w-0 -translate-x-1/2 border-r-[74px] border-r-transparent border-b-[140px] border-b-[color:var(--primary)]/20 border-l-[74px] border-l-transparent" />
+					<div className="grid place-items-center overflow-hidden rounded-sm border border-[color:var(--border-subtle)] bg-[color:var(--canvas)] bg-[radial-gradient(circle,color-mix(in_srgb,var(--primary)_8%,transparent)_1px,transparent_1px)] bg-[size:24px_24px]">
+						<div className="relative grid h-[min(72vh,72vw)] max-h-[560px] w-[min(72vh,72vw)] max-w-[560px] place-items-center border border-[color:var(--primary-faint)]">
+							<span className="absolute top-[-18px] left-0 font-medium text-[9px] text-[color:var(--text-ghost)]">
+								100 x 100 mm
+							</span>
+							<span className="absolute top-[-18px] right-0 inline-flex items-center gap-1 font-medium text-[9px] text-[color:var(--text-ghost)]">
+								<Crop className="h-2.5 w-2.5" /> Brother PE910L
+							</span>
+							<div className="relative h-56 w-56 sm:h-64 sm:w-64">
+								<div className="absolute inset-0 rounded-full border-2 border-[color:var(--primary)]/70 shadow-[0_0_40px_color-mix(in_srgb,var(--primary)_12%,transparent)]" />
+								<svg
+									viewBox="0 0 100 100"
+									aria-hidden="true"
+									className="absolute inset-0 h-full w-full opacity-55"
+								>
+									<path
+										d="M50 10 L90 90 L10 90 Z"
+										fill="none"
+										stroke="var(--primary)"
+										strokeWidth="0.7"
+									/>
+									<circle
+										cx="50"
+										cy="50"
+										r="30"
+										fill="none"
+										stroke="var(--primary)"
+										strokeDasharray="2 1.5"
+										strokeWidth="0.5"
+									/>
+								</svg>
+								<div className="absolute inset-0 grid place-items-center text-[color:var(--primary)]/50">
+									<Sparkles className="h-12 w-12" />
+								</div>
 							</div>
 						</div>
 					</div>
-					<div className="mx-auto inline-flex items-center gap-1 rounded-full border border-[color:var(--toolbar-border)] bg-[color:var(--toolbar)] px-2 py-1 backdrop-blur-md">
-						<IconButton label="Zoom out" icon="-" />
-						<span className="px-2 text-[color:var(--text-secondary)] text-xs">
+					<div className="mx-auto inline-flex items-center gap-1 rounded-full border border-[color:var(--border-default)] bg-[color:var(--surface)]/90 px-1.5 py-1 backdrop-blur-md">
+						<ZoomActionButton
+							icon={<ZoomOut className="h-3.5 w-3.5" />}
+							label="Zoom out"
+						/>
+						<span className="min-w-10 px-1 text-center font-semibold text-[10px] text-[color:var(--text-secondary)]">
 							100%
 						</span>
-						<IconButton label="Zoom in" icon="+" />
+						<ZoomActionButton
+							icon={<ZoomIn className="h-3.5 w-3.5" />}
+							label="Zoom in"
+						/>
+						<div className="mx-0.5 h-3.5 w-px bg-[color:var(--border-subtle)]" />
+						<ZoomActionButton
+							icon={<Scan className="h-3.5 w-3.5" />}
+							label="Center design"
+						/>
+						<ZoomActionButton
+							icon={<RectangleHorizontal className="h-3.5 w-3.5" />}
+							label="Fit screen"
+						/>
+					</div>
+					<div className="pointer-events-none absolute top-3 right-3 z-30 flex gap-2">
+						<div className="pointer-events-auto">
+							<Button
+								variant="secondary"
+								size="sm"
+								onClick={() => setObjectsLoading((value) => !value)}
+							>
+								Objects Skeleton
+							</Button>
+						</div>
+						<div className="pointer-events-auto">
+							<Button
+								variant="secondary"
+								size="sm"
+								onClick={() => setSequencerLoading((value) => !value)}
+							>
+								Sequencer Skeleton
+							</Button>
+						</div>
 					</div>
 				</section>
 
-				<ResizeHandle
-					label="Resize right panel"
-					onPointerDown={(event) => startResize("right", event)}
-					onArrowLeft={() =>
-						setLayout((current) => ({
-							...current,
-							rightPanelWidth: clampPanel(current.rightPanelWidth + 16),
-						}))
-					}
-					onArrowRight={() =>
-						setLayout((current) => ({
-							...current,
-							rightPanelWidth: clampPanel(current.rightPanelWidth - 16),
-						}))
-					}
-				/>
+				{isMobile ? null : (
+					<ResizeHandle
+						label="Resize right panel"
+						onPointerDown={(event) => startResize("right", event)}
+						onArrowLeft={() =>
+							setLayout((current) => ({
+								...current,
+								rightPanelWidth: clampPanel(current.rightPanelWidth + 16),
+							}))
+						}
+						onArrowRight={() =>
+							setLayout((current) => ({
+								...current,
+								rightPanelWidth: clampPanel(current.rightPanelWidth - 16),
+							}))
+						}
+					/>
+				)}
 
-				<PanelColumn
-					title={sectionTitle(mode, "right")}
-					collapsed={layout.rightCollapsed}
-					onToggle={() =>
-						setLayout((current) => ({
-							...current,
-							rightCollapsed: !current.rightCollapsed,
-						}))
-					}
-					toggleIcon={layout.rightCollapsed ? "<" : ">"}
-				>
-					{renderInspector(mode, reducedMotion, setReducedMotion)}
-				</PanelColumn>
+				{isMobile ? null : (
+					<PanelColumn
+						title={sectionTitle(mode, "right")}
+						collapsed={layout.rightCollapsed}
+						onToggle={() =>
+							setLayout((current) => ({
+								...current,
+								rightCollapsed: !current.rightCollapsed,
+							}))
+						}
+						labelPrefix={sectionTitle(mode, "right")}
+						toggleIcon={layout.rightCollapsed ? "<" : ">"}
+					>
+						{renderInspector({
+							mode,
+							reducedMotion,
+							setReducedMotion,
+							selectedType,
+							pluginTab,
+							setPluginTab,
+						})}
+					</PanelColumn>
+				)}
 			</main>
 
-			<footer className="flex items-center justify-between border-[color:var(--border-subtle)] border-t bg-[color:var(--footer)] px-3 text-[11px] text-[color:var(--text-muted)]">
-				<div className="inline-flex items-center gap-3">
-					<span className="inline-block h-1.5 w-1.5 rounded-full bg-[color:var(--status-ready)]" />
-					<span>Ready</span>
-					<span>{modeStatus}</span>
-					<span>X: 12.4 Y: -4.2 mm</span>
+			{isMobile ? (
+				<div className="grid gap-2 border-[color:var(--border-subtle)] border-t bg-[color:var(--surface)] p-2 sm:hidden">
+					<details open>
+						<summary className="cursor-pointer rounded-md bg-[color:var(--surface-elevated)] px-2 py-1.5 font-semibold text-[11px] text-[color:var(--text-secondary)]">
+							{sectionTitle(mode, "left")}
+						</summary>
+						<div className="mt-2 max-h-48 overflow-auto rounded-md border border-[color:var(--border-default)] p-2">
+							{renderLeftPanel({
+								mode,
+								objectsLoading,
+								sequencerLoading,
+								selectedObjectId,
+								setSelectedObjectId,
+								selectedSequencerId,
+								setSelectedSequencerId,
+								badgeOpen,
+								setBadgeOpen,
+							})}
+						</div>
+					</details>
+					<details>
+						<summary className="cursor-pointer rounded-md bg-[color:var(--surface-elevated)] px-2 py-1.5 font-semibold text-[11px] text-[color:var(--text-secondary)]">
+							{sectionTitle(mode, "right")}
+						</summary>
+						<div className="mt-2 max-h-64 overflow-auto rounded-md border border-[color:var(--border-default)] p-2">
+							{renderInspector({
+								mode,
+								reducedMotion,
+								setReducedMotion,
+								selectedType,
+								pluginTab,
+								setPluginTab,
+							})}
+						</div>
+					</details>
 				</div>
-				<div className="inline-flex items-center gap-3">
-					<span>38,840 st</span>
-					<span>82.4 x 76.1 mm</span>
-					<span className="text-[color:var(--primary)]">GPU Active</span>
+			) : null}
+
+			<footer className="flex items-center justify-between border-[color:var(--toolbar-border)] border-t bg-[color:var(--footer)] px-3 text-[9px] text-[color:var(--text-muted)]">
+				<div className="flex items-center gap-3 overflow-hidden">
+					<span className="inline-flex items-center gap-1.5">
+						<span className="h-1.5 w-1.5 rounded-full bg-[color:var(--status-ready)]" />{" "}
+						Ready
+					</span>
+					<div className="h-2.5 w-px bg-[color:var(--border-subtle)]" />
+					<span className="truncate">{selectedName}</span>
+					<span className="text-[color:var(--text-ghost)] max-sm:hidden">
+						X: 12.4 Y: -4.2 mm
+					</span>
+				</div>
+				<div className="flex items-center gap-3">
+					<span className="max-sm:hidden">38,840 st</span>
+					<span className="max-sm:hidden">82.4 x 76.1 mm</span>
+					<span className="inline-flex items-center gap-1 text-[color:var(--primary)]">
+						<Bolt className="h-2.5 w-2.5" /> GPU Active
+					</span>
 					<span>v1.0.4</span>
 				</div>
 			</footer>
 
-			<div className="pointer-events-none absolute top-[70px] right-3 z-20 inline-flex gap-2 max-[1080px]:top-[112px]">
-				<div className="pointer-events-auto">
-					<Button
-						variant="secondary"
-						size="sm"
-						onClick={() => setObjectsLoading((v) => !v)}
-					>
-						Objects Skeleton
-					</Button>
+			{exportOpen ? (
+				<div
+					className="fixed inset-0 z-50 grid place-items-center bg-black/65 p-3 backdrop-blur-sm"
+					role="dialog"
+					aria-modal="true"
+					aria-label="Export Design"
+				>
+					<div className="w-full max-w-[480px] rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface)] shadow-2xl">
+						<div className="flex items-center justify-between border-[color:var(--border-subtle)] border-b p-6">
+							<div>
+								<p className="m-0 font-bold text-[color:var(--text-primary)] text-base">
+									Export Design
+								</p>
+								<p className="m-0 mt-1 text-[11px] text-[color:var(--text-muted)]">
+									Choose format for machine output
+								</p>
+							</div>
+							<Button
+								variant="ghost"
+								size="icon"
+								aria-label="Close export"
+								onClick={() => setExportOpen(false)}
+							>
+								<Plus className="h-4 w-4 rotate-45" />
+							</Button>
+						</div>
+						<div className="grid gap-5 p-6">
+							<div className="grid gap-2.5">
+								<SectionLabel>Machine Format</SectionLabel>
+								<div className="grid grid-cols-4 gap-2">
+									{[
+										".DST",
+										".PES",
+										".JEF",
+										".VP3",
+										".EXP",
+										".HUS",
+										".XXX",
+										".SVG",
+									].map((option) => (
+										<button
+											key={option}
+											type="button"
+											onClick={() => setFormat(option)}
+											className={cn(
+												"rounded-lg border px-2 py-2 font-semibold text-[11px] transition-colors",
+												format === option
+													? "border-[color:var(--active-border)] bg-[color:var(--active-bg)] text-[color:var(--primary)]"
+													: "border-[color:var(--border-default)] text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)]",
+											)}
+										>
+											{option}
+										</button>
+									))}
+								</div>
+							</div>
+							<div className="h-px bg-[color:var(--border-subtle)]" />
+							<div className="grid gap-3">
+								<SectionLabel>Options</SectionLabel>
+								<ToggleRow label="Include trims">
+									<Toggle checked onChange={() => {}} label="Include trims" />
+								</ToggleRow>
+								<ToggleRow label="Auto color stops">
+									<Toggle
+										checked
+										onChange={() => {}}
+										label="Auto color stops"
+									/>
+								</ToggleRow>
+							</div>
+							<Panel className="rounded-xl border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] p-3">
+								<div className="flex items-start gap-2 text-[10px] text-[color:var(--text-muted)]">
+									<Send className="mt-0.5 h-3.5 w-3.5" />
+									<p className="m-0">
+										{format} format. Max stitch length: 121 pts. Auto-split if
+										needed.
+									</p>
+								</div>
+							</Panel>
+						</div>
+						<div className="flex items-center justify-end gap-3 border-[color:var(--border-subtle)] border-t p-6">
+							<Button variant="ghost" onClick={() => setExportOpen(false)}>
+								Cancel
+							</Button>
+							<Button variant="primary">Export {format}</Button>
+						</div>
+					</div>
 				</div>
-				<div className="pointer-events-auto">
-					<Button
-						variant="secondary"
-						size="sm"
-						onClick={() => setSequencerLoading((v) => !v)}
-					>
-						Sequencer Skeleton
-					</Button>
-				</div>
-			</div>
+			) : null}
 		</div>
 	);
 }
@@ -350,26 +834,31 @@ function PanelColumn({
 	collapsed,
 	onToggle,
 	toggleIcon,
+	labelPrefix,
 	children,
 }: {
 	title: string;
 	collapsed: boolean;
 	onToggle: () => void;
 	toggleIcon: string;
+	labelPrefix: string;
 	children: ReactNode;
 }) {
 	return (
 		<aside className="grid min-h-0 min-w-[56px] grid-rows-[42px_1fr] bg-[color:var(--surface)] first:border-r first:border-r-[color:var(--border-subtle)] last:border-l last:border-l-[color:var(--border-subtle)]">
-			<div className="flex items-center justify-between border-b border-b-[color:var(--border-subtle)] px-2">
+			<div className="flex items-center justify-between border-b border-b-[color:var(--border-subtle)] px-3">
 				<SectionLabel>{title}</SectionLabel>
 				<IconButton
-					label={collapsed ? `Expand ${title}` : `Collapse ${title}`}
+					label={
+						collapsed ? `Expand ${labelPrefix}` : `Collapse ${labelPrefix}`
+					}
 					onClick={onToggle}
 					icon={toggleIcon}
+					className="h-6 w-6 rounded-md"
 				/>
 			</div>
 			{collapsed ? null : (
-				<div className="min-h-0 overflow-auto p-2">{children}</div>
+				<div className="min-h-0 overflow-auto px-2 py-2">{children}</div>
 			)}
 		</aside>
 	);
@@ -390,7 +879,7 @@ function ResizeHandle({
 		<button
 			type="button"
 			aria-label={label}
-			className="hidden w-2 bg-transparent p-0 transition-colors hover:bg-[color:var(--primary-faint)] focus-visible:bg-[color:var(--primary-faint)] min-[1081px]:block"
+			className="w-2 bg-transparent p-0 transition-colors hover:bg-[color:var(--primary-faint)] focus-visible:bg-[color:var(--primary-faint)]"
 			onPointerDown={onPointerDown}
 			onKeyDown={(event) => {
 				if (event.key === "ArrowLeft") onArrowLeft();
@@ -400,17 +889,33 @@ function ResizeHandle({
 	);
 }
 
-function renderLeftPanel(
-	mode: Mode,
-	objectsLoading: boolean,
-	sequencerLoading: boolean,
-) {
+function renderLeftPanel({
+	mode,
+	objectsLoading,
+	sequencerLoading,
+	selectedObjectId,
+	setSelectedObjectId,
+	selectedSequencerId,
+	setSelectedSequencerId,
+	badgeOpen,
+	setBadgeOpen,
+}: {
+	mode: Mode;
+	objectsLoading: boolean;
+	sequencerLoading: boolean;
+	selectedObjectId: string;
+	setSelectedObjectId: (value: string) => void;
+	selectedSequencerId: string;
+	setSelectedSequencerId: (value: string) => void;
+	badgeOpen: boolean;
+	setBadgeOpen: (value: boolean) => void;
+}) {
 	if (mode === "preview") {
 		return (
 			<EmptyState
 				title="Preview Mode"
 				description="Simulates final output. Editing is paused."
-				icon="O"
+				icon={<Eye className="h-6 w-6" />}
 			/>
 		);
 	}
@@ -427,32 +932,53 @@ function renderLeftPanel(
 		}
 
 		return (
-			<div className="grid gap-2">
-				{[
-					"Circle - Outline",
-					"Star Shape",
-					"Triangle",
-					"Badge Logo",
-					"logo.png",
-				].map((name, index) => (
-					<Panel
-						key={name}
-						className={cn(
-							"grid gap-0.5 border-[color:var(--border-default)] bg-[color:color-mix(in_srgb,var(--surface)_75%,transparent)] p-2 transition-colors",
-							index === 0 &&
-								"border-[color:var(--selected-border)] bg-[color:var(--selected-bg)]",
-						)}
-					>
-						<p className="m-0 text-sm">{name}</p>
-						<span className="text-[color:var(--text-muted)] text-xs">
-							{index === 4 ? "Image" : "Vector"}
-						</span>
-					</Panel>
-				))}
-				<EmptyState
-					title="Plugin Dock"
-					description="No object plugins attached yet. Install plugins to enrich object tools."
-				/>
+			<div className="grid gap-1">
+				{objects.map((item) => {
+					const selected = selectedObjectId === item.id;
+					return (
+						<button
+							key={item.id}
+							type="button"
+							onClick={() => setSelectedObjectId(item.id)}
+							className={cn(
+								"grid grid-cols-[28px_1fr_auto] items-center gap-2 rounded-lg border px-2 py-2 text-left transition-colors",
+								selected
+									? "border-[color:var(--selected-border)] bg-[color:var(--selected-bg)]"
+									: "border-transparent hover:bg-[color:var(--hover-bg)]",
+							)}
+						>
+							<div className="grid h-7 w-7 place-items-center rounded-lg border border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] text-[color:var(--text-muted)]">
+								{item.icon}
+							</div>
+							<div className="min-w-0">
+								<p
+									className={cn(
+										"m-0 truncate font-semibold text-[11px]",
+										selected
+											? "text-[color:var(--text-primary)]"
+											: "text-[color:var(--text-secondary)]",
+									)}
+								>
+									{item.name}
+								</p>
+								<p className="m-0 text-[10px] text-[color:var(--text-label)]">
+									{item.meta}
+								</p>
+							</div>
+							<div
+								className={cn(
+									"flex items-center gap-1 text-[color:var(--text-ghost)]",
+									selected
+										? "opacity-100"
+										: "opacity-0 group-hover:opacity-100",
+								)}
+							>
+								<Eye className="h-3.5 w-3.5" />
+								<Lock className="h-3.5 w-3.5" />
+							</div>
+						</button>
+					);
+				})}
 			</div>
 		);
 	}
@@ -468,135 +994,257 @@ function renderLeftPanel(
 	}
 
 	return (
-		<div className="grid gap-2">
-			{[
-				"Circle - Outline",
-				"Star Shape",
-				"Triangle",
-				"Shield Outline",
-				"Shield Fill",
-			].map((name, index) => (
-				<Panel
-					key={name}
-					className={cn(
-						"grid gap-0.5 border-[color:var(--border-default)] bg-[color:color-mix(in_srgb,var(--surface)_75%,transparent)] p-2 transition-colors",
-						index === 0 &&
-							"border-[color:var(--selected-border)] bg-[color:var(--selected-bg)]",
-					)}
-				>
-					<p className="m-0 text-sm">{name}</p>
-					<span className="text-[color:var(--text-muted)] text-xs">
-						{index * 900 + 1300} st
-					</span>
-				</Panel>
+		<div className="grid gap-1">
+			{sequencerBaseRows.map((row) => (
+				<SequencerItem
+					key={row.id}
+					row={row}
+					selected={selectedSequencerId === row.id}
+					onClick={() => setSelectedSequencerId(row.id)}
+				/>
 			))}
+			<div>
+				<button
+					type="button"
+					onClick={() => setBadgeOpen(!badgeOpen)}
+					className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left hover:bg-[color:var(--hover-bg)]"
+				>
+					<span
+						className={cn(
+							"text-[color:var(--text-ghost)] transition-transform",
+							badgeOpen ? "rotate-0" : "-rotate-90",
+						)}
+					>
+						<MoveVertical className="h-3 w-3" />
+					</span>
+					<Folder className="h-3.5 w-3.5 text-[color:var(--text-faint)]" />
+					<span className="flex-1 font-bold text-[10px] text-[color:var(--text-muted)] uppercase tracking-[0.08em]">
+						Badge Logo
+					</span>
+					<span className="text-[10px] text-[color:var(--text-ghost)]">
+						5 paths - 18,200 st
+					</span>
+				</button>
+				{badgeOpen ? (
+					<div className="ml-5 grid gap-1">
+						{sequencerGroupedRows.map((row) => (
+							<SequencerItem
+								key={row.id}
+								row={row}
+								selected={selectedSequencerId === row.id}
+								onClick={() => setSelectedSequencerId(row.id)}
+							/>
+						))}
+					</div>
+				) : null}
+			</div>
 		</div>
 	);
 }
 
-function renderInspector(
-	mode: Mode,
-	reducedMotion: boolean,
-	setReducedMotion: (next: boolean) => void,
-) {
+function renderInspector({
+	mode,
+	reducedMotion,
+	setReducedMotion,
+	selectedType,
+	pluginTab,
+	setPluginTab,
+}: {
+	mode: Mode;
+	reducedMotion: boolean;
+	setReducedMotion: (next: boolean) => void;
+	selectedType: "vector" | "image";
+	pluginTab: PluginTab["id"];
+	setPluginTab: (value: PluginTab["id"]) => void;
+}) {
 	if (mode === "objects") {
+		if (selectedType === "image") {
+			return <ImageInspector />;
+		}
+
 		return (
 			<div className="grid gap-3">
 				<SectionLabel>Position & Size</SectionLabel>
-				<div className="grid grid-cols-2 gap-2">
-					<Input value="12.4" readOnly aria-label="X" />
-					<Input value="-4.2" readOnly aria-label="Y" />
-					<Input value="64.0" readOnly aria-label="W" />
-					<Input value="64.0" readOnly aria-label="H" />
+				<div className="grid grid-cols-2 gap-1.5">
+					<PropertyInput label="X" value="12.4" suffix="mm" />
+					<PropertyInput label="Y" value="-4.2" suffix="mm" />
+					<PropertyInput label="W" value="64.0" suffix="mm" />
+					<PropertyInput label="H" value="64.0" suffix="mm" />
 				</div>
+				<div className="grid grid-cols-2 gap-1.5">
+					<PropertyInput
+						label={<RotateCw className="h-3 w-3" />}
+						value="0"
+						suffix="deg"
+					/>
+					<PropertyInput
+						label={<CircleDot className="h-3 w-3" />}
+						value="0"
+						suffix="px"
+					/>
+				</div>
+				<div className="h-px bg-[color:var(--border-subtle)]" />
 				<SectionLabel>Alignment</SectionLabel>
-				<div className="flex flex-wrap gap-2">
-					<IconButton label="Align left" icon="L" />
-					<IconButton label="Align center" icon="C" />
-					<IconButton label="Align right" icon="R" />
-					<IconButton label="Align top" icon="T" />
+				<div className="grid grid-cols-7 gap-1">
+					<AlignIcon
+						icon={<AlignHorizontalDistributeStart className="h-3.5 w-3.5" />}
+						label="Align left"
+					/>
+					<AlignIcon
+						icon={<AlignHorizontalDistributeCenter className="h-3.5 w-3.5" />}
+						label="Align horizontal center"
+					/>
+					<AlignIcon
+						icon={<AlignHorizontalDistributeEnd className="h-3.5 w-3.5" />}
+						label="Align right"
+					/>
+					<div className="mx-auto h-4 w-px bg-[color:var(--border-subtle)]" />
+					<AlignIcon
+						icon={<AlignVerticalDistributeStart className="h-3.5 w-3.5" />}
+						label="Align top"
+					/>
+					<AlignIcon
+						icon={<AlignVerticalDistributeCenter className="h-3.5 w-3.5" />}
+						label="Align vertical center"
+					/>
+					<AlignIcon
+						icon={<AlignVerticalDistributeEnd className="h-3.5 w-3.5" />}
+						label="Align bottom"
+					/>
 				</div>
+				<div className="h-px bg-[color:var(--border-subtle)]" />
 				<SectionLabel>Blend</SectionLabel>
-				<Input value="100" readOnly aria-label="Opacity" />
-				<SectionLabel>Plugin Dock</SectionLabel>
-				<EmptyState
-					title="No Inspector Plugins"
-					description="Plugins can contribute object-level controls in this area."
-				/>
+				<PropertyRow label="Opacity">
+					<Input
+						value="100"
+						readOnly
+						aria-label="Opacity"
+						className="h-7 max-w-[58px] text-right text-[11px]"
+					/>
+					<span className="w-6 text-center text-[9px] text-[color:var(--text-ghost)]">
+						%
+					</span>
+				</PropertyRow>
 			</div>
 		);
 	}
 
 	if (mode === "preview") {
 		return (
-			<div className="grid gap-3">
-				<SectionLabel>Simulation</SectionLabel>
-				<div className="grid gap-2 text-[color:var(--text-secondary)] text-sm">
-					<ToggleRow label="Show fabric">
-						<Toggle checked onChange={() => {}} label="Show fabric" />
-					</ToggleRow>
-					<ToggleRow label="3D thread effect">
-						<Toggle checked onChange={() => {}} label="3D thread effect" />
-					</ToggleRow>
-					<ToggleRow label="Show jumps">
-						<Toggle checked={false} onChange={() => {}} label="Show jumps" />
-					</ToggleRow>
-					<ToggleRow label="Reduced motion">
-						<Toggle
-							checked={reducedMotion}
-							onChange={setReducedMotion}
-							label="Reduced motion"
-						/>
-					</ToggleRow>
-				</div>
-				<SectionLabel>Design Summary</SectionLabel>
-				<Panel>
-					<StatsGrid
-						stats={[
-							["Stitches", "38,840"],
-							["Colors", "4"],
-							["Size", "82.4 x 76.1 mm"],
-							["Est. Time", "18m 12s"],
-						]}
-					/>
-				</Panel>
-				<SectionLabel>Plugin Dock</SectionLabel>
-				<EmptyState
-					title="Preview Dock Empty"
-					description="Preview plugins can render analysis widgets and overlays here."
-				/>
-			</div>
+			<PreviewInspector
+				reducedMotion={reducedMotion}
+				setReducedMotion={setReducedMotion}
+			/>
 		);
 	}
 
 	return (
 		<div className="grid gap-3">
 			<SectionLabel>Thread Color</SectionLabel>
-			<Panel className="flex items-center gap-3">
-				<div className="h-7 w-7 rounded-md bg-[#ef4a4a]" />
+			<Panel className="flex items-center gap-3 rounded-xl border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] p-2.5">
+				<div className="h-8 w-8 rounded-lg border-2 border-white/15 bg-[#ef4a4a]" />
 				<div>
-					<p className="m-0 text-sm">Madeira 1147</p>
-					<span className="text-[color:var(--text-muted)] text-xs">
+					<p className="m-0 font-semibold text-[11px]">Madeira 1147</p>
+					<span className="text-[10px] text-[color:var(--text-muted)]">
 						Rayon 40 - Red
 					</span>
 				</div>
+				<MoveHorizontal className="ml-auto h-3.5 w-3.5 text-[color:var(--text-ghost)]" />
 			</Panel>
+			<SectionLabel>Vector Mode</SectionLabel>
+			<div className="grid grid-cols-2 gap-1.5">
+				<ModeTile
+					icon={<Diamond className="h-4 w-4" />}
+					label="Outline"
+					active
+				/>
+				<ModeTile
+					icon={<PaintBucket className="h-4 w-4" />}
+					label="Fill"
+					disabled
+				/>
+			</div>
+			<div className="h-px bg-[color:var(--border-subtle)]" />
 			<SectionLabel>Stitch Type</SectionLabel>
-			<div className="flex flex-wrap gap-2">
-				<Button variant="primary" size="sm">
-					Satin
-				</Button>
-				<Button size="sm">Fill</Button>
-				<Button size="sm">Running</Button>
+			<div className="grid grid-cols-3 gap-1.5">
+				<ModeTile
+					icon={<AlignCenter className="h-4 w-4" />}
+					label="Satin"
+					active
+				/>
+				<ModeTile icon={<PaintBucket className="h-4 w-4" />} label="Fill" />
+				<ModeTile
+					icon={<MoveHorizontal className="h-4 w-4" />}
+					label="Running"
+				/>
 			</div>
+			<div className="h-px bg-[color:var(--border-subtle)]" />
 			<SectionLabel>Parameters</SectionLabel>
-			<div className="grid gap-2">
-				<Input value="0.40" readOnly aria-label="Spacing" />
-				<Input value="0.15" readOnly aria-label="Pull comp" />
-				<Input value="4.5" readOnly aria-label="Density" />
-			</div>
+			<PropertyRow label="Spacing">
+				<Input
+					value="0.40"
+					readOnly
+					aria-label="Spacing"
+					className="h-7 max-w-[58px] text-right text-[11px]"
+				/>
+				<span className="w-6 text-center text-[9px] text-[color:var(--text-ghost)] uppercase">
+					mm
+				</span>
+			</PropertyRow>
+			<PropertyRow label="Pull Comp">
+				<Input
+					value="0.15"
+					readOnly
+					aria-label="Pull comp"
+					className="h-7 max-w-[58px] text-right text-[11px]"
+				/>
+				<span className="w-6 text-center text-[9px] text-[color:var(--text-ghost)] uppercase">
+					mm
+				</span>
+			</PropertyRow>
+			<PropertyRow label="Density">
+				<Input
+					value="4.5"
+					readOnly
+					aria-label="Density"
+					className="h-7 max-w-[58px] text-right text-[11px]"
+				/>
+				<span className="w-6 text-center text-[9px] text-[color:var(--text-ghost)] uppercase">
+					l/mm
+				</span>
+			</PropertyRow>
+			<details>
+				<summary className="cursor-pointer font-semibold text-[11px] text-[color:var(--text-muted)]">
+					Advanced
+				</summary>
+				<div className="mt-3 grid gap-2 border-[color:var(--border-subtle)] border-t pt-3">
+					<PropertyRow label="Underlay">
+						<Input
+							value="Center Walk"
+							readOnly
+							aria-label="Underlay"
+							className="h-7 max-w-[92px] text-[10px]"
+						/>
+					</PropertyRow>
+					<PropertyRow label="Underlay Gap">
+						<Input
+							value="2.00"
+							readOnly
+							aria-label="Underlay gap"
+							className="h-7 max-w-[58px] text-right text-[11px]"
+						/>
+						<span className="w-6 text-center text-[9px] text-[color:var(--text-ghost)] uppercase">
+							mm
+						</span>
+					</PropertyRow>
+					<ToggleRow label="Trim at End">
+						<Toggle checked onChange={() => {}} label="Trim at End" />
+					</ToggleRow>
+				</div>
+			</details>
+			<div className="h-px bg-[color:var(--border-subtle)]" />
 			<SectionLabel>Stats</SectionLabel>
-			<Panel>
+			<Panel className="rounded-xl border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] p-3">
 				<StatsGrid
 					stats={[
 						["Stitches", "3,240"],
@@ -606,29 +1254,55 @@ function renderInspector(
 					]}
 				/>
 			</Panel>
+			<div className="h-px bg-[color:var(--border-subtle)]" />
 			<SectionLabel>Plugin Dock</SectionLabel>
-			<Panel className="grid gap-2">
-				<div className="inline-flex gap-2">
+			<div className="flex items-center justify-between">
+				<span className="font-bold text-[9px] text-[color:var(--primary)] uppercase tracking-[0.12em]">
+					Plugin Dock
+				</span>
+				<Plus className="h-3.5 w-3.5 text-[color:var(--text-ghost)]" />
+			</div>
+			<div className="inline-flex border-[color:var(--border-subtle)] border-b">
+				{pluginTabs.map((tab) => (
 					<button
+						key={tab.id}
 						type="button"
-						className="border-[color:var(--primary)] border-b pb-1 text-[11px] text-[color:var(--primary)] uppercase tracking-[0.08em]"
+						onClick={() => setPluginTab(tab.id)}
+						className={cn(
+							"px-2 py-1 font-bold text-[10px] uppercase tracking-[0.06em]",
+							pluginTab === tab.id
+								? "border-[color:var(--primary)] border-b-2 text-[color:var(--primary)]"
+								: "text-[color:var(--text-muted)]",
+						)}
 					>
-						Thread
+						{tab.label}
 					</button>
-					<button
-						type="button"
-						className="pb-1 text-[11px] text-[color:var(--text-muted)] uppercase tracking-[0.08em]"
-					>
-						Density
-					</button>
-					<button
-						type="button"
-						className="pb-1 text-[11px] text-[color:var(--text-muted)] uppercase tracking-[0.08em]"
-					>
-						Colors
-					</button>
-				</div>
-				<Skeleton className="h-20" />
+				))}
+			</div>
+			<Panel className="rounded-xl border-[color:var(--border-default)] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--primary)_8%,transparent),transparent)] p-3">
+				{pluginTab === "thread" ? (
+					<StatsGrid
+						stats={[
+							["Total Thread", "14.2m"],
+							["Bobbin", "5.1m"],
+							["Est. Time", "8m 24s"],
+						]}
+					/>
+				) : pluginTab === "density" ? (
+					<StatsGrid
+						stats={[
+							["Max", "8.2 st/mm"],
+							["Avg", "4.6 st/mm"],
+						]}
+					/>
+				) : (
+					<StatsGrid
+						stats={[
+							["Palette", "Madeira Rayon"],
+							["Colors", "6"],
+						]}
+					/>
+				)}
 			</Panel>
 		</div>
 	);
@@ -642,7 +1316,7 @@ function ToggleRow({
 	children: ReactNode;
 }) {
 	return (
-		<div className="flex items-center justify-between">
+		<div className="flex items-center justify-between text-[11px] text-[color:var(--text-secondary)]">
 			<span>{label}</span>
 			{children}
 		</div>
@@ -651,15 +1325,319 @@ function ToggleRow({
 
 function StatsGrid({ stats }: { stats: [string, string][] }) {
 	return (
-		<div className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-[color:var(--text-muted)] text-xs">
+		<div className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-[10px] text-[color:var(--text-muted)]">
 			{stats.map(([name, value]) => (
 				<div key={name} className="contents">
 					<span>{name}</span>
-					<strong className="text-[color:var(--text-secondary)]">
+					<strong className="font-mono text-[color:var(--text-secondary)]">
 						{value}
 					</strong>
 				</div>
 			))}
+		</div>
+	);
+}
+
+function MenuGhostButton({ label }: { label: string }) {
+	return (
+		<button
+			type="button"
+			className="rounded-md px-2.5 py-1.5 text-[12px] text-[color:var(--text-muted)] transition-colors hover:bg-[color:var(--hover-bg)] hover:text-[color:var(--text-primary)]"
+		>
+			{label}
+		</button>
+	);
+}
+
+function PluginMenuItem({
+	icon,
+	label,
+	status = false,
+}: {
+	icon: ReactNode;
+	label: string;
+	status?: boolean;
+}) {
+	return (
+		<button
+			type="button"
+			className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[12px] text-[color:var(--text-muted)] transition-colors hover:bg-[color:var(--active-bg)] hover:text-[color:var(--text-primary)]"
+		>
+			{icon}
+			<span className="flex-1">{label}</span>
+			{status ? (
+				<span className="h-1.5 w-1.5 rounded-full bg-[color:var(--status-ready)]" />
+			) : null}
+		</button>
+	);
+}
+
+function ToolButton({
+	icon,
+	label,
+	active = false,
+}: {
+	icon: ReactNode;
+	label: string;
+	active?: boolean;
+}) {
+	return (
+		<IconButton
+			label={label}
+			icon={icon}
+			active={active}
+			className="h-9 w-9 rounded-xl"
+		/>
+	);
+}
+
+function MiniSeparator() {
+	return <div className="h-5 w-px bg-[color:var(--border-subtle)]" />;
+}
+
+function ZoomActionButton({ icon, label }: { icon: ReactNode; label: string }) {
+	return (
+		<button
+			type="button"
+			aria-label={label}
+			className="grid h-7 w-7 place-items-center rounded-full text-[color:var(--text-muted)] transition-colors hover:bg-[color:var(--hover-bg)] hover:text-[color:var(--text-secondary)]"
+		>
+			{icon}
+		</button>
+	);
+}
+
+function SequencerItem({
+	row,
+	selected,
+	onClick,
+}: {
+	row: SequencerRow;
+	selected: boolean;
+	onClick: () => void;
+}) {
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			className={cn(
+				"grid w-full grid-cols-[12px_14px_1fr] items-center gap-2 rounded-lg border px-2 py-1.5 text-left transition-colors",
+				selected
+					? "border-[color:var(--selected-border)] bg-[color:var(--selected-bg)]"
+					: "border-transparent hover:bg-[color:var(--hover-bg)]",
+			)}
+		>
+			<GripVertical className="h-3.5 w-3.5 text-[color:var(--text-ghost)]" />
+			<span
+				className="h-3.5 w-3.5 rounded-sm border border-white/15"
+				style={{ backgroundColor: row.color }}
+			/>
+			<div>
+				<p
+					className={cn(
+						"m-0 font-semibold text-[11px]",
+						selected
+							? "text-[color:var(--text-primary)]"
+							: "text-[color:var(--text-secondary)]",
+					)}
+				>
+					{row.name}
+				</p>
+				<p className="m-0 text-[10px] text-[color:var(--text-label)]">
+					{row.meta}
+				</p>
+			</div>
+		</button>
+	);
+}
+
+function PropertyInput({
+	label,
+	value,
+	suffix,
+}: {
+	label: ReactNode;
+	value: string;
+	suffix: string;
+}) {
+	return (
+		<div className="flex items-center gap-1">
+			<span className="w-3 text-center text-[10px] text-[color:var(--text-label)]">
+				{label}
+			</span>
+			<Input value={value} readOnly className="h-7 text-right text-[11px]" />
+			<span className="w-6 text-center text-[9px] text-[color:var(--text-ghost)]">
+				{suffix}
+			</span>
+		</div>
+	);
+}
+
+function PropertyRow({
+	label,
+	children,
+}: {
+	label: string;
+	children: ReactNode;
+}) {
+	return (
+		<div className="flex items-center">
+			<span className="flex-1 text-[11px] text-[color:var(--text-muted)]">
+				{label}
+			</span>
+			{children}
+		</div>
+	);
+}
+
+function AlignIcon({ icon, label }: { icon: ReactNode; label: string }) {
+	return (
+		<button
+			type="button"
+			aria-label={label}
+			className="grid h-7 w-7 place-items-center rounded-md text-[color:var(--text-ghost)] transition-colors hover:bg-[color:var(--hover-bg)] hover:text-[color:var(--text-secondary)]"
+		>
+			{icon}
+		</button>
+	);
+}
+
+function ModeTile({
+	icon,
+	label,
+	active = false,
+	disabled = false,
+}: {
+	icon: ReactNode;
+	label: string;
+	active?: boolean;
+	disabled?: boolean;
+}) {
+	return (
+		<button
+			type="button"
+			disabled={disabled}
+			className={cn(
+				"grid gap-1 rounded-lg border px-2 py-2 text-center",
+				active
+					? "border-[color:var(--active-border)] bg-[color:var(--active-bg)] text-[color:var(--primary)]"
+					: "border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] text-[color:var(--text-muted)]",
+				disabled && "cursor-not-allowed opacity-35",
+			)}
+		>
+			<span className="mx-auto">{icon}</span>
+			<span
+				className={cn(
+					"font-bold text-[8px] uppercase",
+					active
+						? "text-[color:var(--primary)]"
+						: "text-[color:var(--text-muted)]",
+				)}
+			>
+				{label}
+			</span>
+		</button>
+	);
+}
+
+function ImageInspector() {
+	return (
+		<div className="grid gap-3">
+			<SectionLabel>Position & Size</SectionLabel>
+			<div className="grid grid-cols-2 gap-1.5">
+				<PropertyInput label="X" value="22.0" suffix="mm" />
+				<PropertyInput label="Y" value="10.5" suffix="mm" />
+				<PropertyInput label="W" value="40.0" suffix="mm" />
+				<PropertyInput label="H" value="30.0" suffix="mm" />
+			</div>
+			<div className="h-px bg-[color:var(--border-subtle)]" />
+			<SectionLabel>Image</SectionLabel>
+			<Panel className="rounded-xl border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] p-3">
+				<StatsGrid
+					stats={[
+						["File", "logo.png"],
+						["Original", "320 x 240 px"],
+					]}
+				/>
+			</Panel>
+			<SectionLabel>Blend</SectionLabel>
+			<PropertyRow label="Opacity">
+				<Input
+					value="100"
+					readOnly
+					aria-label="Opacity"
+					className="h-7 max-w-[58px] text-right text-[11px]"
+				/>
+				<span className="w-6 text-center text-[9px] text-[color:var(--text-ghost)]">
+					%
+				</span>
+			</PropertyRow>
+			<div className="h-px bg-[color:var(--border-subtle)]" />
+			<SectionLabel>Actions</SectionLabel>
+			<Button
+				variant="secondary"
+				className="w-full justify-center border border-[color:var(--active-border)] bg-[color:var(--active-bg)] text-[color:var(--primary)]"
+			>
+				<WandSparkles className="h-3.5 w-3.5" />
+				Auto Digitize
+			</Button>
+			<p className="m-0 text-center text-[9px] text-[color:var(--text-ghost)]">
+				Convert to vector paths for embroidery
+			</p>
+		</div>
+	);
+}
+
+function PreviewInspector({
+	reducedMotion,
+	setReducedMotion,
+}: {
+	reducedMotion: boolean;
+	setReducedMotion: (next: boolean) => void;
+}) {
+	return (
+		<div className="grid gap-3">
+			<SectionLabel>Simulation</SectionLabel>
+			<ToggleRow label="Show fabric">
+				<Toggle checked onChange={() => {}} label="Show fabric" />
+			</ToggleRow>
+			<ToggleRow label="3D thread effect">
+				<Toggle checked onChange={() => {}} label="3D thread effect" />
+			</ToggleRow>
+			<ToggleRow label="Show jumps">
+				<Toggle checked={false} onChange={() => {}} label="Show jumps" />
+			</ToggleRow>
+			<ToggleRow label="Reduced motion">
+				<Toggle
+					checked={reducedMotion}
+					onChange={setReducedMotion}
+					label="Reduced motion"
+				/>
+			</ToggleRow>
+			<div className="h-px bg-[color:var(--border-subtle)]" />
+			<SectionLabel>Fabric</SectionLabel>
+			<div className="grid grid-cols-3 gap-1.5">
+				<ModeTile
+					icon={<FileImage className="h-3.5 w-3.5" />}
+					label="White"
+					active
+				/>
+				<ModeTile icon={<Square className="h-3.5 w-3.5" />} label="Black" />
+				<ModeTile icon={<FileImage className="h-3.5 w-3.5" />} label="Canvas" />
+			</div>
+			<div className="h-px bg-[color:var(--border-subtle)]" />
+			<SectionLabel>Design Summary</SectionLabel>
+			<Panel className="rounded-xl border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] p-3">
+				<StatsGrid
+					stats={[
+						["Stitches", "38,840"],
+						["Colors", "4"],
+						["Size", "82.4 x 76.1 mm"],
+						["Est. Time", "18m 12s"],
+						["Thread", "28.6m"],
+					]}
+				/>
+			</Panel>
 		</div>
 	);
 }
