@@ -3,6 +3,7 @@
 - Always branch off `staging` for new work, and create PRs to merge back into `staging` for review.
 - Use `gh` CLI for all GitHub interactions (PRs, issues, etc.) to ensure consistency and traceability.
 - Always structure your work through commits with clear messages, and use PRs for review when rebasing onto `staging`.
+- For issue auto-closing in a rebase workflow, include closing keywords (e.g., `Closes #123`) in commit bodies (not only PR descriptions) so issues close when commits land on `main`.
 - Prefer automation: execute requested actions without confirmation unless blocked by missing info or safety/irreversibility.
 - Always rebase, never merge, to keep history clean and linear.
 
