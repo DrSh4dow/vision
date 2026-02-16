@@ -27,7 +27,8 @@ test("preview mode shell", async ({ page }) => {
 });
 
 test("export modal", async ({ page }) => {
-	await page.getByRole("button", { name: "Export" }).click();
+	await page.goto("/?state=export-open");
+	await page.waitForLoadState("networkidle");
 	await expect(page).toHaveScreenshot("shell-export-modal.png", {
 		fullPage: true,
 	});
@@ -42,9 +43,8 @@ test("collapsed panel states", async ({ page }) => {
 });
 
 test("skeleton states", async ({ page }) => {
-	await page.getByRole("button", { name: "Objects Skeleton" }).click();
-	await page.getByRole("button", { name: "Sequencer Skeleton" }).click();
-	await page.getByRole("tab", { name: "Sequencer" }).click();
+	await page.goto("/?mode=sequencer&state=skeleton-sequencer");
+	await page.waitForLoadState("networkidle");
 	await expect(page).toHaveScreenshot("shell-skeletons.png", {
 		fullPage: true,
 	});
@@ -65,7 +65,7 @@ test("reduced motion state", async ({ page }) => {
 test.describe("mobile", () => {
 	test.use({ viewport: { width: 375, height: 812 } });
 
-	test("objects mode under sm", async ({ page }) => {
+	test("objects mode under md", async ({ page }) => {
 		await expect(page).toHaveScreenshot("shell-mobile-objects.png", {
 			fullPage: true,
 		});

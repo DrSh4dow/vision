@@ -91,11 +91,27 @@ const LAYOUT_KEY = "vision.layout.v1";
 const REDUCED_MOTION_KEY = "vision.reduced-motion";
 
 const defaultLayout: LayoutState = {
-	leftPanelWidth: visionLayoutDefaults.leftPanelWidth,
-	rightPanelWidth: visionLayoutDefaults.rightPanelWidth,
+	leftPanelWidth: 256,
+	rightPanelWidth: 272,
 	leftCollapsed: false,
 	rightCollapsed: false,
 };
+
+function getInitialMode(): Mode {
+	const params = new URLSearchParams(globalThis.location.search);
+	const param = params.get("mode");
+	if (param === "objects" || param === "sequencer" || param === "preview") {
+		return param;
+	}
+	return "objects";
+}
+
+function hasStateFlag(flag: string): boolean {
+	const params = new URLSearchParams(globalThis.location.search);
+	const state = params.get("state");
+	if (!state) return false;
+	return state.split(",").includes(flag);
+}
 
 const objects: ObjectItem[] = [
 	{
@@ -232,7 +248,7 @@ function sectionTitle(mode: Mode, side: PanelSide) {
 }
 
 export function App() {
-	const [mode, setMode] = useState<Mode>("objects");
+	const [mode, setMode] = useState<Mode>(() => getInitialMode());
 	const [layout, setLayout] = useState<LayoutState>(() =>
 		parseLayout(globalThis.localStorage.getItem(LAYOUT_KEY)),
 	);
@@ -243,10 +259,10 @@ export function App() {
 		}
 		return persisted === "1";
 	});
-	const [objectsLoading, setObjectsLoading] = useState(false);
-	const [sequencerLoading, setSequencerLoading] = useState(false);
+	const [objectsLoading] = useState(() => hasStateFlag("skeleton-objects"));
+	const [sequencerLoading] = useState(() => hasStateFlag("skeleton-sequencer"));
 	const [isMobile, setIsMobile] = useState(
-		() => globalThis.matchMedia("(max-width: 639px)").matches,
+		() => globalThis.matchMedia("(max-width: 767px)").matches,
 	);
 	const [selectedObjectId, setSelectedObjectId] = useState(
 		objects[0]?.id ?? "circle",
@@ -257,7 +273,9 @@ export function App() {
 	const [badgeOpen, setBadgeOpen] = useState(true);
 	const [pluginTab, setPluginTab] = useState<PluginTab["id"]>("thread");
 	const [pluginsOpen, setPluginsOpen] = useState(false);
-	const [exportOpen, setExportOpen] = useState(false);
+	const [exportOpen, setExportOpen] = useState(() =>
+		hasStateFlag("export-open"),
+	);
 	const [format, setFormat] = useState(".DST");
 	const pluginMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -274,7 +292,7 @@ export function App() {
 	}, [reducedMotion]);
 
 	useEffect(() => {
-		const media = globalThis.matchMedia("(max-width: 639px)");
+		const media = globalThis.matchMedia("(max-width: 767px)");
 		const handleChange = () => setIsMobile(media.matches);
 		handleChange();
 		media.addEventListener("change", handleChange);
@@ -344,8 +362,8 @@ export function App() {
 
 	return (
 		<div className="grid h-full grid-rows-[48px_1fr_24px] overflow-hidden bg-[color:var(--background)] text-[color:var(--foreground)]">
-			<header className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-4 border-[color:var(--toolbar-border)] border-b bg-[color:var(--toolbar)] px-3 backdrop-blur-xl max-sm:grid-cols-[1fr_auto] max-sm:gap-2 max-sm:px-2">
-				<div className="flex items-center gap-3 max-sm:gap-2">
+			<header className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-4 border-[color:var(--toolbar-border)] border-b bg-[color:var(--toolbar)] px-3 backdrop-blur-xl max-md:grid-cols-[1fr_auto] max-md:gap-2 max-md:px-2">
+				<div className="flex items-center gap-3 max-md:gap-2">
 					<div className="grid h-7 w-7 place-items-center rounded-lg bg-[color:var(--primary)] shadow-[0_8px_24px_color-mix(in_srgb,var(--primary)_35%,transparent)]">
 						<Layers className="h-4 w-4 text-[color:var(--primary-foreground)]" />
 					</div>
@@ -354,7 +372,7 @@ export function App() {
 					</p>
 					<nav
 						aria-label="Application"
-						className="flex items-center gap-1 max-sm:hidden"
+						className="flex items-center gap-1 max-md:hidden"
 					>
 						<MenuGhostButton label="File" />
 						<MenuGhostButton label="Edit" />
@@ -403,12 +421,12 @@ export function App() {
 							) : null}
 						</div>
 					</nav>
-					<div className="h-5 w-px bg-[color:var(--border-subtle)] max-sm:hidden" />
+					<div className="h-5 w-px bg-[color:var(--border-subtle)] max-md:hidden" />
 					<Tabs
 						label="Mode"
 						value={mode}
 						onChange={(next) => setMode(next as Mode)}
-						className="max-sm:hidden"
+						className="max-md:hidden"
 						options={[
 							{ value: "objects", label: "Objects" },
 							{ value: "sequencer", label: "Sequencer" },
@@ -416,7 +434,7 @@ export function App() {
 						]}
 					/>
 				</div>
-				<div className="mx-auto w-full max-w-[420px] max-sm:hidden">
+				<div className="mx-auto w-full max-w-[420px] max-md:hidden">
 					<div className="relative">
 						<Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-[color:var(--text-ghost)]" />
 						<Input
@@ -426,7 +444,7 @@ export function App() {
 						/>
 					</div>
 				</div>
-				<div className="flex justify-center max-sm:order-last max-sm:col-span-2 sm:hidden">
+				<div className="flex justify-center max-md:order-last max-md:col-span-2 md:hidden">
 					<Tabs
 						label="Mode"
 						value={mode}
@@ -439,9 +457,9 @@ export function App() {
 					/>
 				</div>
 				<div className="inline-flex items-center gap-2 justify-self-end">
-					<Button variant="ghost" size="sm" className="max-sm:px-2">
+					<Button variant="ghost" size="sm" className="max-md:px-2">
 						<Share2 className="h-3.5 w-3.5" />
-						<span className="max-sm:hidden">Share</span>
+						<span className="max-md:hidden">Share</span>
 					</Button>
 					<Button
 						variant="primary"
@@ -457,14 +475,9 @@ export function App() {
 			<main
 				className="grid min-h-0"
 				style={{
-					gridTemplateColumns:
-						isMobile || (layout.leftCollapsed && layout.rightCollapsed)
-							? "minmax(0,1fr)"
-							: layout.leftCollapsed
-								? `56px 8px minmax(0,1fr) 8px ${rightWidth}px`
-								: layout.rightCollapsed
-									? `${leftWidth}px 8px minmax(0,1fr) 8px 56px`
-									: `${leftWidth}px 8px minmax(0,1fr) 8px ${rightWidth}px`,
+					gridTemplateColumns: isMobile
+						? "minmax(0,1fr)"
+						: `${leftWidth}px 8px minmax(0,1fr) 8px ${rightWidth}px`,
 				}}
 			>
 				{isMobile ? null : (
@@ -513,7 +526,7 @@ export function App() {
 					/>
 				)}
 
-				<section className="relative grid min-w-0 grid-rows-[auto_1fr_auto] gap-3 overflow-hidden bg-[linear-gradient(180deg,color-mix(in_srgb,var(--background)_90%,black_10%),var(--background))] px-2 py-3 sm:px-3">
+				<section className="relative grid min-w-0 grid-rows-[1fr_auto] gap-3 overflow-hidden bg-[linear-gradient(180deg,color-mix(in_srgb,var(--background)_90%,black_10%),var(--background))] px-2 py-3 md:px-3">
 					{mode !== "preview" ? (
 						<div className="pointer-events-none absolute top-3 left-1/2 z-20 -translate-x-1/2 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface)]/90 p-1.5 shadow-2xl backdrop-blur-lg">
 							<div className="pointer-events-auto flex items-center gap-1">
@@ -551,15 +564,15 @@ export function App() {
 					<div className="absolute top-4 right-4 font-medium text-[9px] text-[color:var(--text-ghost)]">
 						RENDER_ENGINE v2.1
 					</div>
-					<div className="grid place-items-center overflow-hidden rounded-sm border border-[color:var(--border-subtle)] bg-[color:var(--canvas)] bg-[radial-gradient(circle,color-mix(in_srgb,var(--primary)_8%,transparent)_1px,transparent_1px)] bg-[size:24px_24px]">
-						<div className="relative grid h-[min(72vh,72vw)] max-h-[560px] w-[min(72vh,72vw)] max-w-[560px] place-items-center border border-[color:var(--primary-faint)]">
+					<div className="grid min-h-0 place-items-center overflow-hidden rounded-sm border border-[color:var(--border-subtle)] bg-[color:var(--canvas)] bg-[radial-gradient(circle,color-mix(in_srgb,var(--primary)_8%,transparent)_1px,transparent_1px)] bg-[size:24px_24px]">
+						<div className="relative grid h-[min(52vw,68vh)] max-h-[560px] w-[min(52vw,68vh)] max-w-[560px] place-items-center border border-[color:var(--primary-faint)]">
 							<span className="absolute top-[-18px] left-0 font-medium text-[9px] text-[color:var(--text-ghost)]">
 								100 x 100 mm
 							</span>
 							<span className="absolute top-[-18px] right-0 inline-flex items-center gap-1 font-medium text-[9px] text-[color:var(--text-ghost)]">
 								<Crop className="h-2.5 w-2.5" /> Brother PE910L
 							</span>
-							<div className="relative h-56 w-56 sm:h-64 sm:w-64">
+							<div className="relative h-56 w-56 md:h-64 md:w-64">
 								<div className="absolute inset-0 rounded-full border-2 border-[color:var(--primary)]/70 shadow-[0_0_40px_color-mix(in_srgb,var(--primary)_12%,transparent)]" />
 								<svg
 									viewBox="0 0 100 100"
@@ -610,26 +623,6 @@ export function App() {
 							label="Fit screen"
 						/>
 					</div>
-					<div className="pointer-events-none absolute top-3 right-3 z-30 flex gap-2">
-						<div className="pointer-events-auto">
-							<Button
-								variant="secondary"
-								size="sm"
-								onClick={() => setObjectsLoading((value) => !value)}
-							>
-								Objects Skeleton
-							</Button>
-						</div>
-						<div className="pointer-events-auto">
-							<Button
-								variant="secondary"
-								size="sm"
-								onClick={() => setSequencerLoading((value) => !value)}
-							>
-								Sequencer Skeleton
-							</Button>
-						</div>
-					</div>
 				</section>
 
 				{isMobile ? null : (
@@ -677,7 +670,7 @@ export function App() {
 			</main>
 
 			{isMobile ? (
-				<div className="grid gap-2 border-[color:var(--border-subtle)] border-t bg-[color:var(--surface)] p-2 sm:hidden">
+				<div className="grid gap-2 border-[color:var(--border-subtle)] border-t bg-[color:var(--surface)] p-2 md:hidden">
 					<details open>
 						<summary className="cursor-pointer rounded-md bg-[color:var(--surface-elevated)] px-2 py-1.5 font-semibold text-[11px] text-[color:var(--text-secondary)]">
 							{sectionTitle(mode, "left")}
@@ -722,13 +715,13 @@ export function App() {
 					</span>
 					<div className="h-2.5 w-px bg-[color:var(--border-subtle)]" />
 					<span className="truncate">{selectedName}</span>
-					<span className="text-[color:var(--text-ghost)] max-sm:hidden">
+					<span className="text-[color:var(--text-ghost)] max-md:hidden">
 						X: 12.4 Y: -4.2 mm
 					</span>
 				</div>
 				<div className="flex items-center gap-3">
-					<span className="max-sm:hidden">38,840 st</span>
-					<span className="max-sm:hidden">82.4 x 76.1 mm</span>
+					<span className="max-md:hidden">38,840 st</span>
+					<span className="max-md:hidden">82.4 x 76.1 mm</span>
 					<span className="inline-flex items-center gap-1 text-[color:var(--primary)]">
 						<Bolt className="h-2.5 w-2.5" /> GPU Active
 					</span>
