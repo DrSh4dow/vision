@@ -9,7 +9,8 @@
 		"preview": "vite preview --port 3000",
 		"check": "biome check .",
 		"typecheck": "tsc --noEmit",
-		"test": "vitest run --passWithNoTests"
+		"test": "vitest run --passWithNoTests",
+		"test:visual": "playwright test"
 	},
 	"dependencies": {
 		"@vision/runtime": "*",
@@ -23,6 +24,7 @@
 		"@types/react": "19.2.2",
 		"@types/react-dom": "19.2.2",
 		"@vitejs/plugin-react": "^5.0.4",
+		"@playwright/test": "^1.56.1",
 		"typescript": "5.9.2",
 		"vite": "^7.1.12"
 	}

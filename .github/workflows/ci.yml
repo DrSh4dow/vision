@@ -32,3 +32,18 @@ jobs:
 
       - name: Test
         run: bun run test
+
+      - name: Install Playwright Browsers
+        run: bunx playwright install --with-deps chromium
+
+      - name: Visual Snapshots
+        run: bun run --filter @vision/web test:visual
+
+      - name: Upload Visual Snapshot Diffs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-visual-diffs
+          path: |
+            apps/vision-web/test-results
+            apps/vision-web/tests/**/*.png
