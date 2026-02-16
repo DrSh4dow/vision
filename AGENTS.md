@@ -2,8 +2,9 @@
 - The default development branch is `staging`
 - Always branch off `staging` for new work, and create PRs to merge back into `staging` for review.
 - Use `gh` CLI for all GitHub interactions (PRs, issues, etc.) to ensure consistency and traceability.
-- Always structure your work through commits with clear messages, and use PRs for review when merging into `staging`.
+- Always structure your work through commits with clear messages, and use PRs for review when rebasing onto `staging`.
 - Prefer automation: execute requested actions without confirmation unless blocked by missing info or safety/irreversibility.
+- Always rebase, never merge, to keep history clean and linear.
 
 ## Repo Snapshot
 
