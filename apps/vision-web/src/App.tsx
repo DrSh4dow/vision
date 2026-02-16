@@ -206,6 +206,9 @@ const pluginTabs: PluginTab[] = [
 	{ id: "colors", label: "Colors" },
 ];
 
+const subtleInputClass =
+	"border-[color:var(--border-subtle)] bg-[color:color-mix(in_srgb,var(--surface-elevated)_76%,transparent)] focus-visible:border-[color:var(--ring)]";
+
 function clampPanel(width: number) {
 	return Math.max(
 		visionLayoutDefaults.minPanelWidth,
@@ -440,7 +443,7 @@ export function App() {
 						<Input
 							placeholder="Search commands... ⌘K"
 							aria-label="Command search"
-							className="h-8 border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] pl-8 text-[12px] placeholder:text-[color:var(--text-ghost)]"
+							className="h-8 border-[color:var(--border-subtle)] bg-[color:color-mix(in_srgb,var(--surface-elevated)_72%,transparent)] pl-8 text-[12px] placeholder:text-[color:var(--text-ghost)]"
 						/>
 					</div>
 				</div>
@@ -526,7 +529,7 @@ export function App() {
 					/>
 				)}
 
-				<section className="relative grid min-w-0 grid-rows-[1fr_auto] gap-3 overflow-hidden bg-[linear-gradient(180deg,color-mix(in_srgb,var(--background)_90%,black_10%),var(--background))] px-2 py-3 md:px-3">
+				<section className="relative min-h-0 min-w-0 overflow-hidden bg-[color:var(--canvas)]">
 					{mode !== "preview" ? (
 						<div className="pointer-events-none absolute top-3 left-1/2 z-20 -translate-x-1/2 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface)]/90 p-1.5 shadow-2xl backdrop-blur-lg">
 							<div className="pointer-events-auto flex items-center gap-1">
@@ -561,11 +564,17 @@ export function App() {
 							</div>
 						</div>
 					) : null}
-					<div className="absolute top-4 right-4 font-medium text-[9px] text-[color:var(--text-ghost)]">
+					<div className="absolute top-4 right-4 z-20 font-medium text-[9px] text-[color:var(--text-ghost)]">
 						RENDER_ENGINE v2.1
 					</div>
-					<div className="grid min-h-0 place-items-center overflow-hidden rounded-sm border border-[color:var(--border-subtle)] bg-[color:var(--canvas)] bg-[radial-gradient(circle,color-mix(in_srgb,var(--primary)_8%,transparent)_1px,transparent_1px)] bg-[size:24px_24px]">
-						<div className="relative grid h-[min(52vw,68vh)] max-h-[560px] w-[min(52vw,68vh)] max-w-[560px] place-items-center border border-[color:var(--primary-faint)]">
+					<div className="absolute inset-0 grid place-items-center overflow-hidden bg-[radial-gradient(circle,color-mix(in_srgb,var(--primary)_7%,transparent)_1px,transparent_1px)] bg-[size:24px_24px]">
+						<div
+							className="relative grid place-items-center border border-[color:var(--primary-faint)]"
+							style={{
+								width: "min(calc(100% - 56px), 620px)",
+								height: "min(calc(100% - 56px), 620px)",
+							}}
+						>
 							<span className="absolute top-[-18px] left-0 font-medium text-[9px] text-[color:var(--text-ghost)]">
 								100 x 100 mm
 							</span>
@@ -601,7 +610,7 @@ export function App() {
 							</div>
 						</div>
 					</div>
-					<div className="mx-auto inline-flex items-center gap-1 rounded-full border border-[color:var(--border-default)] bg-[color:var(--surface)]/90 px-1.5 py-1 backdrop-blur-md">
+					<div className="absolute bottom-4 left-1/2 z-20 inline-flex -translate-x-1/2 items-center gap-1 rounded-full border border-[color:var(--border-default)] bg-[color:var(--surface)]/90 px-1.5 py-1 backdrop-blur-md">
 						<ZoomActionButton
 							icon={<ZoomOut className="h-3.5 w-3.5" />}
 							label="Zoom out"
@@ -1112,7 +1121,10 @@ function renderInspector({
 						value="100"
 						readOnly
 						aria-label="Opacity"
-						className="h-7 max-w-[58px] text-right text-[11px]"
+						className={cn(
+							subtleInputClass,
+							"h-7 max-w-[58px] text-right text-[11px]",
+						)}
 					/>
 					<span className="w-6 text-center text-[9px] text-[color:var(--text-ghost)]">
 						%
@@ -1178,7 +1190,10 @@ function renderInspector({
 					value="0.40"
 					readOnly
 					aria-label="Spacing"
-					className="h-7 max-w-[58px] text-right text-[11px]"
+					className={cn(
+						subtleInputClass,
+						"h-7 max-w-[58px] text-right text-[11px]",
+					)}
 				/>
 				<span className="w-6 text-center text-[9px] text-[color:var(--text-ghost)] uppercase">
 					mm
@@ -1189,7 +1204,10 @@ function renderInspector({
 					value="0.15"
 					readOnly
 					aria-label="Pull comp"
-					className="h-7 max-w-[58px] text-right text-[11px]"
+					className={cn(
+						subtleInputClass,
+						"h-7 max-w-[58px] text-right text-[11px]",
+					)}
 				/>
 				<span className="w-6 text-center text-[9px] text-[color:var(--text-ghost)] uppercase">
 					mm
@@ -1200,7 +1218,10 @@ function renderInspector({
 					value="4.5"
 					readOnly
 					aria-label="Density"
-					className="h-7 max-w-[58px] text-right text-[11px]"
+					className={cn(
+						subtleInputClass,
+						"h-7 max-w-[58px] text-right text-[11px]",
+					)}
 				/>
 				<span className="w-6 text-center text-[9px] text-[color:var(--text-ghost)] uppercase">
 					l/mm
@@ -1216,7 +1237,7 @@ function renderInspector({
 							value="Center Walk"
 							readOnly
 							aria-label="Underlay"
-							className="h-7 max-w-[92px] text-[10px]"
+							className={cn(subtleInputClass, "h-7 max-w-[92px] text-[10px]")}
 						/>
 					</PropertyRow>
 					<PropertyRow label="Underlay Gap">
@@ -1224,7 +1245,10 @@ function renderInspector({
 							value="2.00"
 							readOnly
 							aria-label="Underlay gap"
-							className="h-7 max-w-[58px] text-right text-[11px]"
+							className={cn(
+								subtleInputClass,
+								"h-7 max-w-[58px] text-right text-[11px]",
+							)}
 						/>
 						<span className="w-6 text-center text-[9px] text-[color:var(--text-ghost)] uppercase">
 							mm
@@ -1458,7 +1482,11 @@ function PropertyInput({
 			<span className="w-3 text-center text-[10px] text-[color:var(--text-label)]">
 				{label}
 			</span>
-			<Input value={value} readOnly className="h-7 text-right text-[11px]" />
+			<Input
+				value={value}
+				readOnly
+				className={cn(subtleInputClass, "h-7 text-right text-[11px]")}
+			/>
 			<span className="w-6 text-center text-[9px] text-[color:var(--text-ghost)]">
 				{suffix}
 			</span>
@@ -1559,7 +1587,10 @@ function ImageInspector() {
 					value="100"
 					readOnly
 					aria-label="Opacity"
-					className="h-7 max-w-[58px] text-right text-[11px]"
+					className={cn(
+						subtleInputClass,
+						"h-7 max-w-[58px] text-right text-[11px]",
+					)}
 				/>
 				<span className="w-6 text-center text-[9px] text-[color:var(--text-ghost)]">
 					%
