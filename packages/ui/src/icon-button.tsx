@@ -1,5 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
-import { cn } from "./utils.js";
+import { Button } from "./components/ui/button";
+import { cn } from "./lib/utils";
 
 export interface IconButtonProps
 	extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
@@ -16,18 +17,19 @@ export function IconButton({
 	...props
 }: IconButtonProps) {
 	return (
-		<button
-			type="button"
+		<Button
 			aria-label={label}
+			variant="ghost"
+			size="icon"
 			className={cn(
-				"inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[color:var(--border-default)] bg-transparent text-[color:var(--text-muted)] transition-colors hover:bg-[color:var(--hover-bg)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/60",
+				"h-8 w-8 rounded-lg text-[color:var(--text-muted)] hover:bg-[color:var(--hover-bg)] hover:text-[color:var(--text-primary)]",
 				active &&
-					"border-[color:var(--active-border)] bg-[color:var(--active-bg)] text-[color:var(--primary)]",
+					"border border-[color:var(--active-border)] bg-[color:var(--active-bg)] text-[color:var(--primary)]",
 				className,
 			)}
 			{...props}
 		>
 			{icon}
-		</button>
+		</Button>
 	);
 }

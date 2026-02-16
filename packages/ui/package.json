@@ -5,24 +5,32 @@
 	"type": "module",
 	"exports": {
 		".": "./src/index.ts",
-		"./theme.css": "./src/theme.css",
+		"./index.css": "./src/index.css",
+		"./theme.css": "./src/index.css",
 		"./*": "./src/*"
 	},
 	"scripts": {
 		"build": "tsc -p tsconfig.json",
 		"check": "biome check .",
+		"showcase:build": "vite build --config showcase/vite.config.ts",
+		"showcase:dev": "vite --config showcase/vite.config.ts --port 4201",
+		"showcase:preview": "vite preview --config showcase/vite.config.ts --port 4201",
 		"test": "vitest run --passWithNoTests",
 		"generate:component": "turbo gen react-component",
 		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
+		"@vitejs/plugin-react": "^5.0.4",
 		"@vision/typescript-config": "*",
 		"@types/node": "^22.15.3",
 		"@types/react": "19.2.2",
 		"@types/react-dom": "19.2.2",
-		"typescript": "5.9.2"
+		"typescript": "5.9.2",
+		"vite": "^7.1.12"
 	},
 	"dependencies": {
+		"@base-ui/react": "^1.0.0-beta.4",
+		"@base-ui-components/react": "^1.0.0-beta.4",
 		"@fontsource-variable/geist": "^5.2.8",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",

@@ -1,20 +1,12 @@
-import type { ReactNode } from "react";
-import { cn } from "./utils.js";
+import type { ComponentProps } from "react";
+import { Card } from "./components/ui/card";
+import { cn } from "./lib/utils";
 
-interface PanelProps {
-	children: ReactNode;
-	className?: string;
-}
-
-export function Panel({ children, className }: PanelProps) {
+export function Panel({ className, ...props }: ComponentProps<"div">) {
 	return (
-		<section
-			className={cn(
-				"rounded-lg border border-[color:var(--border)] bg-[color:var(--card)] p-3",
-				className,
-			)}
-		>
-			{children}
-		</section>
+		<Card
+			className={cn("gap-0 rounded-lg border border-border py-3", className)}
+			{...props}
+		/>
 	);
 }
