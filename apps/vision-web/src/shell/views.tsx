@@ -353,32 +353,36 @@ export function renderInspector({
 				</div>
 				<div className="h-px bg-[color:var(--border-subtle)]" />
 				<SectionLabel>Alignment</SectionLabel>
-				<div className="grid grid-cols-7 gap-1">
-					<AlignIcon
-						icon={<AlignHorizontalDistributeStart className="h-3.5 w-3.5" />}
-						label="Align left"
-					/>
-					<AlignIcon
-						icon={<AlignHorizontalDistributeCenter className="h-3.5 w-3.5" />}
-						label="Align horizontal center"
-					/>
-					<AlignIcon
-						icon={<AlignHorizontalDistributeEnd className="h-3.5 w-3.5" />}
-						label="Align right"
-					/>
-					<div className="mx-auto h-4 w-px bg-[color:var(--border-subtle)]" />
-					<AlignIcon
-						icon={<AlignVerticalDistributeStart className="h-3.5 w-3.5" />}
-						label="Align top"
-					/>
-					<AlignIcon
-						icon={<AlignVerticalDistributeCenter className="h-3.5 w-3.5" />}
-						label="Align vertical center"
-					/>
-					<AlignIcon
-						icon={<AlignVerticalDistributeEnd className="h-3.5 w-3.5" />}
-						label="Align bottom"
-					/>
+				<div className="flex items-center gap-2 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-elevated)] p-1.5">
+					<div className="flex items-center gap-1">
+						<AlignIcon
+							icon={<AlignHorizontalDistributeStart className="h-3.5 w-3.5" />}
+							label="Align left"
+						/>
+						<AlignIcon
+							icon={<AlignHorizontalDistributeCenter className="h-3.5 w-3.5" />}
+							label="Align horizontal center"
+						/>
+						<AlignIcon
+							icon={<AlignHorizontalDistributeEnd className="h-3.5 w-3.5" />}
+							label="Align right"
+						/>
+					</div>
+					<div className="h-6 w-px bg-[color:var(--border-subtle)]" />
+					<div className="flex items-center gap-1">
+						<AlignIcon
+							icon={<AlignVerticalDistributeStart className="h-3.5 w-3.5" />}
+							label="Align top"
+						/>
+						<AlignIcon
+							icon={<AlignVerticalDistributeCenter className="h-3.5 w-3.5" />}
+							label="Align vertical center"
+						/>
+						<AlignIcon
+							icon={<AlignVerticalDistributeEnd className="h-3.5 w-3.5" />}
+							label="Align bottom"
+						/>
+					</div>
 				</div>
 				<div className="h-px bg-[color:var(--border-subtle)]" />
 				<SectionLabel>Blend</SectionLabel>
@@ -850,7 +854,7 @@ function AlignIcon({ icon, label }: { icon: ReactNode; label: string }) {
 		<button
 			type="button"
 			aria-label={label}
-			className="grid h-7 w-7 place-items-center rounded-md border border-[color:var(--border-subtle)] bg-[color:var(--surface-elevated)] text-[color:var(--text-ghost)] transition-colors hover:border-[color:var(--border-default)] hover:bg-[color:var(--hover-bg)] hover:text-[color:var(--text-secondary)]"
+			className="grid h-8 w-8 place-items-center rounded-md border border-transparent text-[color:var(--text-ghost)] transition-colors hover:border-[color:var(--border-default)] hover:bg-[color:var(--hover-bg)] hover:text-[color:var(--text-secondary)]"
 		>
 			{icon}
 		</button>
