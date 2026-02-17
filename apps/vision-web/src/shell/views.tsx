@@ -71,15 +71,27 @@ export function PanelColumn({
 }) {
 	return (
 		<aside className="grid min-h-0 min-w-[56px] grid-rows-[42px_1fr] bg-[color:var(--surface)] first:border-r first:border-r-[color:var(--border-subtle)] last:border-l last:border-l-[color:var(--border-subtle)]">
-			<div className="flex items-center justify-between border-b border-b-[color:var(--border-subtle)] px-3">
-				<SectionLabel>{title}</SectionLabel>
+			<div
+				className={cn(
+					"flex border-b border-b-[color:var(--border-subtle)] px-3",
+					collapsed
+						? "items-center justify-center"
+						: "items-center justify-between",
+				)}
+			>
+				{collapsed ? null : <SectionLabel>{title}</SectionLabel>}
 				<IconButton
 					label={
 						collapsed ? `Expand ${labelPrefix}` : `Collapse ${labelPrefix}`
 					}
 					onClick={onToggle}
 					icon={toggleIcon}
-					className="h-6 w-6 rounded-md"
+					className={cn(
+						"rounded-md",
+						collapsed
+							? "h-8 w-8 border border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] text-[color:var(--text-secondary)]"
+							: "h-6 w-6",
+					)}
 				/>
 			</div>
 			{collapsed ? null : (
@@ -800,16 +812,16 @@ function PropertyInput({
 	suffix: string;
 }) {
 	return (
-		<div className="flex items-center gap-1">
-			<span className="w-3 text-center text-[10px] text-[color:var(--text-label)]">
+		<div className="grid grid-cols-[14px_58px_20px] items-center gap-1">
+			<span className="text-center text-[10px] text-[color:var(--text-label)]">
 				{label}
 			</span>
 			<Input
 				value={value}
 				readOnly
-				className={cn(subtleInputClass, "h-7 text-right text-[11px]")}
+				className={cn(subtleInputClass, "h-7 w-[58px] text-right text-[11px]")}
 			/>
-			<span className="w-6 text-center text-[9px] text-[color:var(--text-ghost)]">
+			<span className="text-left text-[9px] text-[color:var(--text-ghost)]">
 				{suffix}
 			</span>
 		</div>
@@ -838,7 +850,7 @@ function AlignIcon({ icon, label }: { icon: ReactNode; label: string }) {
 		<button
 			type="button"
 			aria-label={label}
-			className="grid h-7 w-7 place-items-center rounded-md text-[color:var(--text-ghost)] transition-colors hover:bg-[color:var(--hover-bg)] hover:text-[color:var(--text-secondary)]"
+			className="grid h-7 w-7 place-items-center rounded-md border border-[color:var(--border-subtle)] bg-[color:var(--surface-elevated)] text-[color:var(--text-ghost)] transition-colors hover:border-[color:var(--border-default)] hover:bg-[color:var(--hover-bg)] hover:text-[color:var(--text-secondary)]"
 		>
 			{icon}
 		</button>

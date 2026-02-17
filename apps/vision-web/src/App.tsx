@@ -15,6 +15,7 @@ import {
 	Download,
 	Layers,
 	MousePointer2,
+	Pencil,
 	PenTool,
 	Plus,
 	RectangleHorizontal,
@@ -422,7 +423,7 @@ export function App() {
 									label="Pen tool"
 								/>
 								<ToolButton
-									icon={<WandSparkles className="h-4 w-4" />}
+									icon={<Pencil className="h-4 w-4" />}
 									label="Freehand tool"
 								/>
 								<MiniSeparator />
