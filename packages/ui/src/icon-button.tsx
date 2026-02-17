@@ -1,9 +1,9 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
-import { Button } from "./components/ui/button";
+import type { ComponentProps, ReactNode } from "react";
+import { Button } from "./button";
 import { cn } from "./utils";
 
 export interface IconButtonProps
-	extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
+	extends Omit<ComponentProps<typeof Button>, "children" | "size" | "variant"> {
 	label: string;
 	icon: ReactNode;
 	active?: boolean;

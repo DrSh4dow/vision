@@ -1,18 +1,18 @@
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import {
 	type buttonVariants,
 	Button as PrimitiveButton,
 } from "./components/ui/button";
 
+type PrimitiveProps = ComponentProps<typeof PrimitiveButton>;
 type PrimitiveVariant = NonNullable<
 	Parameters<typeof buttonVariants>[0]
 >["variant"];
-type PrimitiveSize = NonNullable<Parameters<typeof buttonVariants>[0]>["size"];
+type PrimitiveSize = PrimitiveProps["size"];
 
 type ButtonVariant = "primary" | "secondary" | "ghost";
 
-interface ButtonProps
-	extends Omit<Parameters<typeof PrimitiveButton>[0], "children" | "variant"> {
+interface ButtonProps extends Omit<PrimitiveProps, "children" | "variant"> {
 	children: ReactNode;
 	variant?: ButtonVariant;
 	size?: PrimitiveSize;
