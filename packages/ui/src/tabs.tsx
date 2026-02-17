@@ -38,7 +38,7 @@ export function Tabs({
 							disabled={option.disabled}
 							className={cn(
 								isModeVariant &&
-									"h-[30px] min-w-[82px] flex-none rounded-[8px] border border-transparent px-3 py-1 font-semibold text-[11px] text-[color:var(--text-muted)] tracking-[-0.01em] hover:text-[color:var(--text-secondary)]",
+									"h-[30px] min-w-[82px] flex-none rounded-full border border-transparent px-3 py-1 font-semibold text-[11px] text-[color:var(--text-muted)] tracking-[-0.01em] hover:text-[color:var(--text-secondary)]",
 								isModeVariant &&
 									isSelected &&
 									"border-transparent bg-[color:var(--primary)] text-[color:var(--primary-foreground)] shadow-[0_8px_18px_color-mix(in_srgb,var(--primary)_35%,transparent)]",
