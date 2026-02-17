@@ -1,21 +1,38 @@
-"use client";
+import type { ComponentProps, ReactNode } from "react";
+import {
+	type buttonVariants,
+	Button as PrimitiveButton,
+} from "./components/ui/button";
 
-import type { ReactNode } from "react";
+type PrimitiveProps = ComponentProps<typeof PrimitiveButton>;
+type PrimitiveVariant = NonNullable<
+	Parameters<typeof buttonVariants>[0]
+>["variant"];
+type PrimitiveSize = PrimitiveProps["size"];
 
-interface ButtonProps {
+type ButtonVariant = "primary" | "secondary" | "ghost";
+
+interface ButtonProps extends Omit<PrimitiveProps, "children" | "variant"> {
 	children: ReactNode;
-	className?: string;
-	appName: string;
+	variant?: ButtonVariant;
+	size?: PrimitiveSize;
 }
 
-export const Button = ({ children, className, appName }: ButtonProps) => {
-	return (
-		<button
-			type="button"
-			className={className}
-			onClick={() => alert(`Hello from your ${appName} app!`)}
-		>
-			{children}
-		</button>
-	);
+const variantMap: Record<ButtonVariant, PrimitiveVariant> = {
+	primary: "default",
+	secondary: "secondary",
+	ghost: "ghost",
 };
+
+export function Button({
+	children,
+	variant = "primary",
+	size,
+	...props
+}: ButtonProps) {
+	return (
+		<PrimitiveButton variant={variantMap[variant]} size={size} {...props}>
+			{children}
+		</PrimitiveButton>
+	);
+}

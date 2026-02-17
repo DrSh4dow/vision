@@ -1,7 +1,16 @@
 {
 	"extends": "@vision/typescript-config/react-library.json",
 	"compilerOptions": {
-		"outDir": "dist"
+		"outDir": "dist",
+		"module": "ESNext",
+		"moduleResolution": "Bundler",
+		"baseUrl": ".",
+		"paths": {
+			"@/*": ["src/*"],
+			"@/components/*": ["src/components/*"],
+			"@/lib/*": ["src/lib/*"],
+			"@/hooks/*": ["src/hooks/*"]
+		}
 	},
 	"include": ["src"],
 	"exclude": ["node_modules", "dist"]
