@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { Button } from "./components/ui/button";
-import { cn } from "./lib/utils";
+import { cn } from "./utils";
 
 export interface IconButtonProps
 	extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
