@@ -338,8 +338,6 @@ export function renderInspector({
 					<PropertyInput label="Y" value="-4.2" suffix="mm" />
 					<PropertyInput label="W" value="64.0" suffix="mm" />
 					<PropertyInput label="H" value="64.0" suffix="mm" />
-				</div>
-				<div className="grid grid-cols-2 gap-1.5">
 					<PropertyInput
 						label={<RotateCw className="h-3 w-3" />}
 						value="0"
@@ -353,7 +351,7 @@ export function renderInspector({
 				</div>
 				<div className="h-px bg-[color:var(--border-subtle)]" />
 				<SectionLabel>Alignment</SectionLabel>
-				<div className="flex items-center gap-2 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-elevated)] p-1.5">
+				<div className="flex items-center justify-center gap-2 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-elevated)] p-1.5">
 					<div className="flex items-center gap-1">
 						<AlignIcon
 							icon={<AlignHorizontalDistributeStart className="h-3.5 w-3.5" />}
