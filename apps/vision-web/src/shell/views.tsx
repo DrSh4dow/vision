@@ -95,7 +95,9 @@ export function PanelColumn({
 				/>
 			</div>
 			{collapsed ? null : (
-				<div className="min-h-0 overflow-auto px-2 py-2">{children}</div>
+				<div className="min-h-0 min-w-0 overflow-auto px-2 py-2">
+					{children}
+				</div>
 			)}
 		</aside>
 	);
@@ -351,36 +353,32 @@ export function renderInspector({
 				</div>
 				<div className="h-px bg-[color:var(--border-subtle)]" />
 				<SectionLabel>Alignment</SectionLabel>
-				<div className="flex items-center justify-center gap-2 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-elevated)] p-1.5">
-					<div className="flex items-center gap-1">
-						<AlignIcon
-							icon={<AlignHorizontalDistributeStart className="h-3.5 w-3.5" />}
-							label="Align left"
-						/>
-						<AlignIcon
-							icon={<AlignHorizontalDistributeCenter className="h-3.5 w-3.5" />}
-							label="Align horizontal center"
-						/>
-						<AlignIcon
-							icon={<AlignHorizontalDistributeEnd className="h-3.5 w-3.5" />}
-							label="Align right"
-						/>
-					</div>
+				<div className="flex flex-wrap items-center justify-center gap-1.5 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-elevated)] p-1.5">
+					<AlignIcon
+						icon={<AlignHorizontalDistributeStart className="h-3.5 w-3.5" />}
+						label="Align left"
+					/>
+					<AlignIcon
+						icon={<AlignHorizontalDistributeCenter className="h-3.5 w-3.5" />}
+						label="Align horizontal center"
+					/>
+					<AlignIcon
+						icon={<AlignHorizontalDistributeEnd className="h-3.5 w-3.5" />}
+						label="Align right"
+					/>
 					<div className="h-6 w-px bg-[color:var(--border-subtle)]" />
-					<div className="flex items-center gap-1">
-						<AlignIcon
-							icon={<AlignVerticalDistributeStart className="h-3.5 w-3.5" />}
-							label="Align top"
-						/>
-						<AlignIcon
-							icon={<AlignVerticalDistributeCenter className="h-3.5 w-3.5" />}
-							label="Align vertical center"
-						/>
-						<AlignIcon
-							icon={<AlignVerticalDistributeEnd className="h-3.5 w-3.5" />}
-							label="Align bottom"
-						/>
-					</div>
+					<AlignIcon
+						icon={<AlignVerticalDistributeStart className="h-3.5 w-3.5" />}
+						label="Align top"
+					/>
+					<AlignIcon
+						icon={<AlignVerticalDistributeCenter className="h-3.5 w-3.5" />}
+						label="Align vertical center"
+					/>
+					<AlignIcon
+						icon={<AlignVerticalDistributeEnd className="h-3.5 w-3.5" />}
+						label="Align bottom"
+					/>
 				</div>
 				<div className="h-px bg-[color:var(--border-subtle)]" />
 				<SectionLabel>Blend</SectionLabel>
@@ -814,16 +812,19 @@ function PropertyInput({
 	suffix: string;
 }) {
 	return (
-		<div className="grid grid-cols-[14px_58px_20px] items-center gap-1">
-			<span className="text-center text-[10px] text-[color:var(--text-label)]">
+		<div className="flex min-w-0 items-center gap-1">
+			<span className="shrink-0 text-center text-[10px] text-[color:var(--text-label)]">
 				{label}
 			</span>
 			<Input
 				value={value}
 				readOnly
-				className={cn(subtleInputClass, "h-7 w-[58px] text-right text-[11px]")}
+				className={cn(
+					subtleInputClass,
+					"h-7 min-w-0 flex-1 text-right text-[11px]",
+				)}
 			/>
-			<span className="text-left text-[9px] text-[color:var(--text-ghost)]">
+			<span className="shrink-0 text-left text-[9px] text-[color:var(--text-ghost)]">
 				{suffix}
 			</span>
 		</div>
