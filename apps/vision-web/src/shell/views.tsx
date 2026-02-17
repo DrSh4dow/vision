@@ -333,69 +333,77 @@ export function renderInspector({
 		}
 
 		return (
-			<div className="grid gap-3">
-				<SectionLabel>Position & Size</SectionLabel>
-				<div className="grid grid-cols-2 gap-1.5">
-					<PropertyInput label="X" value="12.4" suffix="mm" />
-					<PropertyInput label="Y" value="-4.2" suffix="mm" />
-					<PropertyInput label="W" value="64.0" suffix="mm" />
-					<PropertyInput label="H" value="64.0" suffix="mm" />
-					<PropertyInput
-						label={<RotateCw className="h-3 w-3" />}
-						value="0"
-						suffix="deg"
-					/>
-					<PropertyInput
-						label={<CircleDot className="h-3 w-3" />}
-						value="0"
-						suffix="px"
-					/>
-				</div>
-				<div className="h-px bg-[color:var(--border-subtle)]" />
-				<SectionLabel>Alignment</SectionLabel>
-				<div className="flex flex-wrap items-center justify-center gap-1.5 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-elevated)] p-1.5">
-					<AlignIcon
-						icon={<AlignHorizontalDistributeStart className="h-3.5 w-3.5" />}
-						label="Align left"
-					/>
-					<AlignIcon
-						icon={<AlignHorizontalDistributeCenter className="h-3.5 w-3.5" />}
-						label="Align horizontal center"
-					/>
-					<AlignIcon
-						icon={<AlignHorizontalDistributeEnd className="h-3.5 w-3.5" />}
-						label="Align right"
-					/>
-					<div className="h-6 w-px bg-[color:var(--border-subtle)]" />
-					<AlignIcon
-						icon={<AlignVerticalDistributeStart className="h-3.5 w-3.5" />}
-						label="Align top"
-					/>
-					<AlignIcon
-						icon={<AlignVerticalDistributeCenter className="h-3.5 w-3.5" />}
-						label="Align vertical center"
-					/>
-					<AlignIcon
-						icon={<AlignVerticalDistributeEnd className="h-3.5 w-3.5" />}
-						label="Align bottom"
-					/>
-				</div>
-				<div className="h-px bg-[color:var(--border-subtle)]" />
-				<SectionLabel>Blend</SectionLabel>
-				<PropertyRow label="Opacity">
-					<Input
-						value="100"
-						readOnly
-						aria-label="Opacity"
-						className={cn(
-							subtleInputClass,
-							"h-7 max-w-[58px] text-right text-[11px]",
-						)}
-					/>
-					<span className="w-6 text-center text-[9px] text-[color:var(--text-ghost)]">
-						%
-					</span>
-				</PropertyRow>
+			<div className="grid gap-5">
+				<InspectorSection title="Position & Size">
+					<div className="grid grid-cols-2 gap-2">
+						<PropertyInput label="X" value="12.4" suffix="mm" />
+						<PropertyInput label="Y" value="-4.2" suffix="mm" />
+						<PropertyInput label="W" value="64.0" suffix="mm" />
+						<PropertyInput label="H" value="64.0" suffix="mm" />
+						<PropertyInput
+							label={<RotateCw className="h-3 w-3" />}
+							value="0"
+							suffix="deg"
+						/>
+						<PropertyInput
+							label={<CircleDot className="h-3 w-3" />}
+							value="0"
+							suffix="px"
+						/>
+					</div>
+				</InspectorSection>
+				<InspectorSection title="Alignment">
+					<div className="flex flex-wrap items-center justify-center gap-2">
+						<div className="flex items-center gap-1 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-elevated)] p-1">
+							<AlignIcon
+								icon={
+									<AlignHorizontalDistributeStart className="h-3.5 w-3.5" />
+								}
+								label="Align left"
+							/>
+							<AlignIcon
+								icon={
+									<AlignHorizontalDistributeCenter className="h-3.5 w-3.5" />
+								}
+								label="Align horizontal center"
+							/>
+							<AlignIcon
+								icon={<AlignHorizontalDistributeEnd className="h-3.5 w-3.5" />}
+								label="Align right"
+							/>
+						</div>
+						<div className="flex items-center gap-1 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-elevated)] p-1">
+							<AlignIcon
+								icon={<AlignVerticalDistributeStart className="h-3.5 w-3.5" />}
+								label="Align top"
+							/>
+							<AlignIcon
+								icon={<AlignVerticalDistributeCenter className="h-3.5 w-3.5" />}
+								label="Align vertical center"
+							/>
+							<AlignIcon
+								icon={<AlignVerticalDistributeEnd className="h-3.5 w-3.5" />}
+								label="Align bottom"
+							/>
+						</div>
+					</div>
+				</InspectorSection>
+				<InspectorSection title="Blend">
+					<PropertyRow label="Opacity">
+						<Input
+							value="100"
+							readOnly
+							aria-label="Opacity"
+							className={cn(
+								subtleInputClass,
+								"h-8 max-w-[64px] text-right text-[11px]",
+							)}
+						/>
+						<span className="w-6 shrink-0 text-center text-[9px] text-[color:var(--text-ghost)]">
+							%
+						</span>
+					</PropertyRow>
+				</InspectorSection>
 			</div>
 		);
 	}
@@ -416,187 +424,194 @@ export function renderInspector({
 	}
 
 	return (
-		<div className="grid gap-3">
-			<SectionLabel>Thread Color</SectionLabel>
-			<Panel className="flex items-center gap-3 rounded-xl border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] p-2.5">
-				<div className="h-8 w-8 rounded-lg border-2 border-white/15 bg-[#ef4a4a]" />
-				<div>
-					<p className="m-0 font-semibold text-[11px]">Madeira 1147</p>
-					<span className="text-[10px] text-[color:var(--text-muted)]">
-						Rayon 40 - Red
-					</span>
+		<div className="grid gap-5">
+			<InspectorSection title="Thread Color">
+				<Panel className="flex items-center gap-3 rounded-xl border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] p-3">
+					<div className="h-8 w-8 rounded-lg border-2 border-white/15 bg-[#ef4a4a]" />
+					<div>
+						<p className="m-0 font-semibold text-[11px]">Madeira 1147</p>
+						<span className="text-[10px] text-[color:var(--text-muted)]">
+							Rayon 40 - Red
+						</span>
+					</div>
+					<MoveHorizontal className="ml-auto h-3.5 w-3.5 text-[color:var(--text-ghost)]" />
+				</Panel>
+			</InspectorSection>
+			<InspectorSection title="Vector Mode">
+				<div className="grid grid-cols-2 gap-2">
+					<ModeTile
+						icon={<Diamond className="h-4 w-4" />}
+						label="Outline"
+						active
+					/>
+					<ModeTile
+						icon={<PaintBucket className="h-4 w-4" />}
+						label="Fill"
+						disabled
+					/>
 				</div>
-				<MoveHorizontal className="ml-auto h-3.5 w-3.5 text-[color:var(--text-ghost)]" />
-			</Panel>
-			<SectionLabel>Vector Mode</SectionLabel>
-			<div className="grid grid-cols-2 gap-1.5">
-				<ModeTile
-					icon={<Diamond className="h-4 w-4" />}
-					label="Outline"
-					active
-				/>
-				<ModeTile
-					icon={<PaintBucket className="h-4 w-4" />}
-					label="Fill"
-					disabled
-				/>
-			</div>
-			<div className="h-px bg-[color:var(--border-subtle)]" />
-			<SectionLabel>Stitch Type</SectionLabel>
-			<div className="grid grid-cols-3 gap-1.5">
-				<ModeTile
-					icon={<AlignCenter className="h-4 w-4" />}
-					label="Satin"
-					active
-				/>
-				<ModeTile icon={<PaintBucket className="h-4 w-4" />} label="Fill" />
-				<ModeTile
-					icon={<MoveHorizontal className="h-4 w-4" />}
-					label="Running"
-				/>
-			</div>
-			<div className="h-px bg-[color:var(--border-subtle)]" />
-			<SectionLabel>Parameters</SectionLabel>
-			<PropertyRow label="Spacing">
-				<Input
-					value="0.40"
-					readOnly
-					aria-label="Spacing"
-					className={cn(
-						subtleInputClass,
-						"h-7 max-w-[58px] text-right text-[11px]",
-					)}
-				/>
-				<span className="w-6 text-center text-[9px] text-[color:var(--text-ghost)] uppercase">
-					mm
-				</span>
-			</PropertyRow>
-			<PropertyRow label="Pull Comp">
-				<Input
-					value="0.15"
-					readOnly
-					aria-label="Pull comp"
-					className={cn(
-						subtleInputClass,
-						"h-7 max-w-[58px] text-right text-[11px]",
-					)}
-				/>
-				<span className="w-6 text-center text-[9px] text-[color:var(--text-ghost)] uppercase">
-					mm
-				</span>
-			</PropertyRow>
-			<PropertyRow label="Density">
-				<Input
-					value="4.5"
-					readOnly
-					aria-label="Density"
-					className={cn(
-						subtleInputClass,
-						"h-7 max-w-[58px] text-right text-[11px]",
-					)}
-				/>
-				<span className="w-6 text-center text-[9px] text-[color:var(--text-ghost)] uppercase">
-					l/mm
-				</span>
-			</PropertyRow>
-			<details>
-				<summary className="cursor-pointer font-semibold text-[11px] text-[color:var(--text-muted)]">
-					Advanced
-				</summary>
-				<div className="mt-3 grid gap-2 border-[color:var(--border-subtle)] border-t pt-3">
-					<PropertyRow label="Underlay">
+			</InspectorSection>
+			<InspectorSection title="Stitch Type">
+				<div className="grid grid-cols-3 gap-2">
+					<ModeTile
+						icon={<AlignCenter className="h-4 w-4" />}
+						label="Satin"
+						active
+					/>
+					<ModeTile icon={<PaintBucket className="h-4 w-4" />} label="Fill" />
+					<ModeTile
+						icon={<MoveHorizontal className="h-4 w-4" />}
+						label="Running"
+					/>
+				</div>
+			</InspectorSection>
+			<InspectorSection title="Parameters">
+				<div className="grid gap-2.5">
+					<PropertyRow label="Spacing">
 						<Input
-							value="Center Walk"
+							value="0.40"
 							readOnly
-							aria-label="Underlay"
-							className={cn(subtleInputClass, "h-7 max-w-[92px] text-[10px]")}
-						/>
-					</PropertyRow>
-					<PropertyRow label="Underlay Gap">
-						<Input
-							value="2.00"
-							readOnly
-							aria-label="Underlay gap"
+							aria-label="Spacing"
 							className={cn(
 								subtleInputClass,
-								"h-7 max-w-[58px] text-right text-[11px]",
+								"h-8 max-w-[64px] text-right text-[11px]",
 							)}
 						/>
-						<span className="w-6 text-center text-[9px] text-[color:var(--text-ghost)] uppercase">
+						<span className="w-5 shrink-0 text-center text-[9px] text-[color:var(--text-ghost)] uppercase">
 							mm
 						</span>
 					</PropertyRow>
-					<ToggleRow label="Trim at End">
-						<Toggle
-							checked={trimAtEnd}
-							onChange={setTrimAtEnd}
-							label="Trim at End"
+					<PropertyRow label="Pull Comp">
+						<Input
+							value="0.15"
+							readOnly
+							aria-label="Pull comp"
+							className={cn(
+								subtleInputClass,
+								"h-8 max-w-[64px] text-right text-[11px]",
+							)}
 						/>
-					</ToggleRow>
+						<span className="w-5 shrink-0 text-center text-[9px] text-[color:var(--text-ghost)] uppercase">
+							mm
+						</span>
+					</PropertyRow>
+					<PropertyRow label="Density">
+						<Input
+							value="4.5"
+							readOnly
+							aria-label="Density"
+							className={cn(
+								subtleInputClass,
+								"h-8 max-w-[64px] text-right text-[11px]",
+							)}
+						/>
+						<span className="w-5 shrink-0 text-center text-[9px] text-[color:var(--text-ghost)] uppercase">
+							l/mm
+						</span>
+					</PropertyRow>
+					<details>
+						<summary className="cursor-pointer font-semibold text-[11px] text-[color:var(--text-muted)]">
+							Advanced
+						</summary>
+						<div className="mt-3 grid gap-2.5 border-[color:var(--border-subtle)] border-t pt-3">
+							<PropertyRow label="Underlay">
+								<Input
+									value="Center Walk"
+									readOnly
+									aria-label="Underlay"
+									className={cn(
+										subtleInputClass,
+										"h-8 max-w-[92px] text-[10px]",
+									)}
+								/>
+							</PropertyRow>
+							<PropertyRow label="Underlay Gap">
+								<Input
+									value="2.00"
+									readOnly
+									aria-label="Underlay gap"
+									className={cn(
+										subtleInputClass,
+										"h-8 max-w-[64px] text-right text-[11px]",
+									)}
+								/>
+								<span className="w-5 shrink-0 text-center text-[9px] text-[color:var(--text-ghost)] uppercase">
+									mm
+								</span>
+							</PropertyRow>
+							<ToggleRow label="Trim at End">
+								<Toggle
+									checked={trimAtEnd}
+									onChange={setTrimAtEnd}
+									label="Trim at End"
+								/>
+							</ToggleRow>
+						</div>
+					</details>
 				</div>
-			</details>
-			<div className="h-px bg-[color:var(--border-subtle)]" />
-			<SectionLabel>Stats</SectionLabel>
-			<Panel className="rounded-xl border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] p-3">
-				<StatsGrid
-					stats={[
-						["Stitches", "3,240"],
-						["Trims", "2"],
-						["Jumps", "1"],
-						["Thread", "2.1m"],
-					]}
-				/>
-			</Panel>
-			<div className="h-px bg-[color:var(--border-subtle)]" />
-			<SectionLabel>Plugin Dock</SectionLabel>
-			<div className="flex items-center justify-between">
-				<span className="font-bold text-[9px] text-[color:var(--primary)] uppercase tracking-[0.12em]">
-					Plugin Dock
-				</span>
-				<Plus className="h-3.5 w-3.5 text-[color:var(--text-ghost)]" />
-			</div>
-			<div className="inline-flex border-[color:var(--border-subtle)] border-b">
-				{pluginTabs.map((tab) => (
-					<button
-						key={tab.id}
-						type="button"
-						onClick={() => setPluginTab(tab.id)}
-						className={cn(
-							"px-2 py-1 font-bold text-[10px] uppercase tracking-[0.06em]",
-							pluginTab === tab.id
-								? "border-[color:var(--primary)] border-b-2 text-[color:var(--primary)]"
-								: "text-[color:var(--text-muted)]",
-						)}
-					>
-						{tab.label}
-					</button>
-				))}
-			</div>
-			<Panel className="rounded-xl border-[color:var(--border-default)] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--primary)_8%,transparent),transparent)] p-3">
-				{pluginTab === "thread" ? (
+			</InspectorSection>
+			<InspectorSection title="Stats">
+				<Panel className="rounded-xl border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] p-3">
 					<StatsGrid
 						stats={[
-							["Total Thread", "14.2m"],
-							["Bobbin", "5.1m"],
-							["Est. Time", "8m 24s"],
+							["Stitches", "3,240"],
+							["Trims", "2"],
+							["Jumps", "1"],
+							["Thread", "2.1m"],
 						]}
 					/>
-				) : pluginTab === "density" ? (
-					<StatsGrid
-						stats={[
-							["Max", "8.2 st/mm"],
-							["Avg", "4.6 st/mm"],
-						]}
-					/>
-				) : (
-					<StatsGrid
-						stats={[
-							["Palette", "Madeira Rayon"],
-							["Colors", "6"],
-						]}
-					/>
-				)}
-			</Panel>
+				</Panel>
+			</InspectorSection>
+			<InspectorSection title="Plugin Dock">
+				<div className="flex items-center justify-between">
+					<span className="font-bold text-[9px] text-[color:var(--primary)] uppercase tracking-[0.12em]">
+						Plugin Dock
+					</span>
+					<Plus className="h-3.5 w-3.5 text-[color:var(--text-ghost)]" />
+				</div>
+				<div className="inline-flex border-[color:var(--border-subtle)] border-b">
+					{pluginTabs.map((tab) => (
+						<button
+							key={tab.id}
+							type="button"
+							onClick={() => setPluginTab(tab.id)}
+							className={cn(
+								"px-2.5 py-1.5 font-bold text-[10px] uppercase tracking-[0.06em]",
+								pluginTab === tab.id
+									? "border-[color:var(--primary)] border-b-2 text-[color:var(--primary)]"
+									: "text-[color:var(--text-muted)]",
+							)}
+						>
+							{tab.label}
+						</button>
+					))}
+				</div>
+				<Panel className="rounded-xl border-[color:var(--border-default)] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--primary)_8%,transparent),transparent)] p-3">
+					{pluginTab === "thread" ? (
+						<StatsGrid
+							stats={[
+								["Total Thread", "14.2m"],
+								["Bobbin", "5.1m"],
+								["Est. Time", "8m 24s"],
+							]}
+						/>
+					) : pluginTab === "density" ? (
+						<StatsGrid
+							stats={[
+								["Max", "8.2 st/mm"],
+								["Avg", "4.6 st/mm"],
+							]}
+						/>
+					) : (
+						<StatsGrid
+							stats={[
+								["Palette", "Madeira Rayon"],
+								["Colors", "6"],
+							]}
+						/>
+					)}
+				</Panel>
+			</InspectorSection>
 		</div>
 	);
 }
@@ -609,7 +624,7 @@ function ToggleRow({
 	children: ReactNode;
 }) {
 	return (
-		<div className="flex items-center justify-between text-[11px] text-[color:var(--text-secondary)]">
+		<div className="flex items-center justify-between py-0.5 text-[11px] text-[color:var(--text-secondary)]">
 			<span>{label}</span>
 			{children}
 		</div>
@@ -802,6 +817,21 @@ function SequencerItem({
 	);
 }
 
+function InspectorSection({
+	title,
+	children,
+}: {
+	title: string;
+	children: ReactNode;
+}) {
+	return (
+		<div className="grid gap-3">
+			<SectionLabel>{title}</SectionLabel>
+			{children}
+		</div>
+	);
+}
+
 function PropertyInput({
 	label,
 	value,
@@ -812,8 +842,8 @@ function PropertyInput({
 	suffix: string;
 }) {
 	return (
-		<div className="flex min-w-0 items-center gap-1">
-			<span className="shrink-0 text-center text-[10px] text-[color:var(--text-label)]">
+		<div className="flex min-w-0 items-center gap-1.5">
+			<span className="w-3 shrink-0 text-center text-[10px] text-[color:var(--text-ghost)]">
 				{label}
 			</span>
 			<Input
@@ -821,10 +851,10 @@ function PropertyInput({
 				readOnly
 				className={cn(
 					subtleInputClass,
-					"h-7 min-w-0 flex-1 text-right text-[11px]",
+					"h-8 min-w-0 flex-1 text-right text-[11px]",
 				)}
 			/>
-			<span className="shrink-0 text-left text-[9px] text-[color:var(--text-ghost)]">
+			<span className="w-5 shrink-0 text-left text-[9px] text-[color:var(--text-ghost)]">
 				{suffix}
 			</span>
 		</div>
@@ -839,7 +869,7 @@ function PropertyRow({
 	children: ReactNode;
 }) {
 	return (
-		<div className="flex items-center">
+		<div className="flex items-center gap-2">
 			<span className="flex-1 text-[11px] text-[color:var(--text-muted)]">
 				{label}
 			</span>
@@ -853,7 +883,7 @@ function AlignIcon({ icon, label }: { icon: ReactNode; label: string }) {
 		<button
 			type="button"
 			aria-label={label}
-			className="grid h-8 w-8 place-items-center rounded-md border border-transparent text-[color:var(--text-ghost)] transition-colors hover:border-[color:var(--border-default)] hover:bg-[color:var(--hover-bg)] hover:text-[color:var(--text-secondary)]"
+			className="grid h-7 w-7 place-items-center rounded-md text-[color:var(--text-ghost)] transition-colors hover:bg-[color:var(--hover-bg)] hover:text-[color:var(--text-secondary)]"
 		>
 			{icon}
 		</button>
@@ -900,51 +930,53 @@ function ModeTile({
 
 function ImageInspector() {
 	return (
-		<div className="grid gap-3">
-			<SectionLabel>Position & Size</SectionLabel>
-			<div className="grid grid-cols-2 gap-1.5">
-				<PropertyInput label="X" value="22.0" suffix="mm" />
-				<PropertyInput label="Y" value="10.5" suffix="mm" />
-				<PropertyInput label="W" value="40.0" suffix="mm" />
-				<PropertyInput label="H" value="30.0" suffix="mm" />
-			</div>
-			<div className="h-px bg-[color:var(--border-subtle)]" />
-			<SectionLabel>Image</SectionLabel>
-			<Panel className="rounded-xl border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] p-3">
-				<StatsGrid
-					stats={[
-						["File", "logo.png"],
-						["Original", "320 x 240 px"],
-					]}
-				/>
-			</Panel>
-			<SectionLabel>Blend</SectionLabel>
-			<PropertyRow label="Opacity">
-				<Input
-					value="100"
-					readOnly
-					aria-label="Opacity"
-					className={cn(
-						subtleInputClass,
-						"h-7 max-w-[58px] text-right text-[11px]",
-					)}
-				/>
-				<span className="w-6 text-center text-[9px] text-[color:var(--text-ghost)]">
-					%
-				</span>
-			</PropertyRow>
-			<div className="h-px bg-[color:var(--border-subtle)]" />
-			<SectionLabel>Actions</SectionLabel>
-			<Button
-				variant="secondary"
-				className="w-full justify-center border border-[color:var(--active-border)] bg-[color:var(--active-bg)] text-[color:var(--primary)]"
-			>
-				<WandSparkles className="h-3.5 w-3.5" />
-				Auto Digitize
-			</Button>
-			<p className="m-0 text-center text-[9px] text-[color:var(--text-ghost)]">
-				Convert to vector paths for embroidery
-			</p>
+		<div className="grid gap-5">
+			<InspectorSection title="Position & Size">
+				<div className="grid grid-cols-2 gap-2">
+					<PropertyInput label="X" value="22.0" suffix="mm" />
+					<PropertyInput label="Y" value="10.5" suffix="mm" />
+					<PropertyInput label="W" value="40.0" suffix="mm" />
+					<PropertyInput label="H" value="30.0" suffix="mm" />
+				</div>
+			</InspectorSection>
+			<InspectorSection title="Image">
+				<Panel className="rounded-xl border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] p-3">
+					<StatsGrid
+						stats={[
+							["File", "logo.png"],
+							["Original", "320 x 240 px"],
+						]}
+					/>
+				</Panel>
+			</InspectorSection>
+			<InspectorSection title="Blend">
+				<PropertyRow label="Opacity">
+					<Input
+						value="100"
+						readOnly
+						aria-label="Opacity"
+						className={cn(
+							subtleInputClass,
+							"h-8 max-w-[64px] text-right text-[11px]",
+						)}
+					/>
+					<span className="w-5 shrink-0 text-center text-[9px] text-[color:var(--text-ghost)]">
+						%
+					</span>
+				</PropertyRow>
+			</InspectorSection>
+			<InspectorSection title="Actions">
+				<Button
+					variant="secondary"
+					className="w-full justify-center border border-[color:var(--active-border)] bg-[color:var(--active-bg)] text-[color:var(--primary)]"
+				>
+					<WandSparkles className="h-3.5 w-3.5" />
+					Auto Digitize
+				</Button>
+				<p className="m-0 text-center text-[9px] text-[color:var(--text-ghost)]">
+					Convert to vector paths for embroidery
+				</p>
+			</InspectorSection>
 		</div>
 	);
 }
@@ -969,60 +1001,66 @@ function PreviewInspector({
 	setShowJumps: (next: boolean) => void;
 }) {
 	return (
-		<div className="grid gap-3">
-			<SectionLabel>Simulation</SectionLabel>
-			<ToggleRow label="Show fabric">
-				<Toggle
-					checked={showFabric}
-					onChange={setShowFabric}
-					label="Show fabric"
-				/>
-			</ToggleRow>
-			<ToggleRow label="3D thread effect">
-				<Toggle
-					checked={showThreadEffect}
-					onChange={setShowThreadEffect}
-					label="3D thread effect"
-				/>
-			</ToggleRow>
-			<ToggleRow label="Show jumps">
-				<Toggle
-					checked={showJumps}
-					onChange={setShowJumps}
-					label="Show jumps"
-				/>
-			</ToggleRow>
-			<ToggleRow label="Reduced motion">
-				<Toggle
-					checked={reducedMotion}
-					onChange={setReducedMotion}
-					label="Reduced motion"
-				/>
-			</ToggleRow>
-			<div className="h-px bg-[color:var(--border-subtle)]" />
-			<SectionLabel>Fabric</SectionLabel>
-			<div className="grid grid-cols-3 gap-1.5">
-				<ModeTile
-					icon={<FileImage className="h-3.5 w-3.5" />}
-					label="White"
-					active
-				/>
-				<ModeTile icon={<Square className="h-3.5 w-3.5" />} label="Black" />
-				<ModeTile icon={<FileImage className="h-3.5 w-3.5" />} label="Canvas" />
-			</div>
-			<div className="h-px bg-[color:var(--border-subtle)]" />
-			<SectionLabel>Design Summary</SectionLabel>
-			<Panel className="rounded-xl border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] p-3">
-				<StatsGrid
-					stats={[
-						["Stitches", "38,840"],
-						["Colors", "4"],
-						["Size", "82.4 x 76.1 mm"],
-						["Est. Time", "18m 12s"],
-						["Thread", "28.6m"],
-					]}
-				/>
-			</Panel>
+		<div className="grid gap-5">
+			<InspectorSection title="Simulation">
+				<div className="grid gap-2.5">
+					<ToggleRow label="Show fabric">
+						<Toggle
+							checked={showFabric}
+							onChange={setShowFabric}
+							label="Show fabric"
+						/>
+					</ToggleRow>
+					<ToggleRow label="3D thread effect">
+						<Toggle
+							checked={showThreadEffect}
+							onChange={setShowThreadEffect}
+							label="3D thread effect"
+						/>
+					</ToggleRow>
+					<ToggleRow label="Show jumps">
+						<Toggle
+							checked={showJumps}
+							onChange={setShowJumps}
+							label="Show jumps"
+						/>
+					</ToggleRow>
+					<ToggleRow label="Reduced motion">
+						<Toggle
+							checked={reducedMotion}
+							onChange={setReducedMotion}
+							label="Reduced motion"
+						/>
+					</ToggleRow>
+				</div>
+			</InspectorSection>
+			<InspectorSection title="Fabric">
+				<div className="grid grid-cols-3 gap-2">
+					<ModeTile
+						icon={<FileImage className="h-3.5 w-3.5" />}
+						label="White"
+						active
+					/>
+					<ModeTile icon={<Square className="h-3.5 w-3.5" />} label="Black" />
+					<ModeTile
+						icon={<FileImage className="h-3.5 w-3.5" />}
+						label="Canvas"
+					/>
+				</div>
+			</InspectorSection>
+			<InspectorSection title="Design Summary">
+				<Panel className="rounded-xl border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] p-3">
+					<StatsGrid
+						stats={[
+							["Stitches", "38,840"],
+							["Colors", "4"],
+							["Size", "82.4 x 76.1 mm"],
+							["Est. Time", "18m 12s"],
+							["Thread", "28.6m"],
+						]}
+					/>
+				</Panel>
+			</InspectorSection>
 		</div>
 	);
 }
