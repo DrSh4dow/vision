@@ -10,7 +10,6 @@ import {
 	Skeleton,
 	Tabs,
 	Toggle,
-	visionLayoutDefaults,
 } from "@vision/ui";
 import {
 	AlignCenter,
@@ -54,228 +53,40 @@ import {
 	ZoomIn,
 	ZoomOut,
 } from "lucide-react";
-import type { ReactNode, RefObject } from "react";
+import type {
+	ReactNode,
+	PointerEvent as ReactPointerEvent,
+	RefObject,
+} from "react";
 import { useEffect, useRef, useState } from "react";
-
-type Mode = "objects" | "sequencer" | "preview";
-type PanelSide = "left" | "right";
-
-interface LayoutState {
-	leftPanelWidth: number;
-	rightPanelWidth: number;
-	leftCollapsed: boolean;
-	rightCollapsed: boolean;
-}
-
-interface ObjectItem {
-	id: string;
-	name: string;
-	meta: string;
-	type: "vector" | "image";
-	icon: ReactNode;
-}
-
-interface SequencerRow {
-	id: string;
-	name: string;
-	meta: string;
-	color: string;
-}
-
-interface PluginTab {
-	id: "thread" | "density" | "colors";
-	label: string;
-}
-
-type HeaderMenuId = "file" | "edit" | "plugins";
-
-interface HeaderMenuAction {
-	label: string;
-	shortcut?: string;
-	divider?: boolean;
-}
-
-const LAYOUT_KEY = "vision.layout.v1";
-const REDUCED_MOTION_KEY = "vision.reduced-motion";
-
-const defaultLayout: LayoutState = {
-	leftPanelWidth: 256,
-	rightPanelWidth: 272,
-	leftCollapsed: false,
-	rightCollapsed: false,
-};
-
-function getInitialMode(): Mode {
-	const params = new URLSearchParams(globalThis.location.search);
-	const param = params.get("mode");
-	if (param === "objects" || param === "sequencer" || param === "preview") {
-		return param;
-	}
-	return "objects";
-}
-
-function hasStateFlag(flag: string): boolean {
-	const params = new URLSearchParams(globalThis.location.search);
-	const state = params.get("state");
-	if (!state) return false;
-	return state.split(",").includes(flag);
-}
-
-const objects: ObjectItem[] = [
-	{
-		id: "circle",
-		name: "Circle - Outline",
-		meta: "Vector - Closed",
-		type: "vector",
-		icon: <Circle className="h-4 w-4" />,
-	},
-	{
-		id: "star",
-		name: "Star Shape",
-		meta: "Vector - Closed",
-		type: "vector",
-		icon: <Star className="h-4 w-4" />,
-	},
-	{
-		id: "triangle",
-		name: "Triangle",
-		meta: "Vector - Closed",
-		type: "vector",
-		icon: <Diamond className="h-4 w-4" />,
-	},
-	{
-		id: "badge",
-		name: "Badge Logo",
-		meta: "SVG - 5 paths",
-		type: "vector",
-		icon: <Folder className="h-4 w-4" />,
-	},
-	{
-		id: "image",
-		name: "logo.png",
-		meta: "Image - 320x240",
-		type: "image",
-		icon: <Image className="h-4 w-4" />,
-	},
-];
-
-const sequencerBaseRows: SequencerRow[] = [
-	{
-		id: "seq-1",
-		name: "Circle - Outline",
-		meta: "3,240 st - Satin",
-		color: "#ef4444",
-	},
-	{
-		id: "seq-2",
-		name: "Star Shape",
-		meta: "12,800 st - Fill",
-		color: "#ef4444",
-	},
-	{
-		id: "seq-3",
-		name: "Triangle",
-		meta: "4,600 st - Running",
-		color: "#60a5fa",
-	},
-];
-
-const sequencerGroupedRows: SequencerRow[] = [
-	{
-		id: "grp-1",
-		name: "Shield Outline",
-		meta: "4,100 st - Satin",
-		color: "#fbbf24",
-	},
-	{
-		id: "grp-2",
-		name: "Shield Fill",
-		meta: "8,400 st - Fill",
-		color: "#fbbf24",
-	},
-	{ id: "grp-3", name: "Banner", meta: "2,600 st - Satin", color: "#ef4444" },
-	{
-		id: "grp-4",
-		name: 'Text - "CLUB"',
-		meta: "1,800 st - Satin",
-		color: "#ffffff",
-	},
-	{
-		id: "grp-5",
-		name: "Star Emblem",
-		meta: "1,300 st - Fill",
-		color: "#ffffff",
-	},
-];
-
-const pluginTabs: PluginTab[] = [
-	{ id: "thread", label: "Thread" },
-	{ id: "density", label: "Density" },
-	{ id: "colors", label: "Colors" },
-];
-
-const subtleInputClass =
-	"border-[color:var(--border-subtle)] bg-[color:color-mix(in_srgb,var(--surface-elevated)_76%,transparent)] focus-visible:border-[color:var(--ring)]";
-
-const fileMenuActions: HeaderMenuAction[] = [
-	{ label: "New" },
-	{ label: "Open" },
-	{ label: "Save", shortcut: "Ctrl+S" },
-	{ label: "Save As...", divider: true },
-	{ label: "Import" },
-	{ label: "Export" },
-];
-
-const editMenuActions: HeaderMenuAction[] = [
-	{ label: "Undo", shortcut: "Ctrl+Z" },
-	{ label: "Redo", shortcut: "Ctrl+Shift+Z", divider: true },
-	{ label: "Cut", shortcut: "Ctrl+X" },
-	{ label: "Copy", shortcut: "Ctrl+C" },
-	{ label: "Paste", shortcut: "Ctrl+V" },
-	{ label: "Duplicate", shortcut: "Ctrl+D", divider: true },
-	{ label: "Delete", shortcut: "Del" },
-];
-
-function clampPanel(width: number) {
-	return Math.max(
-		visionLayoutDefaults.minPanelWidth,
-		Math.min(width, visionLayoutDefaults.maxPanelWidth),
-	);
-}
-
-function parseLayout(value: string | null): LayoutState {
-	if (!value) {
-		return defaultLayout;
-	}
-
-	try {
-		const parsed = JSON.parse(value) as Partial<LayoutState>;
-		return {
-			leftPanelWidth: clampPanel(
-				parsed.leftPanelWidth ?? defaultLayout.leftPanelWidth,
-			),
-			rightPanelWidth: clampPanel(
-				parsed.rightPanelWidth ?? defaultLayout.rightPanelWidth,
-			),
-			leftCollapsed: Boolean(parsed.leftCollapsed),
-			rightCollapsed: Boolean(parsed.rightCollapsed),
-		};
-	} catch {
-		return defaultLayout;
-	}
-}
-
-function sectionTitle(mode: Mode, side: PanelSide) {
-	if (side === "left") {
-		if (mode === "objects") return "Objects";
-		if (mode === "sequencer") return "Stitch Order";
-		return "Preview";
-	}
-
-	if (mode === "objects") return "Design";
-	if (mode === "sequencer") return "Stitch Properties";
-	return "Preview Settings";
-}
+import {
+	activePluginLabels,
+	editMenuActions,
+	fileMenuActions,
+	formatOptions,
+	type HeaderMenuAction,
+	type HeaderMenuId,
+	type LayoutState,
+	type Mode,
+	type ObjectIcon,
+	objects,
+	type PanelSide,
+	type PluginTabId,
+	pluginTabs,
+	type SequencerRow,
+	sectionTitle,
+	sequencerBaseRows,
+	sequencerGroupedRows,
+	subtleInputClass,
+} from "./shell/model";
+import {
+	clampPanel,
+	getInitialMode,
+	hasStateFlag,
+	LAYOUT_KEY,
+	parseLayout,
+	REDUCED_MOTION_KEY,
+} from "./shell/state";
 
 export function App() {
 	const [mode, setMode] = useState<Mode>(() => getInitialMode());
@@ -301,12 +112,18 @@ export function App() {
 		sequencerBaseRows[0]?.id ?? "seq-1",
 	);
 	const [badgeOpen, setBadgeOpen] = useState(true);
-	const [pluginTab, setPluginTab] = useState<PluginTab["id"]>("thread");
+	const [pluginTab, setPluginTab] = useState<PluginTabId>("thread");
 	const [openMenu, setOpenMenu] = useState<HeaderMenuId | null>(null);
 	const [exportOpen, setExportOpen] = useState(() =>
 		hasStateFlag("export-open"),
 	);
 	const [format, setFormat] = useState(".DST");
+	const [includeTrims, setIncludeTrims] = useState(true);
+	const [autoColorStops, setAutoColorStops] = useState(true);
+	const [trimAtEnd, setTrimAtEnd] = useState(true);
+	const [showFabric, setShowFabric] = useState(true);
+	const [showThreadEffect, setShowThreadEffect] = useState(true);
+	const [showJumps, setShowJumps] = useState(false);
 	const fileMenuRef = useRef<HTMLDivElement | null>(null);
 	const editMenuRef = useRef<HTMLDivElement | null>(null);
 	const pluginMenuRef = useRef<HTMLDivElement | null>(null);
@@ -353,6 +170,23 @@ export function App() {
 		return () => globalThis.removeEventListener("pointerdown", onPointerDown);
 	}, [openMenu]);
 
+	useEffect(() => {
+		const onEscape = (event: KeyboardEvent) => {
+			if (event.key !== "Escape") {
+				return;
+			}
+			if (openMenu !== null) {
+				setOpenMenu(null);
+			}
+			if (exportOpen) {
+				setExportOpen(false);
+			}
+		};
+
+		globalThis.addEventListener("keydown", onEscape);
+		return () => globalThis.removeEventListener("keydown", onEscape);
+	}, [openMenu, exportOpen]);
+
 	const toggleMenu = (menu: HeaderMenuId) => {
 		setOpenMenu((current) => (current === menu ? null : menu));
 	};
@@ -371,7 +205,7 @@ export function App() {
 
 	const startResize = (
 		side: PanelSide,
-		event: React.PointerEvent<HTMLElement>,
+		event: ReactPointerEvent<HTMLElement>,
 	) => {
 		event.preventDefault();
 		const originX = event.clientX;
@@ -470,12 +304,7 @@ export function App() {
 									<p className="m-0 px-2.5 py-1 font-bold text-[9px] text-[color:var(--text-ghost)] uppercase tracking-[0.12em]">
 										Active
 									</p>
-									{[
-										"Thread Calculator",
-										"Density Map",
-										"Auto Underlay",
-										"Color Matcher",
-									].map((label) => (
+									{activePluginLabels.map((label) => (
 										<PluginMenuItem
 											key={label}
 											icon={
@@ -737,9 +566,17 @@ export function App() {
 							mode,
 							reducedMotion,
 							setReducedMotion,
+							showFabric,
+							setShowFabric,
+							showThreadEffect,
+							setShowThreadEffect,
+							showJumps,
+							setShowJumps,
 							selectedType,
 							pluginTab,
 							setPluginTab,
+							trimAtEnd,
+							setTrimAtEnd,
 						})}
 					</PanelColumn>
 				)}
@@ -774,9 +611,17 @@ export function App() {
 								mode,
 								reducedMotion,
 								setReducedMotion,
+								showFabric,
+								setShowFabric,
+								showThreadEffect,
+								setShowThreadEffect,
+								showJumps,
+								setShowJumps,
 								selectedType,
 								pluginTab,
 								setPluginTab,
+								trimAtEnd,
+								setTrimAtEnd,
 							})}
 						</div>
 					</details>
@@ -811,8 +656,16 @@ export function App() {
 					role="dialog"
 					aria-modal="true"
 					aria-label="Export Design"
+					onPointerDown={(event) => {
+						if (event.target === event.currentTarget) {
+							setExportOpen(false);
+						}
+					}}
 				>
-					<div className="w-full max-w-[480px] rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface)] shadow-2xl">
+					<div
+						className="w-full max-w-[480px] rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface)] shadow-2xl"
+						onPointerDown={(event) => event.stopPropagation()}
+					>
 						<div className="flex items-center justify-between border-[color:var(--border-subtle)] border-b p-6">
 							<div>
 								<p className="m-0 font-bold text-[color:var(--text-primary)] text-base">
@@ -835,16 +688,7 @@ export function App() {
 							<div className="grid gap-2.5">
 								<SectionLabel>Machine Format</SectionLabel>
 								<div className="grid grid-cols-4 gap-2">
-									{[
-										".DST",
-										".PES",
-										".JEF",
-										".VP3",
-										".EXP",
-										".HUS",
-										".XXX",
-										".SVG",
-									].map((option) => (
+									{formatOptions.map((option) => (
 										<button
 											key={option}
 											type="button"
@@ -865,12 +709,16 @@ export function App() {
 							<div className="grid gap-3">
 								<SectionLabel>Options</SectionLabel>
 								<ToggleRow label="Include trims">
-									<Toggle checked onChange={() => {}} label="Include trims" />
+									<Toggle
+										checked={includeTrims}
+										onChange={setIncludeTrims}
+										label="Include trims"
+									/>
 								</ToggleRow>
 								<ToggleRow label="Auto color stops">
 									<Toggle
-										checked
-										onChange={() => {}}
+										checked={autoColorStops}
+										onChange={setAutoColorStops}
 										label="Auto color stops"
 									/>
 								</ToggleRow>
@@ -940,7 +788,7 @@ function ResizeHandle({
 	onArrowRight,
 }: {
 	label: string;
-	onPointerDown: (event: React.PointerEvent<HTMLElement>) => void;
+	onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
 	onArrowLeft: () => void;
 	onArrowRight: () => void;
 }) {
@@ -948,14 +796,29 @@ function ResizeHandle({
 		<button
 			type="button"
 			aria-label={label}
+			aria-keyshortcuts="ArrowLeft ArrowRight"
 			className="w-2 bg-transparent p-0 transition-colors hover:bg-[color:var(--primary-faint)] focus-visible:bg-[color:var(--primary-faint)]"
 			onPointerDown={onPointerDown}
 			onKeyDown={(event) => {
-				if (event.key === "ArrowLeft") onArrowLeft();
-				if (event.key === "ArrowRight") onArrowRight();
+				if (event.key === "ArrowLeft") {
+					event.preventDefault();
+					onArrowLeft();
+				}
+				if (event.key === "ArrowRight") {
+					event.preventDefault();
+					onArrowRight();
+				}
 			}}
 		/>
 	);
+}
+
+function renderObjectIcon(icon: ObjectIcon) {
+	if (icon === "circle") return <Circle className="h-4 w-4" />;
+	if (icon === "star") return <Star className="h-4 w-4" />;
+	if (icon === "diamond") return <Diamond className="h-4 w-4" />;
+	if (icon === "folder") return <Folder className="h-4 w-4" />;
+	return <Image className="h-4 w-4" />;
 }
 
 function renderLeftPanel({
@@ -1010,14 +873,14 @@ function renderLeftPanel({
 							type="button"
 							onClick={() => setSelectedObjectId(item.id)}
 							className={cn(
-								"grid grid-cols-[28px_1fr_auto] items-center gap-2 rounded-lg border px-2 py-2 text-left transition-colors",
+								"group grid grid-cols-[28px_1fr_auto] items-center gap-2 rounded-lg border px-2 py-2 text-left transition-colors",
 								selected
 									? "border-[color:var(--selected-border)] bg-[color:var(--selected-bg)]"
 									: "border-transparent hover:bg-[color:var(--hover-bg)]",
 							)}
 						>
 							<div className="grid h-7 w-7 place-items-center rounded-lg border border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] text-[color:var(--text-muted)]">
-								{item.icon}
+								{renderObjectIcon(item.icon)}
 							</div>
 							<div className="min-w-0">
 								<p
@@ -1115,16 +978,32 @@ function renderInspector({
 	mode,
 	reducedMotion,
 	setReducedMotion,
+	showFabric,
+	setShowFabric,
+	showThreadEffect,
+	setShowThreadEffect,
+	showJumps,
+	setShowJumps,
 	selectedType,
 	pluginTab,
 	setPluginTab,
+	trimAtEnd,
+	setTrimAtEnd,
 }: {
 	mode: Mode;
 	reducedMotion: boolean;
 	setReducedMotion: (next: boolean) => void;
+	showFabric: boolean;
+	setShowFabric: (next: boolean) => void;
+	showThreadEffect: boolean;
+	setShowThreadEffect: (next: boolean) => void;
+	showJumps: boolean;
+	setShowJumps: (next: boolean) => void;
 	selectedType: "vector" | "image";
-	pluginTab: PluginTab["id"];
-	setPluginTab: (value: PluginTab["id"]) => void;
+	pluginTab: PluginTabId;
+	setPluginTab: (value: PluginTabId) => void;
+	trimAtEnd: boolean;
+	setTrimAtEnd: (next: boolean) => void;
 }) {
 	if (mode === "objects") {
 		if (selectedType === "image") {
@@ -1206,6 +1085,12 @@ function renderInspector({
 			<PreviewInspector
 				reducedMotion={reducedMotion}
 				setReducedMotion={setReducedMotion}
+				showFabric={showFabric}
+				setShowFabric={setShowFabric}
+				showThreadEffect={showThreadEffect}
+				setShowThreadEffect={setShowThreadEffect}
+				showJumps={showJumps}
+				setShowJumps={setShowJumps}
 			/>
 		);
 	}
@@ -1322,7 +1207,11 @@ function renderInspector({
 						</span>
 					</PropertyRow>
 					<ToggleRow label="Trim at End">
-						<Toggle checked onChange={() => {}} label="Trim at End" />
+						<Toggle
+							checked={trimAtEnd}
+							onChange={setTrimAtEnd}
+							label="Trim at End"
+						/>
 					</ToggleRow>
 				</div>
 			</details>
@@ -1496,6 +1385,7 @@ function PluginMenuItem({
 	return (
 		<button
 			type="button"
+			role="menuitem"
 			className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[12px] text-[color:var(--text-muted)] transition-colors hover:bg-[color:var(--active-bg)] hover:text-[color:var(--text-primary)]"
 		>
 			{icon}
@@ -1733,21 +1623,45 @@ function ImageInspector() {
 function PreviewInspector({
 	reducedMotion,
 	setReducedMotion,
+	showFabric,
+	setShowFabric,
+	showThreadEffect,
+	setShowThreadEffect,
+	showJumps,
+	setShowJumps,
 }: {
 	reducedMotion: boolean;
 	setReducedMotion: (next: boolean) => void;
+	showFabric: boolean;
+	setShowFabric: (next: boolean) => void;
+	showThreadEffect: boolean;
+	setShowThreadEffect: (next: boolean) => void;
+	showJumps: boolean;
+	setShowJumps: (next: boolean) => void;
 }) {
 	return (
 		<div className="grid gap-3">
 			<SectionLabel>Simulation</SectionLabel>
 			<ToggleRow label="Show fabric">
-				<Toggle checked onChange={() => {}} label="Show fabric" />
+				<Toggle
+					checked={showFabric}
+					onChange={setShowFabric}
+					label="Show fabric"
+				/>
 			</ToggleRow>
 			<ToggleRow label="3D thread effect">
-				<Toggle checked onChange={() => {}} label="3D thread effect" />
+				<Toggle
+					checked={showThreadEffect}
+					onChange={setShowThreadEffect}
+					label="3D thread effect"
+				/>
 			</ToggleRow>
 			<ToggleRow label="Show jumps">
-				<Toggle checked={false} onChange={() => {}} label="Show jumps" />
+				<Toggle
+					checked={showJumps}
+					onChange={setShowJumps}
+					label="Show jumps"
+				/>
 			</ToggleRow>
 			<ToggleRow label="Reduced motion">
 				<Toggle
