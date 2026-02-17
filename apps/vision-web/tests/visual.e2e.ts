@@ -14,6 +14,14 @@ test("objects mode shell", async ({ page }) => {
 	await expect(page).toHaveScreenshot("shell-objects.png", { fullPage: true });
 });
 
+test("header file menu open", async ({ page }) => {
+	await page.getByRole("button", { name: "File" }).click();
+	await expect(page.getByRole("menu")).toBeVisible();
+	await expect(
+		page.getByRole("menuitem", { name: "Save Ctrl+S", exact: true }),
+	).toBeVisible();
+});
+
 test("sequencer mode shell", async ({ page }) => {
 	await page.getByRole("tab", { name: "Sequencer" }).click();
 	await expect(page).toHaveScreenshot("shell-sequencer.png", {
@@ -34,12 +42,32 @@ test("export modal", async ({ page }) => {
 	});
 });
 
+test("export modal closes on escape", async ({ page }) => {
+	await page.goto("/?state=export-open");
+	await page.waitForLoadState("networkidle");
+	await expect(
+		page.getByRole("dialog", { name: "Export Design" }),
+	).toBeVisible();
+	await page.keyboard.press("Escape");
+	await expect(
+		page.getByRole("dialog", { name: "Export Design" }),
+	).toBeHidden();
+});
+
 test("collapsed panel states", async ({ page }) => {
 	await page.getByLabel("Collapse Objects").click();
 	await page.getByLabel("Collapse Design").click({ force: true });
 	await expect(page).toHaveScreenshot("shell-collapsed-panels.png", {
 		fullPage: true,
 	});
+});
+
+test("panel collapse persists on reload", async ({ page }) => {
+	await page.getByLabel("Collapse Objects").click();
+	await page.getByLabel("Collapse Design").click({ force: true });
+	await page.reload();
+	await expect(page.getByLabel("Expand Objects")).toBeVisible();
+	await expect(page.getByLabel("Expand Design")).toBeVisible();
 });
 
 test("skeleton states", async ({ page }) => {
