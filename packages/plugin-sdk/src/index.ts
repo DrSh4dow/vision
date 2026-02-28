@@ -1,17 +1,17 @@
-export interface VisionCommand {
+export type VisionCommand = {
 	id: string;
 	run: () => void | Promise<void>;
 	title: string;
-}
+};
 
-export interface VisionPluginRegistration {
+export type VisionPluginRegistration = {
 	id: string;
 	name: string;
-}
+};
 
-export interface VisionPluginAPI {
+export type VisionPluginAPI = {
 	registerCommand: (command: VisionCommand) => void;
-}
+};
 
 export type VisionPluginRegister = (
 	api: VisionPluginAPI,
