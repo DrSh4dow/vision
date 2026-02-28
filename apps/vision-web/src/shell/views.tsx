@@ -81,17 +81,17 @@ export function PanelColumn({
 			>
 				{collapsed ? null : <SectionLabel>{title}</SectionLabel>}
 				<IconButton
-					label={
-						collapsed ? `Expand ${labelPrefix}` : `Collapse ${labelPrefix}`
-					}
-					onClick={onToggle}
-					icon={toggleIcon}
 					className={cn(
 						"rounded-md",
 						collapsed
 							? "h-8 w-8 border border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] text-[color:var(--text-secondary)]"
 							: "h-6 w-6",
 					)}
+					icon={toggleIcon}
+					label={
+						collapsed ? `Expand ${labelPrefix}` : `Collapse ${labelPrefix}`
+					}
+					onClick={onToggle}
 				/>
 			</div>
 			{collapsed ? null : (
@@ -116,11 +116,9 @@ export function ResizeHandle({
 }) {
 	return (
 		<button
-			type="button"
-			aria-label={label}
 			aria-keyshortcuts="ArrowLeft ArrowRight"
+			aria-label={label}
 			className="w-2 bg-transparent p-0 transition-colors hover:bg-[color:var(--primary-faint)] focus-visible:bg-[color:var(--primary-faint)]"
-			onPointerDown={onPointerDown}
 			onKeyDown={(event) => {
 				if (event.key === "ArrowLeft") {
 					event.preventDefault();
@@ -131,6 +129,8 @@ export function ResizeHandle({
 					onArrowRight();
 				}
 			}}
+			onPointerDown={onPointerDown}
+			type="button"
 		/>
 	);
 }
@@ -167,9 +167,9 @@ export function renderLeftPanel({
 	if (mode === "preview") {
 		return (
 			<EmptyState
-				title="Preview Mode"
 				description="Simulates final output. Editing is paused."
 				icon={<Eye className="h-6 w-6" />}
+				title="Preview Mode"
 			/>
 		);
 	}
@@ -191,15 +191,15 @@ export function renderLeftPanel({
 					const selected = selectedObjectId === item.id;
 					return (
 						<button
-							key={item.id}
-							type="button"
-							onClick={() => setSelectedObjectId(item.id)}
 							className={cn(
 								"group grid grid-cols-[28px_1fr_auto] items-center gap-2 rounded-lg border px-2 py-2 text-left transition-colors",
 								selected
 									? "border-[color:var(--selected-border)] bg-[color:var(--selected-bg)]"
 									: "border-transparent hover:bg-[color:var(--hover-bg)]",
 							)}
+							key={item.id}
+							onClick={() => setSelectedObjectId(item.id)}
+							type="button"
 						>
 							<div className="grid h-7 w-7 place-items-center rounded-lg border border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] text-[color:var(--text-muted)]">
 								{renderObjectIcon(item.icon)}
@@ -252,16 +252,16 @@ export function renderLeftPanel({
 			{sequencerBaseRows.map((row) => (
 				<SequencerItem
 					key={row.id}
+					onClick={() => setSelectedSequencerId(row.id)}
 					row={row}
 					selected={selectedSequencerId === row.id}
-					onClick={() => setSelectedSequencerId(row.id)}
 				/>
 			))}
 			<div>
 				<button
-					type="button"
-					onClick={() => setBadgeOpen(!badgeOpen)}
 					className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left hover:bg-[color:var(--hover-bg)]"
+					onClick={() => setBadgeOpen(!badgeOpen)}
+					type="button"
 				>
 					<span
 						className={cn(
@@ -284,9 +284,9 @@ export function renderLeftPanel({
 						{sequencerGroupedRows.map((row) => (
 							<SequencerItem
 								key={row.id}
+								onClick={() => setSelectedSequencerId(row.id)}
 								row={row}
 								selected={selectedSequencerId === row.id}
-								onClick={() => setSelectedSequencerId(row.id)}
 							/>
 						))}
 					</div>
@@ -336,19 +336,19 @@ export function renderInspector({
 			<div className="grid gap-5">
 				<InspectorSection title="Position & Size">
 					<div className="grid grid-cols-2 gap-2">
-						<PropertyInput label="X" value="12.4" suffix="mm" />
-						<PropertyInput label="Y" value="-4.2" suffix="mm" />
-						<PropertyInput label="W" value="64.0" suffix="mm" />
-						<PropertyInput label="H" value="64.0" suffix="mm" />
+						<PropertyInput label="X" suffix="mm" value="12.4" />
+						<PropertyInput label="Y" suffix="mm" value="-4.2" />
+						<PropertyInput label="W" suffix="mm" value="64.0" />
+						<PropertyInput label="H" suffix="mm" value="64.0" />
 						<PropertyInput
 							label={<RotateCw className="h-3 w-3" />}
-							value="0"
 							suffix="deg"
+							value="0"
 						/>
 						<PropertyInput
 							label={<CircleDot className="h-3 w-3" />}
-							value="0"
 							suffix="px"
+							value="0"
 						/>
 					</div>
 				</InspectorSection>
@@ -391,13 +391,13 @@ export function renderInspector({
 				<InspectorSection title="Blend">
 					<PropertyRow label="Opacity">
 						<Input
-							value="100"
-							readOnly
 							aria-label="Opacity"
 							className={cn(
 								subtleInputClass,
 								"h-8 max-w-[64px] text-right text-[11px]",
 							)}
+							readOnly
+							value="100"
 						/>
 						<span className="w-6 shrink-0 text-center text-[9px] text-[color:var(--text-ghost)]">
 							%
@@ -413,12 +413,12 @@ export function renderInspector({
 			<PreviewInspector
 				reducedMotion={reducedMotion}
 				setReducedMotion={setReducedMotion}
-				showFabric={showFabric}
 				setShowFabric={setShowFabric}
-				showThreadEffect={showThreadEffect}
-				setShowThreadEffect={setShowThreadEffect}
-				showJumps={showJumps}
 				setShowJumps={setShowJumps}
+				setShowThreadEffect={setShowThreadEffect}
+				showFabric={showFabric}
+				showJumps={showJumps}
+				showThreadEffect={showThreadEffect}
 			/>
 		);
 	}
@@ -440,23 +440,23 @@ export function renderInspector({
 			<InspectorSection title="Vector Mode">
 				<div className="grid grid-cols-2 gap-2">
 					<ModeTile
+						active
 						icon={<Diamond className="h-4 w-4" />}
 						label="Outline"
-						active
 					/>
 					<ModeTile
+						disabled
 						icon={<PaintBucket className="h-4 w-4" />}
 						label="Fill"
-						disabled
 					/>
 				</div>
 			</InspectorSection>
 			<InspectorSection title="Stitch Type">
 				<div className="grid grid-cols-3 gap-2">
 					<ModeTile
+						active
 						icon={<AlignCenter className="h-4 w-4" />}
 						label="Satin"
-						active
 					/>
 					<ModeTile icon={<PaintBucket className="h-4 w-4" />} label="Fill" />
 					<ModeTile
@@ -469,13 +469,13 @@ export function renderInspector({
 				<div className="grid gap-2.5">
 					<PropertyRow label="Spacing">
 						<Input
-							value="0.40"
-							readOnly
 							aria-label="Spacing"
 							className={cn(
 								subtleInputClass,
 								"h-8 max-w-[64px] text-right text-[11px]",
 							)}
+							readOnly
+							value="0.40"
 						/>
 						<span className="w-5 shrink-0 text-center text-[9px] text-[color:var(--text-ghost)] uppercase">
 							mm
@@ -483,13 +483,13 @@ export function renderInspector({
 					</PropertyRow>
 					<PropertyRow label="Pull Comp">
 						<Input
-							value="0.15"
-							readOnly
 							aria-label="Pull comp"
 							className={cn(
 								subtleInputClass,
 								"h-8 max-w-[64px] text-right text-[11px]",
 							)}
+							readOnly
+							value="0.15"
 						/>
 						<span className="w-5 shrink-0 text-center text-[9px] text-[color:var(--text-ghost)] uppercase">
 							mm
@@ -497,13 +497,13 @@ export function renderInspector({
 					</PropertyRow>
 					<PropertyRow label="Density">
 						<Input
-							value="4.5"
-							readOnly
 							aria-label="Density"
 							className={cn(
 								subtleInputClass,
 								"h-8 max-w-[64px] text-right text-[11px]",
 							)}
+							readOnly
+							value="4.5"
 						/>
 						<span className="w-5 shrink-0 text-center text-[9px] text-[color:var(--text-ghost)] uppercase">
 							l/mm
@@ -516,24 +516,24 @@ export function renderInspector({
 						<div className="mt-3 grid gap-2.5 border-[color:var(--border-subtle)] border-t pt-3">
 							<PropertyRow label="Underlay">
 								<Input
-									value="Center Walk"
-									readOnly
 									aria-label="Underlay"
 									className={cn(
 										subtleInputClass,
 										"h-8 max-w-[92px] text-[10px]",
 									)}
+									readOnly
+									value="Center Walk"
 								/>
 							</PropertyRow>
 							<PropertyRow label="Underlay Gap">
 								<Input
-									value="2.00"
-									readOnly
 									aria-label="Underlay gap"
 									className={cn(
 										subtleInputClass,
 										"h-8 max-w-[64px] text-right text-[11px]",
 									)}
+									readOnly
+									value="2.00"
 								/>
 								<span className="w-5 shrink-0 text-center text-[9px] text-[color:var(--text-ghost)] uppercase">
 									mm
@@ -542,8 +542,8 @@ export function renderInspector({
 							<ToggleRow label="Trim at End">
 								<Toggle
 									checked={trimAtEnd}
-									onChange={setTrimAtEnd}
 									label="Trim at End"
+									onChange={setTrimAtEnd}
 								/>
 							</ToggleRow>
 						</div>
@@ -572,15 +572,15 @@ export function renderInspector({
 				<div className="inline-flex border-[color:var(--border-subtle)] border-b">
 					{pluginTabs.map((tab) => (
 						<button
-							key={tab.id}
-							type="button"
-							onClick={() => setPluginTab(tab.id)}
 							className={cn(
 								"px-2.5 py-1.5 font-bold text-[10px] uppercase tracking-[0.06em]",
 								pluginTab === tab.id
 									? "border-[color:var(--primary)] border-b-2 text-[color:var(--primary)]"
 									: "text-[color:var(--text-muted)]",
 							)}
+							key={tab.id}
+							onClick={() => setPluginTab(tab.id)}
+							type="button"
 						>
 							{tab.label}
 						</button>
@@ -635,7 +635,7 @@ function StatsGrid({ stats }: { stats: [string, string][] }) {
 	return (
 		<div className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-[10px] text-[color:var(--text-muted)]">
 			{stats.map(([name, value]) => (
-				<div key={name} className="contents">
+				<div className="contents" key={name}>
 					<span>{name}</span>
 					<strong className="font-mono text-[color:var(--text-secondary)]">
 						{value}
@@ -666,29 +666,29 @@ export function HeaderMenu({
 	return (
 		<div className="relative" ref={menuRef}>
 			<button
-				type="button"
-				onClick={() => onToggle(menuId)}
-				aria-haspopup="menu"
 				aria-expanded={isOpen}
+				aria-haspopup="menu"
 				className={cn(
 					"rounded-md px-2.5 py-1.5 text-[12px] text-[color:var(--text-muted)] transition-colors hover:bg-[color:var(--hover-bg)] hover:text-[color:var(--text-primary)]",
 					isOpen &&
 						"bg-[color:var(--active-bg)] text-[color:var(--text-primary)]",
 				)}
+				onClick={() => onToggle(menuId)}
+				type="button"
 			>
 				{label}
 			</button>
 			{isOpen ? (
 				<div
-					role="menu"
 					className="absolute top-[calc(100%+4px)] left-0 z-50 min-w-44 rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface)] p-1.5 shadow-2xl"
+					role="menu"
 				>
 					{actions.map((action) => (
 						<div key={action.label}>
 							<button
-								type="button"
-								role="menuitem"
 								className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left text-[12px] text-[color:var(--text-muted)] transition-colors hover:bg-[color:var(--active-bg)] hover:text-[color:var(--text-primary)]"
+								role="menuitem"
+								type="button"
 							>
 								<span className="flex-1">{action.label}</span>
 								{action.shortcut ? (
@@ -719,9 +719,9 @@ export function PluginMenuItem({
 }) {
 	return (
 		<button
-			type="button"
-			role="menuitem"
 			className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[12px] text-[color:var(--text-muted)] transition-colors hover:bg-[color:var(--active-bg)] hover:text-[color:var(--text-primary)]"
+			role="menuitem"
+			type="button"
 		>
 			{icon}
 			<span className="flex-1">{label}</span>
@@ -743,10 +743,10 @@ export function ToolButton({
 }) {
 	return (
 		<IconButton
-			label={label}
-			icon={icon}
 			active={active}
 			className="h-9 w-9 rounded-xl"
+			icon={icon}
+			label={label}
 		/>
 	);
 }
@@ -764,9 +764,9 @@ export function ZoomActionButton({
 }) {
 	return (
 		<button
-			type="button"
 			aria-label={label}
 			className="grid h-7 w-7 place-items-center rounded-full text-[color:var(--text-muted)] transition-colors hover:bg-[color:var(--hover-bg)] hover:text-[color:var(--text-secondary)]"
+			type="button"
 		>
 			{icon}
 		</button>
@@ -784,14 +784,14 @@ function SequencerItem({
 }) {
 	return (
 		<button
-			type="button"
-			onClick={onClick}
 			className={cn(
 				"grid w-full grid-cols-[12px_14px_1fr] items-center gap-2 rounded-lg border px-2 py-1.5 text-left transition-colors",
 				selected
 					? "border-[color:var(--selected-border)] bg-[color:var(--selected-bg)]"
 					: "border-transparent hover:bg-[color:var(--hover-bg)]",
 			)}
+			onClick={onClick}
+			type="button"
 		>
 			<GripVertical className="h-3.5 w-3.5 text-[color:var(--text-ghost)]" />
 			<span
@@ -847,12 +847,12 @@ function PropertyInput({
 				{label}
 			</span>
 			<Input
-				value={value}
-				readOnly
 				className={cn(
 					subtleInputClass,
 					"h-8 min-w-0 flex-1 text-right text-[11px]",
 				)}
+				readOnly
+				value={value}
 			/>
 			<span className="w-5 shrink-0 text-left text-[9px] text-[color:var(--text-ghost)]">
 				{suffix}
@@ -881,9 +881,9 @@ function PropertyRow({
 function AlignIcon({ icon, label }: { icon: ReactNode; label: string }) {
 	return (
 		<button
-			type="button"
 			aria-label={label}
 			className="grid h-7 w-7 place-items-center rounded-md text-[color:var(--text-ghost)] transition-colors hover:bg-[color:var(--hover-bg)] hover:text-[color:var(--text-secondary)]"
+			type="button"
 		>
 			{icon}
 		</button>
@@ -903,8 +903,6 @@ function ModeTile({
 }) {
 	return (
 		<button
-			type="button"
-			disabled={disabled}
 			className={cn(
 				"grid gap-1 rounded-lg border px-2 py-2 text-center",
 				active
@@ -912,6 +910,8 @@ function ModeTile({
 					: "border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] text-[color:var(--text-muted)]",
 				disabled && "cursor-not-allowed opacity-35",
 			)}
+			disabled={disabled}
+			type="button"
 		>
 			<span className="mx-auto">{icon}</span>
 			<span
@@ -933,10 +933,10 @@ function ImageInspector() {
 		<div className="grid gap-5">
 			<InspectorSection title="Position & Size">
 				<div className="grid grid-cols-2 gap-2">
-					<PropertyInput label="X" value="22.0" suffix="mm" />
-					<PropertyInput label="Y" value="10.5" suffix="mm" />
-					<PropertyInput label="W" value="40.0" suffix="mm" />
-					<PropertyInput label="H" value="30.0" suffix="mm" />
+					<PropertyInput label="X" suffix="mm" value="22.0" />
+					<PropertyInput label="Y" suffix="mm" value="10.5" />
+					<PropertyInput label="W" suffix="mm" value="40.0" />
+					<PropertyInput label="H" suffix="mm" value="30.0" />
 				</div>
 			</InspectorSection>
 			<InspectorSection title="Image">
@@ -952,13 +952,13 @@ function ImageInspector() {
 			<InspectorSection title="Blend">
 				<PropertyRow label="Opacity">
 					<Input
-						value="100"
-						readOnly
 						aria-label="Opacity"
 						className={cn(
 							subtleInputClass,
 							"h-8 max-w-[64px] text-right text-[11px]",
 						)}
+						readOnly
+						value="100"
 					/>
 					<span className="w-5 shrink-0 text-center text-[9px] text-[color:var(--text-ghost)]">
 						%
@@ -967,8 +967,8 @@ function ImageInspector() {
 			</InspectorSection>
 			<InspectorSection title="Actions">
 				<Button
-					variant="secondary"
 					className="w-full justify-center border border-[color:var(--active-border)] bg-[color:var(--active-bg)] text-[color:var(--primary)]"
+					variant="secondary"
 				>
 					<WandSparkles className="h-3.5 w-3.5" />
 					Auto Digitize
@@ -1007,29 +1007,29 @@ function PreviewInspector({
 					<ToggleRow label="Show fabric">
 						<Toggle
 							checked={showFabric}
-							onChange={setShowFabric}
 							label="Show fabric"
+							onChange={setShowFabric}
 						/>
 					</ToggleRow>
 					<ToggleRow label="3D thread effect">
 						<Toggle
 							checked={showThreadEffect}
-							onChange={setShowThreadEffect}
 							label="3D thread effect"
+							onChange={setShowThreadEffect}
 						/>
 					</ToggleRow>
 					<ToggleRow label="Show jumps">
 						<Toggle
 							checked={showJumps}
-							onChange={setShowJumps}
 							label="Show jumps"
+							onChange={setShowJumps}
 						/>
 					</ToggleRow>
 					<ToggleRow label="Reduced motion">
 						<Toggle
 							checked={reducedMotion}
-							onChange={setReducedMotion}
 							label="Reduced motion"
+							onChange={setReducedMotion}
 						/>
 					</ToggleRow>
 				</div>
@@ -1037,9 +1037,9 @@ function PreviewInspector({
 			<InspectorSection title="Fabric">
 				<div className="grid grid-cols-3 gap-2">
 					<ModeTile
+						active
 						icon={<FileImage className="h-3.5 w-3.5" />}
 						label="White"
-						active
 					/>
 					<ModeTile icon={<Square className="h-3.5 w-3.5" />} label="Black" />
 					<ModeTile

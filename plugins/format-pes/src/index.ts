@@ -4,9 +4,7 @@ export const register: VisionPluginRegister = (api) => {
 	api.registerCommand({
 		id: "format-pes.noop",
 		title: "PES no-op",
-		run: () => {
-			return;
-		},
+		run: () => {},
 	});
 
 	return {

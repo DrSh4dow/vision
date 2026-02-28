@@ -6,25 +6,25 @@ export type PluginTabId = "thread" | "density" | "colors";
 export type HeaderMenuId = "file" | "edit" | "plugins";
 
 export interface LayoutState {
-	leftPanelWidth: number;
-	rightPanelWidth: number;
 	leftCollapsed: boolean;
+	leftPanelWidth: number;
 	rightCollapsed: boolean;
+	rightPanelWidth: number;
 }
 
 export interface ObjectItem {
-	id: string;
-	name: string;
-	meta: string;
-	type: ObjectType;
 	icon: ObjectIcon;
+	id: string;
+	meta: string;
+	name: string;
+	type: ObjectType;
 }
 
 export interface SequencerRow {
-	id: string;
-	name: string;
-	meta: string;
 	color: string;
+	id: string;
+	meta: string;
+	name: string;
 }
 
 export interface PluginTab {
@@ -33,21 +33,21 @@ export interface PluginTab {
 }
 
 export interface HeaderMenuAction {
+	divider?: boolean;
 	label: string;
 	shortcut?: string;
-	divider?: boolean;
 }
 
 export interface InspectorToggles {
-	trimAtEnd: boolean;
 	showFabric: boolean;
-	showThreadEffect: boolean;
 	showJumps: boolean;
+	showThreadEffect: boolean;
+	trimAtEnd: boolean;
 }
 
 export interface ExportOptions {
-	includeTrims: boolean;
 	autoColorStops: boolean;
+	includeTrims: boolean;
 }
 
 export const objects: ObjectItem[] = [

@@ -1,8 +1,8 @@
 import type { ElementType, ReactNode } from "react";
 
 interface SectionLabelProps {
-	children: ReactNode;
 	as?: ElementType;
+	children: ReactNode;
 }
 
 export function SectionLabel({ children, as: Tag = "p" }: SectionLabelProps) {

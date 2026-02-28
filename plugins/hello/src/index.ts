@@ -4,9 +4,7 @@ export const register: VisionPluginRegister = (api) => {
 	api.registerCommand({
 		id: "hello.noop",
 		title: "Hello no-op",
-		run: () => {
-			return;
-		},
+		run: () => {},
 	});
 
 	return {

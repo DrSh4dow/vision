@@ -2,17 +2,17 @@ import { TabsList, Tabs as TabsRoot, TabsTrigger } from "./components/ui/tabs";
 import { cn } from "./utils";
 
 export interface TabOption {
-	value: string;
-	label: string;
 	disabled?: boolean;
+	label: string;
+	value: string;
 }
 
 interface TabsProps {
-	label: string;
-	value: string;
-	options: TabOption[];
-	onChange: (value: string) => void;
 	className?: string;
+	label: string;
+	onChange: (value: string) => void;
+	options: TabOption[];
+	value: string;
 	variant?: "default" | "line" | "mode";
 }
 
@@ -25,7 +25,7 @@ export function Tabs({
 	variant = "default",
 }: TabsProps) {
 	return (
-		<TabsRoot value={value} onValueChange={onChange} className={className}>
+		<TabsRoot className={className} onValueChange={onChange} value={value}>
 			<TabsList aria-label={label} variant={variant}>
 				{options.map((option) => {
 					const isModeVariant = variant === "mode";
@@ -33,9 +33,6 @@ export function Tabs({
 
 					return (
 						<TabsTrigger
-							key={option.value}
-							value={option.value}
-							disabled={option.disabled}
 							className={cn(
 								isModeVariant &&
 									"h-[30px] min-w-[82px] flex-none rounded-full border border-transparent px-3 py-1 font-semibold text-[11px] text-[color:var(--text-muted)] tracking-[-0.01em] hover:text-[color:var(--text-secondary)]",
@@ -43,6 +40,9 @@ export function Tabs({
 									isSelected &&
 									"border-transparent bg-[color:var(--primary)] text-[color:var(--primary-foreground)] shadow-[0_8px_18px_color-mix(in_srgb,var(--primary)_35%,transparent)]",
 							)}
+							disabled={option.disabled}
+							key={option.value}
+							value={option.value}
 						>
 							{option.label}
 						</TabsTrigger>

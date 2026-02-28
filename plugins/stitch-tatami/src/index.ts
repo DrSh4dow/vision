@@ -4,9 +4,7 @@ export const register: VisionPluginRegister = (api) => {
 	api.registerCommand({
 		id: "stitch-tatami.noop",
 		title: "Tatami stitch no-op",
-		run: () => {
-			return;
-		},
+		run: () => {},
 	});
 
 	return {

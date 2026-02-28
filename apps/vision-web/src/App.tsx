@@ -234,39 +234,39 @@ export function App() {
 						className="relative flex items-center gap-1 max-md:hidden"
 					>
 						<HeaderMenu
+							actions={fileMenuActions}
 							label="File"
 							menuId="file"
-							openMenu={openMenu}
-							onToggle={toggleMenu}
 							menuRef={fileMenuRef}
-							actions={fileMenuActions}
+							onToggle={toggleMenu}
+							openMenu={openMenu}
 						/>
 						<HeaderMenu
+							actions={editMenuActions}
 							label="Edit"
 							menuId="edit"
-							openMenu={openMenu}
-							onToggle={toggleMenu}
 							menuRef={editMenuRef}
-							actions={editMenuActions}
+							onToggle={toggleMenu}
+							openMenu={openMenu}
 						/>
 						<div className="relative" ref={pluginMenuRef}>
 							<button
-								type="button"
-								onClick={() => toggleMenu("plugins")}
-								aria-haspopup="menu"
 								aria-expanded={openMenu === "plugins"}
+								aria-haspopup="menu"
 								className={cn(
 									"inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-[12px] text-[color:var(--text-muted)] transition-colors hover:bg-[color:var(--hover-bg)] hover:text-[color:var(--text-primary)]",
 									openMenu === "plugins" &&
 										"bg-[color:var(--active-bg)] text-[color:var(--text-primary)]",
 								)}
+								onClick={() => toggleMenu("plugins")}
+								type="button"
 							>
 								Plugins <Badge>4</Badge>
 							</button>
 							{openMenu === "plugins" ? (
 								<div
-									role="menu"
 									className="absolute top-[calc(100%+4px)] left-0 z-50 w-60 rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface)] p-1.5 shadow-2xl"
+									role="menu"
 								>
 									<PluginMenuItem
 										icon={<Settings2 className="h-3.5 w-3.5" />}
@@ -286,10 +286,10 @@ export function App() {
 									</p>
 									{activePluginLabels.map((label) => (
 										<PluginMenuItem
-											key={label}
 											icon={
 												<WandSparkles className="h-3.5 w-3.5 text-[color:var(--primary)]" />
 											}
+											key={label}
 											label={label}
 											status
 										/>
@@ -300,53 +300,53 @@ export function App() {
 					</nav>
 					<div className="h-5 w-px bg-[color:var(--border-subtle)] max-md:hidden" />
 					<Tabs
-						label="Mode"
-						value={mode}
-						onChange={(next) => setMode(next as Mode)}
-						variant="mode"
 						className="max-md:hidden"
+						label="Mode"
+						onChange={(next) => setMode(next as Mode)}
 						options={[
 							{ value: "objects", label: "Objects" },
 							{ value: "sequencer", label: "Sequencer" },
 							{ value: "preview", label: "Preview" },
 						]}
+						value={mode}
+						variant="mode"
 					/>
 				</div>
 				<div className="mx-auto w-full max-w-[420px] max-md:hidden">
 					<div className="relative">
 						<Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-[color:var(--text-ghost)]" />
 						<Input
-							placeholder="Search commands... ⌘K"
 							aria-label="Command search"
 							className="h-8 border-[color:var(--border-subtle)] bg-[color:var(--input)] pl-8 text-[12px] placeholder:text-[color:var(--text-ghost)]"
+							placeholder="Search commands... ⌘K"
 						/>
 					</div>
 				</div>
 				<div className="flex justify-center max-md:order-last max-md:col-span-2 md:hidden">
 					<Tabs
 						label="Mode"
-						value={mode}
 						onChange={(next) => setMode(next as Mode)}
-						variant="mode"
 						options={[
 							{ value: "objects", label: "Objects" },
 							{ value: "sequencer", label: "Sequencer" },
 							{ value: "preview", label: "Preview" },
 						]}
+						value={mode}
+						variant="mode"
 					/>
 				</div>
 				<div className="inline-flex items-center gap-1.5 justify-self-end">
 					<Button
-						variant="ghost"
 						className="h-8 rounded-lg border border-[color:var(--border-default)] bg-[color:color-mix(in_srgb,var(--surface-elevated)_66%,transparent)] px-2.5 font-medium text-[12px] text-[color:var(--text-secondary)] hover:bg-[color:var(--hover-bg)] hover:text-[color:var(--text-primary)] max-md:px-2"
+						variant="ghost"
 					>
 						<Share2 className="h-3.5 w-3.5" />
 						<span className="max-md:hidden">Share</span>
 					</Button>
 					<Button
-						variant="ghost"
 						className="h-8 rounded-lg border border-transparent bg-[color:var(--primary)] px-3 font-semibold text-[12px] text-[color:var(--primary-foreground)] shadow-[0_6px_14px_color-mix(in_srgb,var(--primary)_30%,transparent)] hover:brightness-110"
 						onClick={() => setExportOpen(true)}
+						variant="ghost"
 					>
 						<Download className="h-3.5 w-3.5" />
 						Export
@@ -364,15 +364,15 @@ export function App() {
 			>
 				{isMobile ? null : (
 					<PanelColumn
-						title={sectionTitle(mode, "left")}
 						collapsed={layout.leftCollapsed}
+						labelPrefix="Objects"
 						onToggle={() =>
 							setLayout((current) => ({
 								...current,
 								leftCollapsed: !current.leftCollapsed,
 							}))
 						}
-						labelPrefix="Objects"
+						title={sectionTitle(mode, "left")}
 						toggleIcon={layout.leftCollapsed ? ">" : "<"}
 					>
 						{renderLeftPanel({
@@ -392,7 +392,6 @@ export function App() {
 				{isMobile ? null : (
 					<ResizeHandle
 						label="Resize left panel"
-						onPointerDown={(event) => startResize("left", event)}
 						onArrowLeft={() =>
 							setLayout((current) => ({
 								...current,
@@ -405,6 +404,7 @@ export function App() {
 								leftPanelWidth: clampPanel(current.leftPanelWidth + 16),
 							}))
 						}
+						onPointerDown={(event) => startResize("left", event)}
 					/>
 				)}
 
@@ -413,8 +413,8 @@ export function App() {
 						<div className="pointer-events-none absolute top-3 left-1/2 z-20 -translate-x-1/2 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface)]/90 p-1.5 shadow-2xl backdrop-blur-lg">
 							<div className="pointer-events-auto flex items-center gap-1">
 								<ToolButton
-									icon={<MousePointer2 className="h-4 w-4" />}
 									active
+									icon={<MousePointer2 className="h-4 w-4" />}
 									label="Select tool"
 								/>
 								<MiniSeparator />
@@ -463,9 +463,9 @@ export function App() {
 							<div className="relative h-56 w-56 md:h-64 md:w-64">
 								<div className="absolute inset-0 rounded-full border-2 border-[color:var(--primary)]/70 shadow-[0_0_40px_color-mix(in_srgb,var(--primary)_12%,transparent)]" />
 								<svg
-									viewBox="0 0 100 100"
 									aria-hidden="true"
 									className="absolute inset-0 h-full w-full opacity-55"
+									viewBox="0 0 100 100"
 								>
 									<path
 										d="M50 10 L90 90 L10 90 Z"
@@ -476,8 +476,8 @@ export function App() {
 									<circle
 										cx="50"
 										cy="50"
-										r="30"
 										fill="none"
+										r="30"
 										stroke="var(--primary)"
 										strokeDasharray="2 1.5"
 										strokeWidth="0.5"
@@ -516,7 +516,6 @@ export function App() {
 				{isMobile ? null : (
 					<ResizeHandle
 						label="Resize right panel"
-						onPointerDown={(event) => startResize("right", event)}
 						onArrowLeft={() =>
 							setLayout((current) => ({
 								...current,
@@ -529,20 +528,21 @@ export function App() {
 								rightPanelWidth: clampPanel(current.rightPanelWidth - 16),
 							}))
 						}
+						onPointerDown={(event) => startResize("right", event)}
 					/>
 				)}
 
 				{isMobile ? null : (
 					<PanelColumn
-						title={sectionTitle(mode, "right")}
 						collapsed={layout.rightCollapsed}
+						labelPrefix={sectionTitle(mode, "right")}
 						onToggle={() =>
 							setLayout((current) => ({
 								...current,
 								rightCollapsed: !current.rightCollapsed,
 							}))
 						}
-						labelPrefix={sectionTitle(mode, "right")}
+						title={sectionTitle(mode, "right")}
 						toggleIcon={layout.rightCollapsed ? "<" : ">"}
 					>
 						{renderInspector({
@@ -635,15 +635,15 @@ export function App() {
 
 			{exportOpen ? (
 				<div
-					className="fixed inset-0 z-50 grid place-items-center bg-black/65 p-3 backdrop-blur-sm"
-					role="dialog"
-					aria-modal="true"
 					aria-label="Export Design"
+					aria-modal="true"
+					className="fixed inset-0 z-50 grid place-items-center bg-black/65 p-3 backdrop-blur-sm"
 					onPointerDown={(event) => {
 						if (event.target === event.currentTarget) {
 							setExportOpen(false);
 						}
 					}}
+					role="dialog"
 				>
 					<div
 						className="w-full max-w-[480px] rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface)] shadow-2xl"
@@ -659,10 +659,10 @@ export function App() {
 								</p>
 							</div>
 							<Button
-								variant="ghost"
-								size="icon"
 								aria-label="Close export"
 								onClick={() => setExportOpen(false)}
+								size="icon"
+								variant="ghost"
 							>
 								<Plus className="h-4 w-4 rotate-45" />
 							</Button>
@@ -673,15 +673,15 @@ export function App() {
 								<div className="grid grid-cols-4 gap-2">
 									{formatOptions.map((option) => (
 										<button
-											key={option}
-											type="button"
-											onClick={() => setFormat(option)}
 											className={cn(
 												"rounded-lg border px-2 py-2 font-semibold text-[11px] transition-colors",
 												format === option
 													? "border-[color:var(--active-border)] bg-[color:var(--active-bg)] text-[color:var(--primary)]"
 													: "border-[color:var(--border-default)] text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)]",
 											)}
+											key={option}
+											onClick={() => setFormat(option)}
+											type="button"
 										>
 											{option}
 										</button>
@@ -695,16 +695,16 @@ export function App() {
 									<span>Include trims</span>
 									<Toggle
 										checked={includeTrims}
-										onChange={setIncludeTrims}
 										label="Include trims"
+										onChange={setIncludeTrims}
 									/>
 								</div>
 								<div className="flex items-center justify-between text-[11px] text-[color:var(--text-secondary)]">
 									<span>Auto color stops</span>
 									<Toggle
 										checked={autoColorStops}
-										onChange={setAutoColorStops}
 										label="Auto color stops"
+										onChange={setAutoColorStops}
 									/>
 								</div>
 							</div>
@@ -719,7 +719,7 @@ export function App() {
 							</Panel>
 						</div>
 						<div className="flex items-center justify-end gap-3 border-[color:var(--border-subtle)] border-t p-6">
-							<Button variant="ghost" onClick={() => setExportOpen(false)}>
+							<Button onClick={() => setExportOpen(false)} variant="ghost">
 								Cancel
 							</Button>
 							<Button variant="primary">Export {format}</Button>

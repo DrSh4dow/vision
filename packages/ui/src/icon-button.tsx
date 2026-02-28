@@ -4,9 +4,9 @@ import { cn } from "./utils";
 
 export interface IconButtonProps
 	extends Omit<ComponentProps<typeof Button>, "children" | "size" | "variant"> {
-	label: string;
-	icon: ReactNode;
 	active?: boolean;
+	icon: ReactNode;
+	label: string;
 }
 
 export function IconButton({
@@ -19,14 +19,14 @@ export function IconButton({
 	return (
 		<Button
 			aria-label={label}
-			variant="ghost"
-			size="icon"
 			className={cn(
 				"h-8 w-8 rounded-lg text-[color:var(--text-muted)] hover:bg-[color:var(--hover-bg)] hover:text-[color:var(--text-primary)]",
 				active &&
 					"border border-[color:var(--active-border)] bg-[color:var(--active-bg)] text-[color:var(--primary)]",
 				className,
 			)}
+			size="icon"
+			variant="ghost"
 			{...props}
 		>
 			{icon}

@@ -27,12 +27,12 @@ function Tabs({
 }: TabsPrimitive.Root.Props) {
 	return (
 		<TabsPrimitive.Root
-			data-slot="tabs"
-			data-orientation={orientation}
 			className={cn(
 				"group/tabs flex gap-2 data-horizontal:flex-col",
 				className,
 			)}
+			data-orientation={orientation}
+			data-slot="tabs"
 			{...props}
 		/>
 	);
@@ -61,9 +61,9 @@ function TabsList({
 }: TabsPrimitive.List.Props & VariantProps<typeof tabsListVariants>) {
 	return (
 		<TabsPrimitive.List
+			className={cn(tabsListVariants({ variant }), className)}
 			data-slot="tabs-list"
 			data-variant={variant}
-			className={cn(tabsListVariants({ variant }), className)}
 			{...props}
 		/>
 	);
@@ -72,7 +72,6 @@ function TabsList({
 function TabsTrigger({ className, ...props }: TabsPrimitive.Tab.Props) {
 	return (
 		<TabsPrimitive.Tab
-			data-slot="tabs-trigger"
 			className={cn(
 				tabsTriggerBaseClass,
 				tabsTriggerLineClass,
@@ -80,6 +79,7 @@ function TabsTrigger({ className, ...props }: TabsPrimitive.Tab.Props) {
 				tabsTriggerIndicatorClass,
 				className,
 			)}
+			data-slot="tabs-trigger"
 			{...props}
 		/>
 	);
@@ -88,8 +88,8 @@ function TabsTrigger({ className, ...props }: TabsPrimitive.Tab.Props) {
 function TabsContent({ className, ...props }: TabsPrimitive.Panel.Props) {
 	return (
 		<TabsPrimitive.Panel
-			data-slot="tabs-content"
 			className={cn("flex-1 text-sm outline-none", className)}
+			data-slot="tabs-content"
 			{...props}
 		/>
 	);

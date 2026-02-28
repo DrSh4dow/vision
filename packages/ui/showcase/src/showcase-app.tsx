@@ -31,13 +31,13 @@ export function ShowcaseApp() {
 					</div>
 					<Tabs
 						label="Showcase pages"
-						value={page}
 						onChange={(value) => setPage(value as Page)}
 						options={[
 							{ value: "primitives", label: "Primitives" },
 							{ value: "tokens", label: "Tokens" },
 							{ value: "shell", label: "Full Shell" },
 						]}
+						value={page}
 					/>
 				</header>
 				{page === "primitives" ? <PrimitivesPage /> : null}
@@ -65,7 +65,7 @@ function PrimitivesPage() {
 				<Input placeholder="Command search" />
 				<div className="flex items-center justify-between text-[color:var(--text-secondary)] text-sm">
 					<span>Reduced motion</span>
-					<Toggle label="Reduced motion" checked onChange={() => {}} />
+					<Toggle checked label="Reduced motion" onChange={() => {}} />
 				</div>
 			</Panel>
 			<Panel className="gap-3">
@@ -73,8 +73,8 @@ function PrimitivesPage() {
 				<div className="flex items-center gap-2">
 					<Badge>Plugin</Badge>
 					<Badge>Active</Badge>
-					<IconButton label="Plus" icon="+" />
-					<IconButton label="Select" icon="S" active />
+					<IconButton icon="+" label="Plus" />
+					<IconButton active icon="S" label="Select" />
 				</div>
 			</Panel>
 			<Card>
@@ -82,8 +82,8 @@ function PrimitivesPage() {
 					<SectionLabel>Skeleton + Empty</SectionLabel>
 					<Skeleton className="h-16" />
 					<EmptyState
-						title="No Plugin Data"
 						description="Install plugins to populate this area."
+						title="No Plugin Data"
 					/>
 				</CardContent>
 			</Card>
@@ -112,8 +112,8 @@ function TokensPage() {
 				<div className="mt-3 grid gap-2">
 					{tokens.map((token) => (
 						<div
-							key={token}
 							className="flex items-center justify-between gap-4 text-sm"
+							key={token}
 						>
 							<span>{token}</span>
 							<span
@@ -157,16 +157,16 @@ function ShellPage() {
 				</div>
 				<Tabs
 					label="Mode"
-					value="objects"
 					onChange={() => {}}
 					options={[
 						{ value: "objects", label: "Objects" },
 						{ value: "sequencer", label: "Sequencer" },
 						{ value: "preview", label: "Preview" },
 					]}
+					value="objects"
 				/>
 				<div className="flex items-center gap-2">
-					<Button variant="ghost" disabled>
+					<Button disabled variant="ghost">
 						Share
 					</Button>
 					<Button>Export</Button>
@@ -198,10 +198,10 @@ function ShellPage() {
 				<aside className="border-[color:var(--border-subtle)] border-l p-2">
 					<SectionLabel>Inspector</SectionLabel>
 					<div className="mt-2 grid gap-2">
-						<Input value="X: 12.4" readOnly />
-						<Input value="Y: -4.2" readOnly />
+						<Input readOnly value="X: 12.4" />
+						<Input readOnly value="Y: -4.2" />
 						<Panel className="p-2">
-							<EmptyState title="Plugin Dock" description="No plugins loaded" />
+							<EmptyState description="No plugins loaded" title="Plugin Dock" />
 						</Panel>
 					</div>
 				</aside>

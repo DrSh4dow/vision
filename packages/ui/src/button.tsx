@@ -14,8 +14,8 @@ type ButtonVariant = "primary" | "secondary" | "ghost";
 
 interface ButtonProps extends Omit<PrimitiveProps, "children" | "variant"> {
 	children: ReactNode;
-	variant?: ButtonVariant;
 	size?: PrimitiveSize;
+	variant?: ButtonVariant;
 }
 
 const variantMap: Record<ButtonVariant, PrimitiveVariant> = {
@@ -31,7 +31,7 @@ export function Button({
 	...props
 }: ButtonProps) {
 	return (
-		<PrimitiveButton variant={variantMap[variant]} size={size} {...props}>
+		<PrimitiveButton size={size} variant={variantMap[variant]} {...props}>
 			{children}
 		</PrimitiveButton>
 	);

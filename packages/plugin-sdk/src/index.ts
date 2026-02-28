@@ -1,7 +1,7 @@
 export interface VisionCommand {
 	id: string;
-	title: string;
 	run: () => void | Promise<void>;
+	title: string;
 }
 
 export interface VisionPluginRegistration {

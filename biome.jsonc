@@ -1,9 +1,22 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.3.15/schema.json",
-	"vcs": {
-		"enabled": true,
-		"clientKind": "git",
-		"useIgnoreFile": true
+	"$schema": "https://biomejs.dev/schemas/2.4.4/schema.json",
+	"assist": {
+		"actions": {
+			"recommended": true,
+			"source": {
+				"noDuplicateClasses": "on",
+				"organizeImports": "on",
+				"useSortedAttributes": "on",
+				"useSortedInterfaceMembers": "on",
+				"useSortedProperties": "on"
+			}
+		},
+		"enabled": true
+	},
+	"css": {
+		"parser": {
+			"tailwindDirectives": true
+		}
 	},
 	"files": {
 		"ignoreUnknown": false,
@@ -12,29 +25,103 @@
 	"formatter": {
 		"enabled": true
 	},
-	"assist": {
-		"actions": {
-			"source": {
-				"organizeImports": "on"
-			}
-		}
-	},
 	"linter": {
+		"domains": {
+			"test": "all",
+			"types": "all"
+		},
 		"enabled": true,
 		"rules": {
-			"recommended": true,
-			"nursery": {
-				"useSortedClasses": {
+			"complexity": {
+				"noExcessiveCognitiveComplexity": "warn",
+				"noExcessiveLinesPerFunction": {
 					"level": "warn",
+					"options": {
+						"maxLines": 100,
+						"skipBlankLines": true
+					}
+				},
+				"noExcessiveNestedTestSuites": "warn",
+				"noForEach": "warn",
+				"noUselessCatchBinding": "warn",
+				"noUselessStringConcat": "warn",
+				"noUselessUndefined": "warn",
+				"useMaxParams": "error",
+				"useSimplifiedLogicExpression": "warn",
+				"useWhile": "warn"
+			},
+			"correctness": {
+				"noNestedComponentDefinitions": "warn"
+			},
+			"nursery": {
+				"noExcessiveLinesPerFile": {
+					"level": "warn",
+					"options": {
+						"maxLines": 500,
+						"skipBlankLines": true
+					}
+				},
+				"noProto": "error",
+				"noUnnecessaryConditions": "warn",
+				"noUselessReturn": "warn",
+				"useAwaitThenable": "error",
+				"useFind": "error",
+				"useGlobalThis": "warn",
+				"useSortedClasses": {
 					"fix": "safe",
+					"level": "warn",
 					"options": {
 						"functions": ["clsx", "cva", "cn"]
 					}
 				}
 			},
+			"performance": {
+				// "noAwaitInLoops": "warn",
+				// "noBarrelFile": "warn",
+				// "noDelete": "warn",
+				// "noNamespaceImport": "warn",
+				// "noReExportAll": "warn",
+				"useTopLevelRegex": "warn"
+			},
+			"recommended": true,
+			"security": {
+				"noDangerouslySetInnerHtml": "off"
+			},
+			"style": {
+				"noCommonJs": "warn",
+				"noDefaultExport": "error",
+				"noDoneCallback": "error",
+				"noEnum": "error",
+				"noExportedImports": "error",
+				// "noMagicNumbers": "warn",
+				"noNamespace": "warn",
+				"noNegationElse": "error",
+				"noNestedTernary": "error",
+				"noParameterAssign": "error",
+				"noParameterProperties": "error",
+				"noUnusedTemplateLiteral": "error",
+				"noUselessElse": "error",
+				"noYodaExpression": "error",
+				"useAsConstAssertion": "warn",
+				"useAtIndex": "error",
+				"useConsistentTypeDefinitions": {
+					"level": "error",
+					"options": {
+						"style": "type"
+					}
+				},
+				"useExportsLast": "error",
+				"useFilenamingConvention": "error",
+				"useForOf": "error",
+				"useReactFunctionComponents": "error",
+				"useSelfClosingElements": "error",
+				"useSymbolDescription": "warn",
+				"useThrowNewError": "error",
+				"useThrowOnlyError": "error",
+				"useTrimStartEnd": "warn",
+				"useUnifiedTypeSignatures": "warn"
+			},
 			"suspicious": {
-				"noImplicitAnyLet": "off",
-				"noArrayIndexKey": "off",
 				"noConsole": {
 					"level": "error",
 					"options": {
@@ -48,30 +135,43 @@
 							"timeEnd"
 						]
 					}
-				}
-			},
-			"complexity": {
-				"useLiteralKeys": "off",
-				"noStaticOnlyClass": "off",
-				"noExtraBooleanCast": "off"
+				},
+				"noEvolvingTypes": "warn",
+				"noMisplacedAssertion": "warn",
+				"useAwait": "warn",
+				"useErrorMessage": "warn",
+				"useGuardForIn": "warn",
+				"useNumberToFixedDigitsArgument": "warn",
+				"useStaticResponseMethods": "warn",
+				"useStrictMode": "error"
 			}
 		}
 	},
-	// Override settings for test files
 	"overrides": [
 		{
-			"includes": [
-				"__tests__/**",
-				"**/*.test.{js,jsx,ts,tsx}",
-				"**/*.spec.{js,jsx,ts,tsx}"
-			],
+			"assist": {
+				"actions": {
+					"source": {
+						"useSortedKeys": "off"
+					}
+				}
+			},
+			"includes": ["**/package.json"]
+		},
+		{
+			"includes": ["**/*.config.{js,cjs,mjs,ts,cts,mts,jsx,tsx}"],
 			"linter": {
 				"rules": {
-					"suspicious": {
-						"noExplicitAny": "off"
+					"style": {
+						"noDefaultExport": "off"
 					}
 				}
 			}
 		}
-	]
+	],
+	"vcs": {
+		"clientKind": "git",
+		"enabled": true,
+		"useIgnoreFile": true
+	}
 }
