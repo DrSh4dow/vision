@@ -1,5 +1,2 @@
-# engine package
-
-- Scope: typed TypeScript facade over the WASM engine.
-- Follow repository-wide guidance in `../../AGENTS.md`.
+- Inherit global rules from root `AGENTS.md`.
 - Keep the WASM boundary narrow, typed, and data-only.

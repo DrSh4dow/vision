@@ -1,5 +1,2 @@
-# stitch-satin plugin
-
-- Scope: satin stitch strategy plugin.
-- Follow repository-wide guidance in `../../AGENTS.md`.
+- Inherit global rules from root `AGENTS.md`.
 - Keep stitch generation deterministic for identical inputs.
