@@ -1,4 +1,4 @@
-import { visionLayoutDefaults } from "@vision/ui";
+import { visionLayoutDefaults } from "@vision/ui/motion";
 import type { LayoutState, Mode } from "./model";
 
 export const LAYOUT_KEY = "vision.layout.v1";

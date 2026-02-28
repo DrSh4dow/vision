@@ -3,8 +3,8 @@ import { expect, test } from "@playwright/test";
 test.beforeEach(async ({ page }) => {
 	await page.goto("/");
 	await page.evaluate(() => {
-		window.localStorage.removeItem("vision.layout.v1");
-		window.localStorage.removeItem("vision.reduced-motion");
+		globalThis.localStorage.removeItem("vision.layout.v1");
+		globalThis.localStorage.removeItem("vision.reduced-motion");
 	});
 	await page.reload();
 	await page.waitForLoadState("networkidle");
@@ -80,7 +80,7 @@ test("skeleton states", async ({ page }) => {
 
 test("reduced motion state", async ({ page }) => {
 	await page.evaluate(() => {
-		window.localStorage.setItem("vision.reduced-motion", "1");
+		globalThis.localStorage.setItem("vision.reduced-motion", "1");
 	});
 	await page.reload();
 	await page.waitForLoadState("networkidle");

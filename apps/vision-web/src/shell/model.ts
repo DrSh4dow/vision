@@ -5,50 +5,50 @@ export type ObjectIcon = "circle" | "star" | "diamond" | "folder" | "image";
 export type PluginTabId = "thread" | "density" | "colors";
 export type HeaderMenuId = "file" | "edit" | "plugins";
 
-export interface LayoutState {
+export type LayoutState = {
 	leftCollapsed: boolean;
 	leftPanelWidth: number;
 	rightCollapsed: boolean;
 	rightPanelWidth: number;
-}
+};
 
-export interface ObjectItem {
+export type ObjectItem = {
 	icon: ObjectIcon;
 	id: string;
 	meta: string;
 	name: string;
 	type: ObjectType;
-}
+};
 
-export interface SequencerRow {
+export type SequencerRow = {
 	color: string;
 	id: string;
 	meta: string;
 	name: string;
-}
+};
 
-export interface PluginTab {
+export type PluginTab = {
 	id: PluginTabId;
 	label: string;
-}
+};
 
-export interface HeaderMenuAction {
+export type HeaderMenuAction = {
 	divider?: boolean;
 	label: string;
 	shortcut?: string;
-}
+};
 
-export interface InspectorToggles {
+export type InspectorToggles = {
 	showFabric: boolean;
 	showJumps: boolean;
 	showThreadEffect: boolean;
 	trimAtEnd: boolean;
-}
+};
 
-export interface ExportOptions {
+export type ExportOptions = {
 	autoColorStops: boolean;
 	includeTrims: boolean;
-}
+};
 
 export const objects: ObjectItem[] = [
 	{

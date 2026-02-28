@@ -1,0 +1,14 @@
+{
+	"root": false,
+	"extends": "//",
+	"linter": {
+		"domains": {
+			"react": "all"
+		},
+		"rules": {
+			"style": {
+				"useFilenamingConvention": "off"
+			}
+		}
+	}
+}
