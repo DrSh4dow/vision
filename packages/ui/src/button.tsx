@@ -1,8 +1,6 @@
 import type { ComponentProps, ReactNode } from "react";
-import {
-	type buttonVariants,
-	Button as PrimitiveButton,
-} from "./components/ui/button";
+import { Button as PrimitiveButton } from "./components/ui/button";
+import type { buttonVariants } from "./components/ui/button-variants";
 
 type PrimitiveProps = ComponentProps<typeof PrimitiveButton>;
 type PrimitiveVariant = NonNullable<
@@ -12,11 +10,11 @@ type PrimitiveSize = PrimitiveProps["size"];
 
 type ButtonVariant = "primary" | "secondary" | "ghost";
 
-interface ButtonProps extends Omit<PrimitiveProps, "children" | "variant"> {
+type ButtonProps = Omit<PrimitiveProps, "children" | "variant"> & {
 	children: ReactNode;
 	size?: PrimitiveSize;
 	variant?: ButtonVariant;
-}
+};
 
 const variantMap: Record<ButtonVariant, PrimitiveVariant> = {
 	primary: "default",

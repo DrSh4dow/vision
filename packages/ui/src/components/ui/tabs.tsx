@@ -1,12 +1,9 @@
 "use client";
 
 import { Tabs as TabsPrimitive } from "@base-ui/react/tabs";
-import { cva, type VariantProps } from "class-variance-authority";
-
+import type { VariantProps } from "class-variance-authority";
 import { cn } from "../../lib/utils";
-
-const modeTabsListClass =
-	"h-9 gap-0.5 rounded-full border border-[color:var(--border-default)] bg-[color:var(--input)] p-1 text-[color:var(--text-muted)]";
+import { tabsListVariants } from "./tabs-variants";
 
 const tabsTriggerBaseClass =
 	"relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-transparent px-1.5 py-0.5 font-medium text-foreground/60 text-sm transition-all hover:text-foreground focus-visible:border-ring focus-visible:outline-1 focus-visible:outline-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start group-data-[variant=default]/tabs-list:aria-selected:shadow-sm group-data-[variant=line]/tabs-list:aria-selected:shadow-none dark:text-muted-foreground dark:hover:text-foreground [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0";
@@ -37,22 +34,6 @@ function Tabs({
 		/>
 	);
 }
-
-const tabsListVariants = cva(
-	"group/tabs-list inline-flex w-fit items-center justify-center rounded-lg p-[3px] text-muted-foreground data-[variant=line]:rounded-none group-data-horizontal/tabs:h-8 group-data-vertical/tabs:h-fit group-data-vertical/tabs:flex-col",
-	{
-		variants: {
-			variant: {
-				default: "bg-muted",
-				line: "gap-1 bg-transparent",
-				mode: modeTabsListClass,
-			},
-		},
-		defaultVariants: {
-			variant: "default",
-		},
-	},
-);
 
 function TabsList({
 	className,
@@ -95,4 +76,4 @@ function TabsContent({ className, ...props }: TabsPrimitive.Panel.Props) {
 	);
 }
 
-export { Tabs, TabsList, TabsTrigger, TabsContent, tabsListVariants };
+export { Tabs, TabsList, TabsTrigger, TabsContent };

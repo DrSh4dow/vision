@@ -1,22 +1,19 @@
 import { useState } from "react";
-import {
-	Badge,
-	Button,
-	Card,
-	CardContent,
-	EmptyState,
-	IconButton,
-	Input,
-	Panel,
-	SectionLabel,
-	Skeleton,
-	Tabs,
-	Toggle,
-} from "../../src";
+import { Button } from "../../src/button";
+import { Badge } from "../../src/components/ui/badge";
+import { Card, CardContent } from "../../src/components/ui/card";
+import { Input } from "../../src/components/ui/input";
+import { Skeleton } from "../../src/components/ui/skeleton";
+import { EmptyState } from "../../src/empty-state";
+import { IconButton } from "../../src/icon-button";
+import { Panel } from "../../src/panel";
+import { SectionLabel } from "../../src/section-label";
+import { Tabs } from "../../src/tabs";
+import { Toggle } from "../../src/toggle";
 
 type Page = "primitives" | "tokens" | "shell";
 
-export function ShowcaseApp() {
+function ShowcaseApp() {
 	const [page, setPage] = useState<Page>("primitives");
 
 	return (
@@ -213,3 +210,5 @@ function ShellPage() {
 		</div>
 	);
 }
+
+export { ShowcaseApp };

@@ -2,12 +2,14 @@ import type { ComponentProps, ReactNode } from "react";
 import { Button } from "./button";
 import { cn } from "./utils";
 
-export interface IconButtonProps
-	extends Omit<ComponentProps<typeof Button>, "children" | "size" | "variant"> {
+export type IconButtonProps = Omit<
+	ComponentProps<typeof Button>,
+	"children" | "size" | "variant"
+> & {
 	active?: boolean;
 	icon: ReactNode;
 	label: string;
-}
+};
 
 export function IconButton({
 	className,

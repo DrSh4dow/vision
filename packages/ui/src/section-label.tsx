@@ -1,9 +1,9 @@
 import type { ElementType, ReactNode } from "react";
 
-interface SectionLabelProps {
+type SectionLabelProps = {
 	as?: ElementType;
 	children: ReactNode;
-}
+};
 
 export function SectionLabel({ children, as: Tag = "p" }: SectionLabelProps) {
 	return (

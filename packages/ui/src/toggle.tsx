@@ -1,12 +1,11 @@
 import type { ComponentProps } from "react";
 import { Switch } from "./components/ui/switch";
 
-interface ToggleProps
-	extends Omit<ComponentProps<typeof Switch>, "onCheckedChange"> {
+type ToggleProps = Omit<ComponentProps<typeof Switch>, "onCheckedChange"> & {
 	checked: boolean;
 	label: string;
 	onChange: (next: boolean) => void;
-}
+};
 
 export function Toggle({ checked, onChange, label, ...props }: ToggleProps) {
 	return (

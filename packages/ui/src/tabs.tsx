@@ -1,22 +1,22 @@
 import { TabsList, Tabs as TabsRoot, TabsTrigger } from "./components/ui/tabs";
 import { cn } from "./utils";
 
-export interface TabOption {
-	disabled?: boolean;
-	label: string;
-	value: string;
-}
-
-interface TabsProps {
+type TabsProps = {
 	className?: string;
 	label: string;
 	onChange: (value: string) => void;
 	options: TabOption[];
 	value: string;
 	variant?: "default" | "line" | "mode";
-}
+};
 
-export function Tabs({
+type TabOption = {
+	disabled?: boolean;
+	label: string;
+	value: string;
+};
+
+function Tabs({
 	label,
 	value,
 	options,
@@ -52,3 +52,5 @@ export function Tabs({
 		</TabsRoot>
 	);
 }
+
+export { Tabs };
