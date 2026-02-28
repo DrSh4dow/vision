@@ -5,6 +5,7 @@
 		"build": "turbo run build",
 		"dev": "turbo run dev",
 		"check": "biome check",
+		"lazycheck": "bun run check && bun run typecheck && bun run test",
 		"check:fix": "biome check --write .",
 		"test": "turbo run test",
 		"typecheck": "turbo run typecheck"

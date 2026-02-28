@@ -37,7 +37,7 @@
 				"noExcessiveLinesPerFunction": {
 					"level": "warn",
 					"options": {
-						"maxLines": 100,
+						"maxLines": 60,
 						"skipBlankLines": true
 					}
 				},
@@ -57,7 +57,7 @@
 				"noExcessiveLinesPerFile": {
 					"level": "warn",
 					"options": {
-						"maxLines": 500,
+						"maxLines": 300,
 						"skipBlankLines": true
 					}
 				},
@@ -76,11 +76,11 @@
 				}
 			},
 			"performance": {
-				// "noAwaitInLoops": "warn",
-				// "noBarrelFile": "warn",
-				// "noDelete": "warn",
-				// "noNamespaceImport": "warn",
-				// "noReExportAll": "warn",
+				"noAwaitInLoops": "warn",
+				"noBarrelFile": "warn",
+				"noDelete": "warn",
+				"noNamespaceImport": "warn",
+				"noReExportAll": "warn",
 				"useTopLevelRegex": "warn"
 			},
 			"recommended": true,
